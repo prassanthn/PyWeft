@@ -1,9 +1,7 @@
-"""PyWeft -- a Blazor-shaped UI framework for Python.
+"""PyWeft -- a UI framework for Python.
 
 Markup in XML, logic in Python, one render core that emits transport-agnostic
 patches so desktop (webview), web (Pyodide) and mobile can share a codebase.
-
-The name is a placeholder; renaming is a find-and-replace on ``pyweft``.
 """
 
 from .component import Component, component_from_source, load_component

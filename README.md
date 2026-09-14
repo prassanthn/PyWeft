@@ -1,6 +1,6 @@
 # PyWeft
 
-A Blazor-shaped UI framework for Python. Markup in XML, logic in Python, and a
+A UI framework for Python. Markup in XML, logic in Python, and a
 render core that emits transport-agnostic patches so desktop, web and mobile
 can share one codebase.
 
@@ -14,7 +14,7 @@ write components and start a project.
 **The render core is done and tested, and the web target works**: components
 run in the browser on Pyodide (CPython in WebAssembly), patching real DOM
 through `static/runtime.js`. Component composition is in — props, `:expr`
-bindings, `emit`, lifecycle, Vue-SFC-style file resolution.
+bindings, `emit`, lifecycle, sibling-file component resolution.
 
 Use it in a project (not on PyPI yet, so install from GitHub):
 
@@ -37,11 +37,11 @@ uv run pyweft run examples/todo  # the todo app live in the browser at :8642 —
 
 ## The architecture bet
 
-Blazor doesn't render native widgets, it renders HTML — `BlazorWebView` is a
-webview hosting the same DOM, and Blazor Server proves the component code can
-live in a different process from the renderer and ship only diffs.
+PyWeft doesn't render native widgets, it renders HTML. A desktop app is a
+webview hosting the same DOM the browser target uses, and the component code
+can live in a different process from the renderer and ship only diffs.
 
-Copy that and the three targets come nearly free:
+That is what makes three targets nearly free:
 
 | Target | Where Python runs | Renderer | Transport |
 |---|---|---|---|
@@ -94,8 +94,8 @@ def forget(self, entry):
 ```
 
 Control flow is elements (`<If>` / `<ElseIf>` / `<Else>` / `<For>`) rather than
-Razor-style `@if` blocks. Lexing indentation-sensitive Python inside markup is a
-tarpit; elements sidestep it entirely and read closer to XAML anyway.
+Python blocks embedded in the markup. Lexing indentation-sensitive Python inside
+markup is a tarpit; elements sidestep it entirely.
 
 - `{{ expr }}` interpolates in text and attribute values
 - `@click="handler"` binds an event — a bare name calls that method, anything
@@ -109,7 +109,7 @@ module if you prefer code-behind to single-file.
 
 ## Reactivity
 
-Blazor's model, not React's. No observables, no proxies. A handler runs, the
+No observables, no proxies. A handler runs, the
 component re-renders, the tree is diffed. Mutating state outside a handler (a
 timer, an async callback) means calling `state_has_changed()` yourself.
 
@@ -168,8 +168,8 @@ current algorithm and still miss the index bugs that actually bite.
 ## Roadmap
 
 **Done:** the JS runtime mirroring `dommodel.py`; the Pyodide web target;
-component composition (props, `:expr` bindings, `emit`, lifecycle, SFC-style
-file resolution).
+component composition (props, `:expr` bindings, `emit`, lifecycle, sibling-file
+resolution).
 
 **Done (continued):** the `pyweft` CLI — `new` scaffolds an app, `run` serves it
 with refresh-on-save, `build` emits a static site; PyPI dependencies declared

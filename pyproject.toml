@@ -5,14 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "pyweft"
 version = "0.0.1"
-description = "A Blazor-shaped UI framework for Python: XML markup, Python code-behind, one render core for desktop/web/mobile."
+description = "A UI framework for Python: XML templates, Python code-behind, one render core for web, desktop and mobile."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Prassanth Nicholas" }]
 dependencies = []
-keywords = ["ui", "framework", "blazor", "vue", "pyodide", "webassembly", "components"]
+keywords = ["ui", "framework", "components", "pyodide", "webassembly", "webview"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

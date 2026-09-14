@@ -1,7 +1,6 @@
 # PyWeft — Getting Started
 
-PyWeft is a UI framework for Python shaped like Blazor and flavored like Vue:
-you write components as `.weft` files — an XML template plus a Python code
+PyWeft is a UI framework for Python: you write components as `.weft` files — an XML template plus a Python code
 block — and PyWeft renders them to HTML, updating the page with minimal diffs
 whenever state changes.
 
@@ -100,7 +99,7 @@ How the code block works:
 There is no change tracking. A variable in the code block is a plain
 attribute on the component; the template reads it by name, and a handler
 writes it with ordinary assignment (`self.cheers += 1`). What makes the UI
-update is the render cycle, borrowed from Blazor:
+update is the render cycle:
 
 1. An event arrives and your handler runs.
 2. The component is marked dirty and re-rendered in full.
@@ -131,15 +130,15 @@ will sit on top of this model, not replace it.
 
 ## 3. Template syntax reference
 
-| Syntax | Vue equivalent | Meaning |
-|---|---|---|
-| `{{ expr }}` | `{{ expr }}` | Interpolate a Python expression in text or attribute values |
-| `:attr="expr"` | `v-bind` | Bind an attribute to an expression. `None`/`False` drop the attribute, `True` keeps it valueless (`:disabled="busy"`), anything else is stringified. On a component, passes the **typed** value as a prop |
-| `@click="handler"` | `v-on` | A bare name calls that method; any other expression is evaluated, so `@click="remove(item)"` works |
-| `@bind="field"` | `v-model` | Two-way binding on inputs. Coerces back to the field's existing type, so a bound `int` stays an `int` |
-| `<If cond="...">` / `<ElseIf cond="...">` / `<Else>` | `v-if` / `v-else-if` / `v-else` | Conditional rendering. Branch elements must be adjacent siblings |
-| `<For each="item in items" key="item['id']" index="i">` | `v-for` + `:key` | Loop. `key` gives rows stable identity across reorders (always use it for dynamic lists); `index` is optional |
-| `<PascalCaseTag ... />` | component | Renders a child component (see below) |
+| Syntax | Meaning |
+|---|---|
+| `{{ expr }}` | Interpolate a Python expression in text or attribute values |
+| `:attr="expr"` | Bind an attribute to an expression. `None`/`False` drop the attribute, `True` keeps it valueless (`:disabled="busy"`), anything else is stringified. On a component, passes the **typed** value as a prop |
+| `@click="handler"` | A bare name calls that method; any other expression is evaluated, so `@click="remove(item)"` works |
+| `@bind="field"` | Two-way binding on inputs. Coerces back to the field's existing type, so a bound `int` stays an `int` |
+| `<If cond="...">` / `<ElseIf cond="...">` / `<Else>` | Conditional rendering. Branch elements must be adjacent siblings |
+| `<For each="item in items" key="item['id']" index="i">` | Loop. `key` gives rows stable identity across reorders (always use it for dynamic lists); `index` is optional |
+| `<PascalCaseTag ... />` | Renders a child component (see below) |
 
 Expressions are real Python, evaluated against the component's state plus any
 loop variables. One caveat: comprehensions and lambdas inside `{{ }}` can't
@@ -152,7 +151,7 @@ block instead.
 
 Any capitalized tag is a child component. PyWeft resolves `<TodoItem>` to
 `TodoItem.weft` or `todo_item.weft` **in the same directory** as the file that
-uses it — like Vue single-file components, but with zero import boilerplate.
+uses it, with no import boilerplate.
 Resolution is recursive (children can have children) and a circular reference
 is reported as an error rather than looping.
 
@@ -264,7 +263,7 @@ flows back down to the child as fresh props in the same cycle.
 callback set on the child as a prop, and `self.emit("remove", x)` simply looks
 up `on_remove` and calls it. Consequences worth knowing:
 
-- Emitting an event the parent did not subscribe to is a no-op, as in Vue.
+- Emitting an event the parent did not subscribe to is a no-op.
 - `emit` returns whatever the parent's handler returned (`None` if nobody
   listened), so a child can ask the parent for a decision.
 - Use lowercase identifier-style event names (`item_removed`, not
