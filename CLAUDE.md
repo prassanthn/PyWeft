@@ -45,7 +45,7 @@ relitigate this without a strong reason.
 **Stage 1 complete and tested: the render core.** **Stage 2 working: the web
 target** — the same core running in the browser under Pyodide (CPython on
 WASM), chosen as the first visible target because it needs no bridge: Python
-and the DOM share a process. Desktop (pywebview) reuses `web/runtime.js`
+and the DOM share a process. Desktop (pywebview) reuses `static/runtime.js`
 unchanged.
 
 ```
@@ -66,11 +66,11 @@ examples/         counter.weft + demo.py (headless); todo/ (composed browser app
 ```
 
 ```bash
-pip install -e ".[dev]"
-pytest                     # must stay green
-python examples/demo.py    # render -> event -> diff -> apply, headless
-pyweft run examples/todo     # live in the browser at http://127.0.0.1:8642/
-pyweft new myapp             # scaffold; pyweft build myapp -> static dist/
+uv sync --extra dev              # or: pip install -e ".[dev]"
+uv run pytest                    # must stay green
+uv run python examples/demo.py   # render -> event -> diff -> apply, headless
+uv run pyweft run examples/todo  # live in the browser at http://127.0.0.1:8642/
+uv run pyweft new myapp          # scaffold; pyweft build myapp -> static dist/
 ```
 
 A pyweft app is a directory: `app.weft` root component, sibling `.weft`
@@ -229,7 +229,7 @@ property — it matters more once events cross an async bridge.
 **Test the differ by convergence, not op sequences.** Apply the patches to the
 old tree and assert the result equals the new tree. Asserting exact op lists
 locks in the current algorithm and still misses the index bugs that actually
-bite. 400 of the 442 tests are randomised trees checked this way; that is what
+bite. 400 of the 464 tests are randomised trees checked this way; that is what
 caught the middle-row deletion cascade.
 
 When adding differ behaviour, add randomised cases, not just hand-written ones.

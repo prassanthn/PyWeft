@@ -23,18 +23,31 @@ JavaScript to write. The same render core will later drive desktop apps
 
 ## 1. Install
 
-PyWeft is not on PyPI yet; install from the repo in editable mode:
+PyWeft is not on PyPI yet, so install it straight from GitHub. With uv:
 
 ```bash
-git clone <this-repo> pyweft && cd pyweft
-pip install -e ".[dev]"
-pytest        # 456 tests should pass
+uv init myproject && cd myproject
+uv add git+https://github.com/prassanthn/PyWeft.git
+uv run pyweft new myapp
+uv run pyweft run myapp
 ```
 
-To see it working immediately, run the bundled todo app:
+With pip, the equivalent is
+`pip install git+https://github.com/prassanthn/PyWeft.git`, then `pyweft new`
+and `pyweft run` directly.
+
+To hack on the framework itself, clone it and install in editable mode:
 
 ```bash
-pyweft run examples/todo
+git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
+uv sync --extra dev      # or: pip install -e ".[dev]"
+uv run pytest            # 464 tests should pass
+```
+
+To see it working immediately, run the bundled todo app from the clone:
+
+```bash
+uv run pyweft run examples/todo
 ```
 
 Then open <http://127.0.0.1:8642/> — a todo app written entirely in Python,

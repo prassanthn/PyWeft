@@ -13,16 +13,26 @@ write components and start a project.
 
 **The render core is done and tested, and the web target works**: components
 run in the browser on Pyodide (CPython in WebAssembly), patching real DOM
-through `web/runtime.js`. Component composition is in — props, `:expr`
+through `static/runtime.js`. Component composition is in — props, `:expr`
 bindings, `emit`, lifecycle, Vue-SFC-style file resolution.
 
+Use it in a project (not on PyPI yet, so install from GitHub):
+
 ```bash
-pip install -e ".[dev]"
-pytest                      # 464 tests
-python examples/demo.py     # render -> event -> diff -> apply, no browser
-pyweft run examples/todo      # the todo app live in the browser at :8642 —
-                            # composed components + a PyPI dep via micropip
-pyweft new myapp              # scaffold your own
+uv add git+https://github.com/prassanthn/PyWeft.git   # or: pip install git+https://github.com/prassanthn/PyWeft.git
+uv run pyweft new myapp
+uv run pyweft run myapp     # open http://127.0.0.1:8642/
+```
+
+Work on the framework itself:
+
+```bash
+git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
+uv sync --extra dev         # or: pip install -e ".[dev]"
+uv run pytest               # 464 tests
+uv run python examples/demo.py   # render -> event -> diff -> apply, no browser
+uv run pyweft run examples/todo  # the todo app live in the browser at :8642 —
+                                 # composed components + a PyPI dep via micropip
 ```
 
 ## The architecture bet
@@ -139,7 +149,7 @@ simply vanish and a late event against a stale id is a no-op, not a crash.
 ## Testing approach
 
 The differ is tested by **convergence, not op sequences**: apply the patches to
-the old tree and assert the result equals the new tree. 400 of the 442 tests are
+the old tree and assert the result equals the new tree. 400 of the 464 tests are
 randomised trees checked this way. Asserting exact op lists would lock in the
 current algorithm and still miss the index bugs that actually bite.
 
