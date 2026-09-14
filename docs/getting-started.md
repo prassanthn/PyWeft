@@ -86,9 +86,7 @@ How the code block works:
   Mutable defaults like `history: list = []` are safe — each component
   instance gets its own copy.
 - **Handlers** are methods taking `self`. After a handler runs, the component
-  re-renders automatically and the DOM is patched. (Only if you mutate state
-  *outside* a handler — a timer, a background task — must you call
-  `self.state_has_changed()` yourself.)
+  re-renders automatically and the DOM is patched.
 - **Computed values** are ordinary Python properties:
 
   ```python
@@ -96,6 +94,38 @@ How the code block works:
   def remaining(self):
       return sum(1 for t in self.items if not t["done"])
   ```
+
+### How state actually works
+
+There is no change tracking. A variable in the code block is a plain
+attribute on the component; the template reads it by name, and a handler
+writes it with ordinary assignment (`self.cheers += 1`). What makes the UI
+update is the render cycle, borrowed from Blazor:
+
+1. An event arrives and your handler runs.
+2. The component is marked dirty and re-rendered in full.
+3. The new tree is diffed against the previous one.
+4. Only the differences are applied to the page.
+
+The framework never asks *whether* `cheers` changed — it re-renders after
+every event and lets the differ find out what moved. That is why there are
+no observables, no `useState`, no signals, and why a `@property` is
+recomputed for free: every render re-evaluates the template.
+
+The one case you must handle yourself is state that changes **outside a
+handler** — a timer, a websocket message, an async callback. Nothing
+triggers the re-render, so call `state_has_changed()` after the mutation:
+
+```python
+def on_message(self, msg):        # invoked by something other than the UI
+    self.items.append(msg)
+    self.state_has_changed()      # schedule a re-render
+```
+
+State belongs to the instance that declared it. To share data between
+components, pass it down as props and send changes up with `emit` (section
+4). A cross-component store and per-field watchers are on the roadmap; both
+will sit on top of this model, not replace it.
 
 ---
 
@@ -123,6 +153,50 @@ block instead.
 Any capitalized tag is a child component. PyWeft resolves `<TodoItem>` to
 `TodoItem.weft` or `todo_item.weft` **in the same directory** as the file that
 uses it — like Vue single-file components, but with zero import boilerplate.
+Resolution is recursive (children can have children) and a circular reference
+is reported as an error rather than looping.
+
+A complete two-file example, taken from `examples/todo/`:
+
+```xml
+<!-- todo_item.weft — the child -->
+<template>
+  <li class="todo-item">
+    <span :class="'done' if item['done'] else None" @click="emit('toggle', item)">
+      {{ item['text'] }}
+    </span>
+    <button class="remove" @click="emit('remove', item)">✕</button>
+  </li>
+</template>
+
+<code>
+item: dict = {}
+</code>
+```
+
+```xml
+<!-- app.weft — the parent -->
+<template>
+  <ul>
+    <For each="item in items" key="item['id']">
+      <TodoItem :item="item" @toggle="toggle(event)" @remove="remove(event)" />
+    </For>
+  </ul>
+</template>
+
+<code>
+items: list = []
+
+def toggle(self, item):
+    item["done"] = not item["done"]
+
+def remove(self, item):
+    self.items = [i for i in self.items if i["id"] != item["id"]]
+</code>
+```
+
+Both files live in the app directory; `pyweft run` picks them up with no
+registration step. The rest of this section explains each piece.
 
 **Props go down.** Use plain attributes for strings, `:attr` for typed values:
 
@@ -138,18 +212,64 @@ item: dict = {}
 title: str = ""
 ```
 
-**Events come up.** The child calls `self.emit("remove", payload)`; the parent
-listens with `@remove` and receives the payload as `event`:
+### Events: emitting and listening
+
+There are two kinds of `@` events, and they are handled differently:
+
+- `@click` on a **plain element** (`<button @click="cheer">`) is a DOM event.
+  The browser fires it and the component whose template contains the element
+  handles it.
+- `@remove` on a **component tag** (`<TodoItem @remove="...">`) is a custom
+  event. Nothing in the browser fires it — the child raises it by calling
+  `emit`, and the parent listens.
+
+**Emitting, in the child.** Call `emit(name, payload)` from a template
+expression or from a method. The payload is optional and can be any Python
+value; falsy values like `0`, `""` and `False` pass through unchanged.
 
 ```xml
-<!-- parent -->
-<TodoItem :item="item" @remove="remove(event)" />
-```
-
-```xml
-<!-- child template -->
+<!-- todo_item.weft -->
 <button @click="emit('remove', item)">✕</button>
+<button @click="save">save</button>
 ```
+
+```python
+def save(self):
+    ...
+    self.emit("saved")                 # no payload
+    self.emit("changed", {"id": self.item["id"], "text": self.draft})
+```
+
+**Listening, in the parent.** Put `@<name>` on the child's tag. The value is
+evaluated in the parent's scope, with the payload available as `event`:
+
+```xml
+<For each="item in items" key="item['id']">
+  <TodoItem :item="item"
+            @remove="remove(event)"
+            @changed="update(item, event)"
+            @saved="mark_saved" />
+</For>
+```
+
+- `@remove="remove(event)"` — any expression works, so you can mix loop
+  variables with the payload, as `@changed` does.
+- `@saved="mark_saved"` — a bare method name is called directly. It receives
+  the payload if it declares a parameter, and nothing otherwise.
+
+After the parent's handler runs the parent re-renders, so any state it changed
+flows back down to the child as fresh props in the same cycle.
+
+**How it connects.** `@remove="..."` on the tag becomes an `on_remove`
+callback set on the child as a prop, and `self.emit("remove", x)` simply looks
+up `on_remove` and calls it. Consequences worth knowing:
+
+- Emitting an event the parent did not subscribe to is a no-op, as in Vue.
+- `emit` returns whatever the parent's handler returned (`None` if nobody
+  listened), so a child can ask the parent for a decision.
+- Use lowercase identifier-style event names (`item_removed`, not
+  `itemRemoved` or `item-removed`) so the `on_` prop name stays a valid
+  Python attribute.
 
 **State stays put.** A child keeps its internal state across parent
 re-renders. Inside a `<For>`, the loop's `key` also keys the child instances,
@@ -159,19 +279,33 @@ so their state follows the data when rows reorder.
 `on_dispose(self)` runs when the component disappears (e.g. its `<If>` went
 false).
 
+**Overriding the file lookup.** A `components` dict in the code block wins
+over the sibling-file convention, which is how you pull a component from
+another directory or give it a different tag name:
+
+```python
+from pyweft import load_component
+
+components = {"Row": load_component("widgets/row.weft")}
+```
+
+From plain Python, `component_from_source(src, components={...})` accepts the
+same dict.
+
 Not yet supported: children inside a component tag (slots) — you'll get a
-clear error; and `@bind` directly on a component.
+clear error, so pass content as a prop for now; and `@bind` directly on a
+component (bind inside the child's own template instead).
 
 ---
 
 ## 5. Starting a new project
 
 ```bash
-pyweft new myapp
-pyweft run myapp
+uv run pyweft new myapp
+uv run pyweft run myapp
 ```
 
-That's it — `new` scaffolds the project, `run` serves it. Open
+(Drop the `uv run` prefix if you installed with pip.) That's it — `new` scaffolds the project, `run` serves it. Open
 `http://127.0.0.1:8642/`, edit a file, refresh: no build step; components are
 compiled in the browser at load time.
 
@@ -219,7 +353,7 @@ work in a browser regardless.
 ### Shipping it
 
 ```bash
-pyweft build myapp          # writes myapp/dist/
+uv run pyweft build myapp   # writes myapp/dist/
 ```
 
 `dist/` is a fully static site — your components, the pyweft runtime, and an
