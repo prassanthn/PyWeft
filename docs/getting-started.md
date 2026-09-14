@@ -350,15 +350,65 @@ One constraint, inherited from the browser: a package must be **pure Python**
 pillow, matplotlib, …). Packages needing raw sockets or subprocesses won't
 work in a browser regardless.
 
-### Shipping it
+### Building for deployment
 
 ```bash
-uv run pyweft build myapp   # writes myapp/dist/
+uv run pyweft build myapp              # writes myapp/dist/
+uv run pyweft build myapp --out site   # or pick the output folder
 ```
 
-`dist/` is a fully static site — your components, the pyweft runtime, and an
-index.html that installs your dependencies at load. Host it anywhere static
-files go (GitHub Pages, S3, nginx); there is no server-side Python.
+`dist/` is a fully static site. There is no compile step: your `.weft` files
+ship verbatim and are parsed in the browser at load, and the dependencies
+from your `pyproject.toml` are written into `index.html` for micropip to
+install on first visit.
+
+```
+dist/
+  index.html        shell: loads Pyodide, installs deps, boots app.weft
+  runtime.js        applies DOM patches, sends events back to Python
+  pyweft-src/*.py   the framework, served to the browser
+  app/              your .weft components and .css files, copied as-is
+```
+
+**Check it locally** the way a host will serve it before deploying:
+
+```bash
+cd myapp/dist
+python -m http.server 8000             # open http://localhost:8000/
+```
+
+Open it over http, not as a `file://` URL — the shell fetches its own files
+and browsers block that from the local filesystem. The first visit downloads
+Pyodide (about 10 MB), so allow a few seconds before the status line reads
+"Running".
+
+**Deploy the folder.** There is no server-side Python, so any static host
+works:
+
+- **GitHub Pages** — push `dist` to a `gh-pages` branch and enable Pages on
+  it: `git subtree push --prefix dist origin gh-pages`. For deploy-on-push,
+  add a GitHub Actions workflow that runs `pyweft build` and uploads `dist`
+  with `actions/deploy-pages`.
+- **Netlify / Vercel** — drag `dist` onto the dashboard, or
+  `netlify deploy --dir dist --prod`.
+- **S3 and similar** — `aws s3 sync dist s3://my-bucket --delete` with static
+  website hosting enabled on the bucket.
+- **Your own server** — copy `dist` into the nginx or Apache document root.
+
+**Before going live:**
+
+- The visitor's browser needs internet access: Pyodide comes from the
+  jsdelivr CDN and dependencies from PyPI at runtime. Air-gapped hosting
+  would need those vendored, which the CLI does not do yet.
+- `.weft` files are served as plain text, so your component source is visible
+  in devtools — the same as any client-side framework.
+- `dist/` is a snapshot. `pyweft run` re-reads files on refresh, but you must
+  rebuild after every change you want deployed.
+- Subpath hosting works without configuration: every reference in
+  `index.html` is relative, so the app runs at `/` or `/myapp/` alike.
+- A desktop executable is not available yet; the pywebview host and
+  Briefcase packaging are on the roadmap. The static site is the only
+  shippable form today.
 
 ---
 
