@@ -13,9 +13,10 @@ File shape::
         self.count += 1
     </code>
 
-The ``<code>`` block is cut out by string scanning *before* any XML parsing,
-because Python source is full of ``<``, ``>`` and ``&`` and would blow up an
-XML parser. Only the ``<template>`` block is parsed as XML.
+The ``<code>`` and ``<style>`` blocks are cut out by string scanning *before*
+any XML parsing, because Python source is full of ``<``, ``>`` and ``&`` (and
+CSS of ``>``) and would blow up an XML parser. Only the ``<template>`` block
+is parsed as XML.
 
 The template must be well-formed XML (close your tags, quote your attributes).
 That buys us the stdlib ``xml.etree`` parser instead of a bespoke HTML5
@@ -80,19 +81,25 @@ class TFor:
 
 _TEMPLATE_RE = re.compile(r"<template\s*>(.*)</template\s*>", re.S)
 _CODE_RE = re.compile(r"<code\s*>(.*)</code\s*>", re.S)
+_STYLE_RE = re.compile(r"<style\s*>(.*)</style\s*>", re.S)
 
 
-def split_source(src: str) -> tuple[str, str]:
-    """Return (template_source, code_source)."""
+def split_source(src: str) -> tuple[str, str, str]:
+    """Return (template_source, code_source, style_source)."""
     code = ""
     match = _CODE_RE.search(src)
     if match:
         code = match.group(1)
         src = src[: match.start()] + src[match.end() :]
+    style = ""
+    match = _STYLE_RE.search(src)
+    if match:
+        style = match.group(1)
+        src = src[: match.start()] + src[match.end() :]
     tmpl = _TEMPLATE_RE.search(src)
     if not tmpl:
         raise TemplateError("no <template> block found")
-    return tmpl.group(1), textwrap.dedent(code)
+    return tmpl.group(1), textwrap.dedent(code), textwrap.dedent(style)
 
 
 _AT_ATTR = re.compile(r"@([A-Za-z_][\w.\-]*)\s*=")

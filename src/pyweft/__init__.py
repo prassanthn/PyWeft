@@ -10,6 +10,7 @@ from .dommodel import apply_patches
 from .expressions import ExpressionError
 from .parser import TemplateError, parse_template, split_source
 from .renderer import Renderer
+from .styles import collect_styles, scope_css
 from .vdom import Element, Node, Text, to_dicts
 
 __version__ = "0.0.1"
@@ -19,6 +20,8 @@ __all__ = [
     "component_from_source",
     "load_component",
     "Renderer",
+    "collect_styles",
+    "scope_css",
     "diff",
     "apply_patches",
     "Element",

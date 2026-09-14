@@ -29,7 +29,7 @@ Work on the framework itself:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev         # or: pip install -e ".[dev]"
-uv run pytest               # 464 tests
+uv run pytest               # 496 tests
 uv run python examples/demo.py   # render -> event -> diff -> apply, no browser
 uv run pyweft run examples/todo  # the todo app live in the browser at :8642 —
                                  # composed components + a PyPI dep via micropip
@@ -104,6 +104,10 @@ markup is a tarpit; elements sidestep it entirely.
   bound `int` doesn't become a string on first keystroke
 - `key="..."` on `<For>` gives rows stable identity across reorders
 
+A `<style>` block in the same file is scoped to the component: its selectors
+only match elements that component renders, so `.row` in two components never
+collide. Page-wide CSS goes in `.css` files in the app directory.
+
 Split files work too: put the markup in `Counter.weft` and the code in a normal
 module if you prefer code-behind to single-file.
 
@@ -149,7 +153,7 @@ simply vanish and a late event against a stale id is a no-op, not a crash.
 ## Testing approach
 
 The differ is tested by **convergence, not op sequences**: apply the patches to
-the old tree and assert the result equals the new tree. 400 of the 464 tests are
+the old tree and assert the result equals the new tree. 400 of the 496 tests are
 randomised trees checked this way. Asserting exact op lists would lock in the
 current algorithm and still miss the index bugs that actually bite.
 
@@ -171,6 +175,8 @@ current algorithm and still miss the index bugs that actually bite.
 component composition (props, `:expr` bindings, `emit`, lifecycle, sibling-file
 resolution).
 
+**Done:** component-scoped `<style>` blocks.
+
 **Done (continued):** the `pyweft` CLI — `new` scaffolds an app, `run` serves it
 with refresh-on-save, `build` emits a static site; PyPI dependencies declared
 in the app's ordinary `pyproject.toml` (add them with `uv add`/pip) and
@@ -180,6 +186,6 @@ installed in-browser by micropip at load.
 wired both ways; an asyncio render queue so async handlers and re-entrant
 events work; hot-reload for `pyweft run`.
 
-**Later:** watchers, provide/inject, scoped CSS; Briefcase packaging for
+**Later:** watchers, provide/inject; Briefcase packaging for
 mobile; codegen-to-Python-source rendering if the tree-walking interpreter
 gets hot; devtools.

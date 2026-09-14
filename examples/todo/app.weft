@@ -17,6 +17,16 @@
   </div>
 </template>
 
+<style>
+/* Scoped to this component. The bare `input, button` rule cannot reach the
+   remove button inside TodoItem: that one belongs to the child. */
+.todo-app { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; }
+h1 small { color: #aaa; font-size: 0.9rem; font-weight: normal; }
+input, button { font: inherit; padding: 0.35rem 0.7rem; margin-right: 0.4rem; }
+ul { padding-left: 0; list-style: none; }
+.hint { color: #888; }
+</style>
+
 <code>
 import humanize  # from PyPI, declared in this app's pyproject.toml
 

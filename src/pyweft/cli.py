@@ -91,6 +91,12 @@ _SCAFFOLD_APP = """\
   </div>
 </template>
 
+<style>
+/* Scoped to this component: these rules cannot leak into other components. */
+.hello { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; }
+input, button { font: inherit; padding: 0.35rem 0.7rem; }
+</style>
+
 <code>
 name: str = ""
 cheers: int = 0
@@ -101,8 +107,9 @@ def cheer(self):
 """
 
 _SCAFFOLD_CSS = """\
-.hello { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; }
-.hello input, .hello button { font: inherit; padding: 0.35rem 0.7rem; }
+/* Global styles. Component-specific rules belong in a <style> block in the
+   component's .weft file, where they are scoped to that component. */
+body { color: #222; }
 """
 
 

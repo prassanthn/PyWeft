@@ -18,6 +18,7 @@ from typing import Any, Callable
 
 from .expressions import ExpressionError, Scope, eval_expr, render_parts
 from .parser import TElement, TemplateError, TFor, TIf, TStatic
+from .styles import marker
 from .vdom import Element, Node, Text
 
 
@@ -175,7 +176,15 @@ class Renderer:
                 setattr(instance, name, value)
         self._seen.add(inst_id)
 
+        before = len(out)
         self._emit(cls.__template__, Scope(instance), path, out, key)
+        # The parent's scoped styles may target the child's root element(s),
+        # so those carry the parent's marker as well as the child's own.
+        parent_scope = getattr(type(scope.component), "__scope__", None)
+        if parent_scope:
+            for node in out[before:]:
+                if isinstance(node, Element):
+                    node.attrs.setdefault(marker(parent_scope), "")
 
     # -------------------------------------------------------------- elements
 
@@ -192,6 +201,11 @@ class Renderer:
             if value is None or value is False:
                 continue
             attrs[name] = "" if value is True else str(value)
+        # Scoped <style> support: mark the element as belonging to its
+        # component so the rewritten selectors can find it.
+        scope_id = getattr(type(scope.component), "__scope__", None)
+        if scope_id:
+            attrs[marker(scope_id)] = ""
         events: dict[str, str] = {}
         prefix = "/".join(path)
 

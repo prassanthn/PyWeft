@@ -33,7 +33,7 @@
     // JSON strings across the boundary to keep proxy lifetimes out of play.
     const BOOTSTRAP = `
 import json
-from pyweft import Renderer, diff, load_component, to_dicts
+from pyweft import Renderer, collect_styles, diff, load_component, to_dicts
 
 _component_cls = load_component("/app/app.weft")
 _component = _component_cls()
@@ -43,6 +43,10 @@ _tree = _renderer.render()
 
 def pyweft_initial():
     return json.dumps(to_dicts(_tree))
+
+def pyweft_styles():
+    # Every component's scoped <style> block, selectors already rewritten.
+    return collect_styles(_component_cls)
 
 def pyweft_dispatch(handler_id, event_json):
     global _tree
@@ -79,6 +83,16 @@ def pyweft_dispatch(handler_id, event_json):
         pyodide.FS.writeFile(`/app/${name}`, src);
       }
       pyodide.runPython(BOOTSTRAP);
+
+      // Component <style> blocks. The core only produces the CSS text; putting
+      // it in the document is the host's job, like applying patch ops.
+      const scopedCss = pyodide.runPython("pyweft_styles()");
+      if (scopedCss) {
+        const styleEl = document.createElement("style");
+        styleEl.id = "pyweft-component-styles";
+        styleEl.textContent = scopedCss;
+        document.head.appendChild(styleEl);
+      }
 
       const initial = pyodide.globals.get("pyweft_initial");
       const dispatch = pyodide.globals.get("pyweft_dispatch");

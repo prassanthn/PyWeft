@@ -22,10 +22,16 @@ from .parser import (
     parse_template,
     split_source,
 )
+from .styles import scope_css
 
 
 class Component:
     __template__: list[Any] = []
+    # Set by the loader when the file has a <style> block: the id stamped on
+    # every element this component renders (as ``data-w-<scope>``) and the
+    # block's CSS with its selectors rewritten to match only those elements.
+    __scope__: str | None = None
+    __style__: str = ""
     # Tag name -> component class, consulted by the renderer when a template
     # element's tag is capitalised. Filled by the loader or passed explicitly.
     components: dict[str, type] = {}
@@ -88,14 +94,24 @@ def component_from_source(
     name: str = "Component",
     base: type = Component,
     components: dict[str, type] | None = None,
+    scope: str | None = None,
 ) -> type:
-    template_src, code_src = split_source(src)
+    """``scope`` is the style scope id; it defaults to the snake-cased ``name``
+    and only matters when the source has a ``<style>`` block."""
+    template_src, code_src, style_src = split_source(src)
     nodes = parse_template(template_src)
 
     namespace: dict[str, Any] = {}
     exec(compile(textwrap.dedent(code_src), f"<{name}.weft>", "exec"), namespace)
     namespace.pop("__builtins__", None)
     namespace["__template__"] = nodes
+    if style_src.strip():
+        scope = scope or _snake(name)
+        namespace["__scope__"] = scope
+        namespace["__style__"] = scope_css(style_src, scope).strip()
+    else:
+        namespace["__scope__"] = None
+        namespace["__style__"] = ""
     # A `components` dict in the code block wins over the passed-in registry.
     namespace["components"] = {**(components or {}), **namespace.get("components", {})}
 
@@ -138,7 +154,9 @@ def load_component(
         raise TemplateError(f"circular component reference involving {p.name}")
     _loading.add(p)
     try:
-        cls = component_from_source(p.read_text(encoding="utf-8"), name or p.stem)
+        cls = component_from_source(
+            p.read_text(encoding="utf-8"), name or p.stem, scope=p.stem
+        )
 
         registry = dict(cls.components)
         for tag in sorted(_component_tags(cls.__template__, set())):

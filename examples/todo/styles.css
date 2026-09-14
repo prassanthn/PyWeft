@@ -1,9 +1,3 @@
-.todo-app { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; }
-.todo-app h1 small { color: #aaa; font-size: 0.9rem; font-weight: normal; }
-.todo-app input, .todo-app button { font: inherit; padding: 0.35rem 0.7rem; margin-right: 0.4rem; }
-.todo-app ul { padding-left: 0; list-style: none; }
-.todo-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; }
-.todo-item span { cursor: pointer; }
-.todo-item .done { text-decoration: line-through; color: #aaa; }
-.todo-item .remove { border: none; background: none; color: #c0392b; cursor: pointer; }
-.todo-app .hint { color: #888; }
+/* Global stylesheet: everything here applies to the whole page.
+   Component-specific rules live in <style> blocks inside the .weft files. */
+:root { --danger: #c0392b; }

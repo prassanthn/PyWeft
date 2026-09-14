@@ -13,7 +13,7 @@ from pyweft.parser import (
 
 
 def test_split_source_separates_code_from_template():
-    template, code = split_source(
+    template, code, _style = split_source(
         "<template><p>hi</p></template>\n<code>\nx = 1\n</code>\n"
     )
     assert "<p>hi</p>" in template
@@ -31,7 +31,7 @@ def test_code_block_with_angle_brackets_does_not_break_parsing():
             self.n += 1
     </code>
     """
-    template, code = split_source(src)
+    template, code, _style = split_source(src)
     assert "self.n < 10" in code
     parse_template(template)  # must not raise
 

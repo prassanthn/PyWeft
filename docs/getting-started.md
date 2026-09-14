@@ -40,7 +40,7 @@ To hack on the framework itself, clone it and install in editable mode:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev      # or: pip install -e ".[dev]"
-uv run pytest            # 464 tests should pass
+uv run pytest            # 496 tests should pass
 ```
 
 To see it working immediately, run the bundled todo app from the clone:
@@ -144,6 +144,40 @@ Expressions are real Python, evaluated against the component's state plus any
 loop variables. One caveat: comprehensions and lambdas inside `{{ }}` can't
 see scope variables (CPython `eval` semantics) — compute those in the code
 block instead.
+
+### Component styles
+
+A `<style>` block in a `.weft` file is **scoped to that component**: its
+rules match only elements this component's template renders.
+
+```xml
+<template>
+  <li class="row"><span>{{ item['text'] }}</span></li>
+</template>
+
+<style>
+.row { display: flex; gap: .5rem; }
+span:hover { text-decoration: underline; }
+</style>
+```
+
+Write selectors as if the component were the whole page. `span:hover` above
+cannot reach a `<span>` rendered by a child or a parent, so two components can
+both use `.row` without a naming scheme. Under the hood every element gets a
+`data-w-<component>` marker and each selector has `[data-w-<component>]`
+appended, which you will see in the browser's element inspector.
+
+Two rules of thumb:
+
+- A parent *can* style the outermost element of a child it places, so
+  `.list > .row` in the parent works for spacing children. It cannot reach
+  inside them.
+- Page-wide rules (`body`, fonts, CSS variables) go in a `.css` file in the
+  app directory, which is included unscoped. `var(--name)` defined there is
+  usable from any component's `<style>`.
+
+`@media`, `@supports` and `@container` blocks are scoped too; `@keyframes`,
+`@font-face` and `@import` are passed through as written.
 
 ---
 
@@ -314,7 +348,7 @@ A scaffolded app looks like this:
 myapp/
   pyproject.toml    # name + dependencies — a completely ordinary pyproject
   app.weft          # root component (must be named app.weft)
-  styles.css        # any .css files here are included automatically
+  styles.css        # global CSS; component styles go in <style> blocks
 ```
 
 Add more components as sibling `.weft` files — `<TodoItem>` in a template
