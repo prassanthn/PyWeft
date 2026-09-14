@@ -1,0 +1,45 @@
+<template>
+  <div class="todo-app">
+    <h1>Todos <small>{{ remaining_label }} left</small></h1>
+
+    <input @bind="draft" placeholder="what needs doing?" />
+    <button @click="add">add</button>
+
+    <ul>
+      <For each="item in items" key="item['id']">
+        <TodoItem :item="item" @toggle="toggle(event)" @remove="remove(event)" />
+      </For>
+    </ul>
+
+    <If cond="not items">
+      <p class="hint">nothing yet — add one above</p>
+    </If>
+  </div>
+</template>
+
+<code>
+import humanize  # from PyPI, declared in this app's pyproject.toml
+
+draft: str = ""
+items: list = []
+next_id: int = 1
+
+@property
+def remaining_label(self):
+    # apnumber spells out small numbers: 3 -> "three"
+    return humanize.apnumber(sum(1 for item in self.items if not item["done"]))
+
+def add(self):
+    text = self.draft.strip()
+    if not text:
+        return
+    self.items.append({"id": self.next_id, "text": text, "done": False})
+    self.next_id += 1
+    self.draft = ""
+
+def toggle(self, item):
+    item["done"] = not item["done"]
+
+def remove(self, item):
+    self.items = [i for i in self.items if i["id"] != item["id"]]
+</code>

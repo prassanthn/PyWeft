@@ -1,0 +1,12 @@
+<template>
+  <li class="todo-item">
+    <span :class="'done' if item['done'] else None" @click="emit('toggle', item)">
+      {{ item['text'] }}
+    </span>
+    <button class="remove" @click="emit('remove', item)">✕</button>
+  </li>
+</template>
+
+<code>
+item: dict = {}
+</code>

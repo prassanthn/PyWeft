@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pyweft-todo",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "pyweft", "run", "examples/todo", "--port", "8643"],
+      "port": 8643
+    }
+  ]
+}

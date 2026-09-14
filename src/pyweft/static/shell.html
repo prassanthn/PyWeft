@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<!-- PyWeft app shell template. The CLI fills in the double-underscore PYWEFT
+     placeholders; everything else is identical for run and build output. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>__PYWEFT_TITLE__</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 40rem;
+      margin: 3rem auto;
+      padding: 0 1rem;
+      color: #222;
+    }
+    #pyweft-status { color: #888; font-size: 0.9rem; }
+  </style>
+  __PYWEFT_CSS__
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+  <script src="runtime.js"></script>
+</head>
+<body>
+  <p id="pyweft-status">Booting Python (WASM)…</p>
+  <div id="app"></div>
+
+  <script>
+    const MODULES = __PYWEFT_MODULES__;
+    const APP_FILES = __PYWEFT_APP_FILES__;
+    const PACKAGES = __PYWEFT_PACKAGES__;
+
+    // The Python half of the bridge. Renders, dispatches, diffs -- and talks
+    // JSON strings across the boundary to keep proxy lifetimes out of play.
+    const BOOTSTRAP = `
+import json
+from pyweft import Renderer, diff, load_component, to_dicts
+
+_component_cls = load_component("/app/app.weft")
+_component = _component_cls()
+_component.on_init()
+_renderer = Renderer(_component)
+_tree = _renderer.render()
+
+def pyweft_initial():
+    return json.dumps(to_dicts(_tree))
+
+def pyweft_dispatch(handler_id, event_json):
+    global _tree
+    _renderer.dispatch(handler_id, json.loads(event_json))
+    new_tree = _renderer.render()
+    ops = diff(_tree, new_tree)
+    _tree = new_tree
+    return json.dumps(ops)
+`;
+
+    async function main() {
+      const status = document.getElementById("pyweft-status");
+      const pyodide = await loadPyodide();
+      window.pyodide = pyodide; // console/devtools access to the live interpreter
+
+      if (PACKAGES.length) {
+        status.textContent = `Installing ${PACKAGES.join(", ")}…`;
+        await pyodide.loadPackage("micropip");
+        const micropip = pyodide.pyimport("micropip");
+        await micropip.install(pyodide.toPy(PACKAGES));
+      }
+
+      status.textContent = "Loading pyweft…";
+      pyodide.FS.mkdirTree("/pyweft-src/pyweft");
+      for (const name of MODULES) {
+        const src = await (await fetch(`pyweft-src/${name}`)).text();
+        pyodide.FS.writeFile(`/pyweft-src/pyweft/${name}`, src);
+      }
+      pyodide.runPython(`import sys; sys.path.insert(0, "/pyweft-src")`);
+
+      pyodide.FS.mkdirTree("/app");
+      for (const name of APP_FILES) {
+        const src = await (await fetch(`app/${name}`)).text();
+        pyodide.FS.writeFile(`/app/${name}`, src);
+      }
+      pyodide.runPython(BOOTSTRAP);
+
+      const initial = pyodide.globals.get("pyweft_initial");
+      const dispatch = pyodide.globals.get("pyweft_dispatch");
+
+      PyWeftRuntime.init(document.getElementById("app"), (handlerId, event) => {
+        const ops = JSON.parse(dispatch(handlerId, JSON.stringify(event)));
+        PyWeftRuntime.applyOps(ops);
+        pyodide.runPython("_component.on_after_render(False)");
+      });
+      PyWeftRuntime.mount(JSON.parse(initial()));
+      pyodide.runPython("_component.on_after_render(True)");
+
+      status.textContent =
+        `Running: Python ${pyodide.runPython("import sys; sys.version.split()[0]")} in WebAssembly`;
+    }
+
+    main().catch((err) => {
+      document.getElementById("pyweft-status").textContent = `Failed to start: ${err}`;
+      throw err;
+    });
+  </script>
+</body>
+</html>
