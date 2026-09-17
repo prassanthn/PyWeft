@@ -141,11 +141,46 @@ will sit on top of this model, not replace it.
 | `<PascalCaseTag ... />` | Renders a child component (see below) |
 
 Expressions are real Python, evaluated against the component's state plus any
-loop variables; `self` is the component, so `{{ self.count }}` and
-`@click="self.count += 1"` are the explicit spellings of the same things.
-Prefer a method once a handler grows past one or two statements. One caveat: comprehensions and lambdas inside `{{ }}` can't
-see scope variables (CPython `eval` semantics) — compute those in the code
-block instead.
+loop variables. `self` is the component, so `{{ self.count }}` is the explicit
+spelling of `{{ count }}`. One caveat: comprehensions and lambdas inside
+`{{ }}` can't see scope variables (CPython `eval` semantics) — compute those
+in the code block instead.
+
+### Inline handlers
+
+An event attribute accepts three forms. Pick the smallest one that fits:
+
+```xml
+<button @click="increment">+1</button>              <!-- 1. call a method -->
+<button @click="remove(item)">remove</button>        <!-- 2. an expression -->
+<button @click="count += 1">+1</button>              <!-- 3. inline statements -->
+```
+
+1. **A bare name** calls that method. If the method declares a parameter it
+   receives the event payload, otherwise it is called with no arguments.
+2. **An expression** is evaluated in the template's scope, so loop variables
+   and the `event` payload are available: `@click="remove(item)"`,
+   `@input="search(event['value'])"`. Whatever it returns is returned from
+   the dispatch, which matters for `emit` (section 4).
+3. **Statements** run when the value does not parse as an expression.
+   Assignment, augmented assignment and `;`-separated statements all work:
+
+   ```xml
+   <button @click="show = not show">toggle</button>
+   <button @click="count += 1; history.append(count)">record</button>
+   <For each="item in items" key="item['id']">
+     <li @click="selected = item">{{ item['text'] }}</li>
+   </For>
+   ```
+
+   A bare name on the left of `=` writes component state, so `count += 1`
+   updates `self.count` on the component that owns the template. Assigning
+   to a loop variable only changes it inside that handler; it never becomes
+   state. `self.count += 1` is the explicit spelling if you prefer it.
+
+After any of the three runs, the component re-renders. Keep inline handlers
+to a statement or two; once logic needs a name, a comment, or a test, move it
+to a method.
 
 ### Component styles
 
@@ -384,6 +419,59 @@ One constraint, inherited from the browser: a package must be **pure Python**
 (most are) or one of the ~250 packages Pyodide ships prebuilt (numpy, pandas,
 pillow, matplotlib, …). Packages needing raw sockets or subprocesses won't
 work in a browser regardless.
+
+### Calling JavaScript
+
+In the browser your component code runs inside Pyodide, which exposes the
+page's JavaScript globals as a Python module named `js`. Anything the page
+can do, a handler can do:
+
+```python
+import js
+
+def save(self):
+    js.localStorage.setItem("draft", self.draft)
+
+def restore(self):
+    self.draft = js.localStorage.getItem("draft") or ""
+
+def shout(self):
+    js.alert(f"{self.count} clicks")
+
+def retitle(self):
+    js.document.title = f"{self.count} clicks"
+```
+
+- **Globals** are attributes of `js`: `js.window`, `js.document`,
+  `js.console.log(...)`, `js.navigator.clipboard.writeText(text)`.
+- **Libraries** you load with a `<script>` tag in a custom shell appear the
+  same way, for example `js.Chart`.
+- **Raw JavaScript** runs with `js.eval("...")` when you need a one-off.
+- **Async APIs** such as `fetch` return promises; `await` them from an
+  `async` method (`await js.fetch(url)`), or use `pyodide.http.pyfetch`.
+- **Callbacks.** Passing a Python function to `js.setTimeout(fn, ms)` works
+  for a one-shot call. For a listener that lives on, wrap it with
+  `pyodide.ffi.create_proxy(fn)` and call `.destroy()` when you remove it,
+  otherwise it leaks.
+
+Two rules keep this safe:
+
+1. **Never modify elements PyWeft rendered.** The runtime owns everything
+   under `#app` and patches it by position. Reading is fine; adding or
+   removing nodes there from JavaScript puts the next patch on the wrong
+   node. If you need a DOM library to draw somewhere, give it an element
+   outside `#app` or a container your template renders and leaves empty.
+2. **Keep `import js` inside handlers, not templates.** The `js` module only
+   exists in the browser. A component that imports it at the top of its
+   code block fails in headless tests and on the desktop target, where
+   Python runs natively; importing inside the method that needs it keeps
+   the rest of the component portable.
+
+State changed from a JavaScript callback happens outside a handler, so call
+`self.state_has_changed()` afterwards, exactly as with a timer.
+
+A transport-independent way to call JavaScript, a `call` patch op that works
+identically in the browser, on desktop and in tests, is on the roadmap.
 
 ### Building for deployment
 
