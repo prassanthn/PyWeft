@@ -16,7 +16,7 @@ from __future__ import annotations
 import inspect
 from typing import Any, Callable
 
-from .expressions import ExpressionError, Scope, eval_expr, render_parts
+from .expressions import ExpressionError, Scope, eval_expr, render_parts, run_handler
 from .parser import TElement, TemplateError, TFor, TIf, TStatic
 from .styles import marker
 from .vdom import Element, Node, Text
@@ -247,9 +247,9 @@ class Renderer:
                     raise ExpressionError(f"no handler named {expr!r}")
                 result = fn(payload) if _takes_arg(fn) else fn()
             else:
-                # Not a bare name, so evaluate it -- which performs the call in
-                # something like @click="remove(item)".
-                result = eval_expr(expr, scope.child(event=payload))
+                # Not a bare name: an expression such as @click="remove(item)",
+                # or inline statements such as @click="count += 1".
+                result = run_handler(expr, scope.child(event=payload))
             component.state_has_changed()
             return result
 

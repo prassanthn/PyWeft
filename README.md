@@ -29,7 +29,7 @@ Work on the framework itself:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev         # or: pip install -e ".[dev]"
-uv run pytest               # 496 tests
+uv run pytest               # 507 tests
 uv run python examples/demo.py   # render -> event -> diff -> apply, no browser
 uv run pyweft run examples/todo  # the todo app live in the browser at :8642 —
                                  # composed components + a PyPI dep via micropip
@@ -98,8 +98,9 @@ Python blocks embedded in the markup. Lexing indentation-sensitive Python inside
 markup is a tarpit; elements sidestep it entirely.
 
 - `{{ expr }}` interpolates in text and attribute values
-- `@click="handler"` binds an event — a bare name calls that method, anything
-  else is evaluated, so `@click="forget(entry)"` works inside a loop
+- `@click="handler"` binds an event — a bare name calls that method, an
+  expression is evaluated (`@click="forget(entry)"` inside a loop), and simple
+  statements work inline (`@click="count += 1"`, `@click="show = not show"`)
 - `@bind="field"` is two-way, and coerces back to the field's existing type so a
   bound `int` doesn't become a string on first keystroke
 - `key="..."` on `<For>` gives rows stable identity across reorders
@@ -153,7 +154,7 @@ simply vanish and a late event against a stale id is a no-op, not a crash.
 ## Testing approach
 
 The differ is tested by **convergence, not op sequences**: apply the patches to
-the old tree and assert the result equals the new tree. 400 of the 496 tests are
+the old tree and assert the result equals the new tree. 400 of the 507 tests are
 randomised trees checked this way. Asserting exact op lists would lock in the
 current algorithm and still miss the index bugs that actually bite.
 

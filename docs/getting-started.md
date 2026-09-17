@@ -40,7 +40,7 @@ To hack on the framework itself, clone it and install in editable mode:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev      # or: pip install -e ".[dev]"
-uv run pytest            # 496 tests should pass
+uv run pytest            # 507 tests should pass
 ```
 
 To see it working immediately, run the bundled todo app from the clone:
@@ -134,14 +134,16 @@ will sit on top of this model, not replace it.
 |---|---|
 | `{{ expr }}` | Interpolate a Python expression in text or attribute values |
 | `:attr="expr"` | Bind an attribute to an expression. `None`/`False` drop the attribute, `True` keeps it valueless (`:disabled="busy"`), anything else is stringified. On a component, passes the **typed** value as a prop |
-| `@click="handler"` | A bare name calls that method; any other expression is evaluated, so `@click="remove(item)"` works |
+| `@click="handler"` | A bare name calls that method; an expression is evaluated, so `@click="remove(item)"` works; simple statements run inline, so `@click="count += 1"` and `@click="show = not show"` work without a method |
 | `@bind="field"` | Two-way binding on inputs. Coerces back to the field's existing type, so a bound `int` stays an `int` |
 | `<If cond="...">` / `<ElseIf cond="...">` / `<Else>` | Conditional rendering. Branch elements must be adjacent siblings |
 | `<For each="item in items" key="item['id']" index="i">` | Loop. `key` gives rows stable identity across reorders (always use it for dynamic lists); `index` is optional |
 | `<PascalCaseTag ... />` | Renders a child component (see below) |
 
 Expressions are real Python, evaluated against the component's state plus any
-loop variables. One caveat: comprehensions and lambdas inside `{{ }}` can't
+loop variables; `self` is the component, so `{{ self.count }}` and
+`@click="self.count += 1"` are the explicit spellings of the same things.
+Prefer a method once a handler grows past one or two statements. One caveat: comprehensions and lambdas inside `{{ }}` can't
 see scope variables (CPython `eval` semantics) — compute those in the code
 block instead.
 

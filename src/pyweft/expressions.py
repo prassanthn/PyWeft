@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import builtins
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from typing import Any
 
 
@@ -34,13 +34,18 @@ def compile_expr(src: str):
     return code
 
 
-class Scope(Mapping):
+class Scope(MutableMapping):
     """Name resolution for template expressions.
 
     Looks in loop variables first, then falls back to attributes on the
     component instance. Passed to ``eval`` as the locals mapping, so a bare
     name in a template resolves the way you'd expect without the component
-    needing to copy its state into a dict every render.
+    needing to copy its state into a dict every render. ``self`` names the
+    component itself.
+
+    It is also the locals mapping for inline handler *statements*
+    (``@click="count += 1"``): a store to a loop variable stays in the scope,
+    a store to anything else becomes component state.
 
     Known limitation: comprehensions and lambdas inside an expression build
     their own frame and only see globals, so ``{{ [x for x in items] }}``
@@ -61,10 +66,24 @@ class Scope(Mapping):
     def __getitem__(self, name: str) -> Any:
         if name in self.vars:
             return self.vars[name]
+        if name == "self":
+            return self.component
         try:
             return getattr(self.component, name)
         except AttributeError:
             raise KeyError(name) from None
+
+    def __setitem__(self, name: str, value: Any) -> None:
+        if name in self.vars:
+            self.vars[name] = value
+        else:
+            setattr(self.component, name, value)
+
+    def __delitem__(self, name: str) -> None:
+        if name in self.vars:
+            del self.vars[name]
+        else:
+            delattr(self.component, name)
 
     def __iter__(self):
         seen = set(self.vars)
@@ -86,6 +105,48 @@ def eval_expr(src: str, scope: Mapping) -> Any:
     except Exception as exc:
         raise ExpressionError(
             f"error evaluating {src!r}: {type(exc).__name__}: {exc}"
+        ) from exc
+
+
+_HANDLER_CACHE: dict[str, tuple[Any, bool]] = {}
+
+
+def compile_handler(src: str) -> tuple[Any, bool]:
+    """Compile a handler value; returns ``(code, is_expression)``.
+
+    A handler is normally an expression (``remove(item)``), but the simple
+    inline cases people reach for are statements (``count += 1``,
+    ``show = not show``, ``a = 1; b = 2``), so fall back to ``exec`` mode when
+    ``eval`` mode does not parse.
+    """
+    src = src.strip()
+    hit = _HANDLER_CACHE.get(src)
+    if hit is None:
+        try:
+            hit = (compile(src, "<pyweft>", "eval"), True)
+        except SyntaxError:
+            try:
+                hit = (compile(src, "<pyweft>", "exec"), False)
+            except SyntaxError as exc:
+                raise ExpressionError(f"bad handler {src!r}: {exc}") from exc
+        _HANDLER_CACHE[src] = hit
+    return hit
+
+
+def run_handler(src: str, scope: MutableMapping) -> Any:
+    """Evaluate an expression handler, or execute a statement handler
+    (returning ``None``), against ``scope``."""
+    code, is_expr = compile_handler(src)
+    try:
+        if is_expr:
+            return eval(code, _GLOBALS, scope)
+        exec(code, _GLOBALS, scope)
+        return None
+    except ExpressionError:
+        raise
+    except Exception as exc:
+        raise ExpressionError(
+            f"error running handler {src!r}: {type(exc).__name__}: {exc}"
         ) from exc
 
 
