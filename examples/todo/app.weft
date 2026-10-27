@@ -29,6 +29,7 @@ ul { padding-left: 0; list-style: none; }
 
 <code>
 import humanize  # from PyPI, declared in this app's pyproject.toml
+from pyweft import effect
 
 draft: str = ""
 items: list = []
@@ -38,6 +39,13 @@ next_id: int = 1
 def remaining_label(self):
     # apnumber spells out small numbers: 3 -> "three"
     return humanize.apnumber(sum(1 for item in self.items if not item["done"]))
+
+@effect
+def sync_tab_title(self):
+    # Re-runs only when `items` changes (read through remaining_label), so
+    # typing in the input does not touch the title.
+    import js
+    js.document.title = f"{self.remaining_label} left · todos"
 
 def add(self):
     text = self.draft.strip()

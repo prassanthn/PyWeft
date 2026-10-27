@@ -18,6 +18,29 @@ JavaScript to write. The same render core will later drive desktop apps
 - **Requirements:** Python ≥ 3.10. The core has zero runtime dependencies.
 - **Status:** working proof of concept. APIs may still move.
 
+**Contents**
+
+1. [Install](#1-install)
+2. [Your first component](#2-your-first-component): how state works,
+   [effects](#effects-reacting-to-state-changes),
+   [async handlers, background work](#async-handlers-and-background-work),
+   [heavy work in a Web Worker](#heavy-work-run_in_background),
+   [threads](#threads)
+3. [Template syntax reference](#3-template-syntax-reference): bindings,
+   inline handlers, component styles
+4. [Composing components](#4-composing-components): props, events,
+   components in folders
+5. [Starting a new project](#5-starting-a-new-project):
+   [hot reload](#hot-reload), [the loading screen](#the-loading-screen),
+   [head.html and assets](#the-page-head-and-the-assets-folder),
+   [CSS frameworks (Tailwind, Bootstrap)](#using-css-frameworks),
+   [PyPI packages](#using-pypi-packages),
+   [calling JavaScript](#calling-javascript),
+   [building for deployment](#building-for-deployment)
+6. [Using the engine from plain Python](#6-using-the-engine-from-plain-python):
+   headless tests, including async ones
+7. [What's here and what's coming](#7-whats-here-and-whats-coming)
+
 ---
 
 ## 1. Install
@@ -40,7 +63,7 @@ To hack on the framework itself, clone it and install in editable mode:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev      # or: pip install -e ".[dev]"
-uv run pytest            # 507 tests should pass
+uv run pytest            # 657 tests should pass
 ```
 
 To see it working immediately, run the bundled todo app from the clone:
@@ -112,8 +135,9 @@ no observables, no `useState`, no signals, and why a `@property` is
 recomputed for free: every render re-evaluates the template.
 
 The one case you must handle yourself is state that changes **outside a
-handler** — a timer, a websocket message, an async callback. Nothing
-triggers the re-render, so call `state_has_changed()` after the mutation:
+handler** — a timer, a websocket message, a JavaScript callback. Nothing
+triggers the re-render, so call `state_has_changed()` after the mutation
+(`async` handlers are covered for you; see "Async handlers" below):
 
 ```python
 def on_message(self, msg):        # invoked by something other than the UI
@@ -121,10 +145,296 @@ def on_message(self, msg):        # invoked by something other than the UI
     self.state_has_changed()      # schedule a re-render
 ```
 
+The re-render happens right after your code returns, not inside the call, so
+calling `state_has_changed()` many times in a row (in a loop, say) still
+costs one render. It works the same in a child component as in the root.
+
 State belongs to the instance that declared it. To share data between
 components, pass it down as props and send changes up with `emit` (section
-4). A cross-component store and per-field watchers are on the roadmap; both
-will sit on top of this model, not replace it.
+4). A cross-component store is on the roadmap; it will sit on top of this
+model, not replace it.
+
+### Effects: reacting to state changes
+
+Some code should run *because* state changed, not because an event fired:
+keeping the tab title in sync, saving a draft, starting a subscription.
+Mark a method with `@effect`:
+
+```python
+from pyweft import effect
+
+@effect
+def sync_title(self):
+    import js
+    js.document.title = f"{self.remaining} left"
+```
+
+- **When it runs.** Once after the component's first render, then after any
+  later render in which a value it read has changed. Effects run after the
+  page has been patched, so the DOM already shows the new state.
+- **What it depends on** is discovered automatically: every state attribute
+  the method reads, including reads inside `@property` values and helper
+  methods it calls. Above, `remaining` reads `self.items`, so the effect
+  re-runs when the list changes and never when, say, a text input does.
+- **In-place changes count.** Values are compared against a copy taken after
+  the last run, so `self.items.append(x)` and `item["done"] = True` re-run
+  the effect, not only reassignment.
+- **Cleanup.** Return a function and it runs before the next run and when the
+  component is removed, which is how you cancel timers and listeners. This
+  saves the draft half a second after the user stops typing; each keystroke
+  cancels the previous pending save:
+
+  ```python
+  @effect
+  def autosave(self):
+      import js
+      from pyodide.ffi import create_proxy
+      draft = self.draft
+      save = create_proxy(lambda: js.localStorage.setItem("draft", draft))
+      timer = js.setTimeout(save, 500)
+      def cancel():
+          js.clearTimeout(timer)
+          save.destroy()
+      return cancel
+  ```
+
+- **Writing state from an effect works**, for example deriving one field
+  from another. The component re-renders once the effects have run. An
+  effect writing one of its own inputs does not re-trigger itself; two
+  effects that keep changing each other's inputs raise `EffectLoopError`
+  after 100 rounds instead of hanging the page. For a value that is purely
+  derived from other state, a `@property` is still simpler.
+
+Effects run synchronously and only in components that are rendered. The
+older `on_after_render(self, first)` hook still exists for code that must
+run after every render; it now fires for child components too, not only the
+root.
+
+### Async handlers and background work
+
+Any handler can be `async def`. Use it for anything that waits: a network
+request, a delay, a JavaScript promise.
+
+```xml
+<button :disabled="loading" @click="load_users">Load users</button>
+<p>{{ status }}</p>
+```
+
+```python
+import asyncio
+
+loading: bool = False
+status: str = ""
+users: list = []
+
+async def load_users(self):
+    import js
+    self.loading = True               # shown as soon as you click
+    self.status = "Loading…"
+    response = await js.fetch("assets/users.json")
+    self.users = (await response.json()).to_py()["users"]
+    self.status = f"{len(self.users)} users"
+    self.loading = False              # shown when the handler finishes
+```
+
+- **When the page updates.** Everything up to the first `await` appears in
+  the same update as the click, so a spinner or a disabled button shows
+  immediately. The component updates again when the handler finishes. To
+  show progress in between (a counter in a long loop, say), call
+  `self.state_has_changed()` after the change.
+- **`on_init` can be async**, which is the usual way to load a component's
+  data. The component renders right away with whatever it has (say,
+  "Loading…") and again when `on_init` finishes. `on_after_render` can be
+  async too; `on_dispose` cannot.
+- **Clicking again while it waits** runs the handler a second time, alongside
+  the first. Both run on one thread and only take turns at `await`, so they
+  never corrupt each other's state, but you usually want one at a time:
+  disable the button while `loading` is true, as above.
+- **Removed components stop.** If a component is removed while one of its
+  handlers is still waiting (a row deleted mid-save, a dialog closed
+  mid-request), the handler is cancelled at its current `await`, as an
+  `asyncio.CancelledError`. Catch it with `try`/`finally` to tidy up.
+- **Errors** raised after an `await` have nobody to return to, so in
+  development they appear in the error overlay with the file and line, and
+  always in the browser console with the full traceback. Everything the
+  handler changed before failing is still shown.
+
+**Starting work yourself.** `self.start_task(coroutine)` runs a coroutine
+alongside the component, with the same rules: the component updates when it
+finishes, and it is cancelled if the component is removed. It returns the
+`asyncio.Task`. For example, a clock:
+
+```python
+async def tick(self):
+    while True:
+        self.now = time.strftime("%H:%M:%S")
+        self.state_has_changed()
+        await asyncio.sleep(1)
+
+def on_init(self):
+    self.start_task(self.tick())     # stops by itself when the clock is removed
+```
+
+**Effects cannot be async** (only the reads before the first `await` could
+be tracked), but an effect can start a task. Return the task's `cancel` as
+the cleanup and only the latest run survives, which is exactly what a
+search box needs; each keystroke cancels the request still in flight:
+
+```python
+@effect
+def search_as_you_type(self):
+    task = self.start_task(self.search(self.query))
+    return task.cancel
+
+async def search(self, query):
+    await asyncio.sleep(0.3)          # wait for typing to pause
+    response = await js.fetch(f"/api/search?q={query}")
+    self.results = (await response.json()).to_py()
+```
+
+#### Heavy work: `run_in_background`
+
+Python in the browser runs on the page's main thread, so a long calculation
+freezes the page: no clicks, no repaints, until it is done. For work like
+that (parsing a big file, statistics, image processing), run it in the
+background:
+
+```python
+from pyweft import run_in_background
+
+busy: bool = False
+report: str = ""
+
+async def analyse(self):
+    self.busy = True                                   # shows immediately
+    self.report = await run_in_background(build_report, self.rows, title="Q3")
+    self.busy = False
+
+def build_report(rows, title=""):     # a plain function: no self
+    ...                               # takes seconds; the page stays responsive
+    return text
+```
+
+In the browser the call runs in a **Web Worker**: a second Python on its own
+browser thread. The page keeps responding while it works, and you `await` the
+result like any other async call. Headless (tests), and on the desktop target
+when it arrives, the same call runs on a thread instead.
+
+The worker is a separate copy of Python, which sets the rules:
+
+- **Pass a plain function** defined at the top level of the `<code>` block,
+  without `self` (or one from an importable module, such as
+  `run_in_background(statistics.median, values)`). It is found in the
+  worker by name, so methods, lambdas and nested functions are refused with
+  a clear error. Other functions and imports from the same `<code>` block are
+  available to it.
+- **It cannot see the component or the page.** Pass in the data it needs and
+  return the result; change state after the `await`, as above. `js` in the
+  worker is the worker's own scope, with no `document`.
+- **Arguments and the result must be picklable**: numbers, strings, lists,
+  dicts, tuples, sets, dates, and objects from installed packages (NumPy
+  arrays, for example). Instances of classes defined in a `.weft` file are
+  not. Everything is copied in and out, so a list the function changes in
+  the worker is not changed on the page.
+- **Exceptions come back**: `ValueError` in the worker raises `ValueError`
+  at the `await`, and the error overlay shows both lines, the `await` and the
+  line in the background function that failed.
+- **The top level of the `<code>` block runs again in the worker** (that is
+  how it finds the function), so keep page-only code such as
+  `js.document...` inside methods, where it belongs anyway.
+- **It must be a regular `def`, not `async def`.** Do any waiting (a
+  download, say) in your handler, then pass the data in:
+
+  ```python
+  async def load_report(self):
+      from pyodide.http import pyfetch
+      rows = await (await pyfetch("assets/sales.json")).json()   # waiting: on the page
+      self.report = await run_in_background(build_report, rows)  # computing: in the worker
+  ```
+
+- **Blocking is fine inside it.** `time.sleep()` or a long loop blocks only
+  the worker, never the page.
+- **`print()` and `js.console.log()` work inside it** and show up in the
+  browser's console as usual, which is handy for checking what it received.
+
+How it behaves:
+
+- **The first call starts the worker**, which loads Python and your
+  dependencies from `pyproject.toml`: a few seconds, mostly cached after the
+  first visit. Later calls start immediately. To start it early, call
+  `pyweft.background.warm_up()` in `on_init`.
+- **One worker, one call at a time**, in the order they were made. Calls
+  made while one runs wait their turn.
+- **Cancelling** (the component is removed, or an effect's cleanup cancels the
+  task) drops a call that has not started yet. A call already running
+  finishes in the worker and its result is discarded; Python in a worker
+  cannot be interrupted. For search-as-you-type, that means at most one
+  stale search runs before the latest one.
+- **Hot reload** reaches the worker too: edit the function, save, and the
+  next call runs the new code.
+
+Use it for work measured in hundreds of milliseconds or more. Each call
+copies its data both ways, so many tiny calls are slower than doing the work
+directly.
+
+**Seeing that it works.** Add a counter next to the button that starts the
+work. While the background call runs, the counter should keep counting:
+
+```xml
+<button :disabled="busy" @click="analyse">Analyse</button>
+<p>{{ report }}</p>
+<button @click="clicks += 1">clicks while it runs: {{ clicks }}</button>
+```
+
+**Common mistakes**, with the error each one gives:
+
+| You wrote | You see | Fix |
+|---|---|---|
+| `def work(self): ... self.number ...` | `AttributeError: 'int' object has no attribute 'number'`: `self` received the first argument you passed | Take the data as parameters: `def work(number)`, called as `run_in_background(work, self.number)` |
+| `run_in_background(self.work, ...)` | `TypeError: run_in_background needs a plain function, not the method ...` | Pass `work`, not `self.work`, and remove `self` from it |
+| `run_in_background(lambda: ...)` | `TypeError: ... lambdas and nested functions cannot be` | Give it a name at the top level of the `<code>` block |
+| `async def work(...)` | `BackgroundError: the result of work could not be pickled: cannot pickle 'coroutine' object` | Make it a plain `def`; await things in the handler first |
+| An argument such as an open file or a lock | `TypeError: the arguments to run_in_background(...) must be picklable` | Pass the data itself (the file's text, a list) |
+| Changing a list inside the function, expecting the page to see it | Nothing changes on the page | Return the new value and assign it after the `await` |
+| (with `pyweft run`) | `the background worker could not start: worker.js was not found (HTTP 404)` | `pyweft run` is older than PyWeft's files: restart it |
+| (on a deployed site) | the same message | Upload `worker.js` with the rest of `pyweft build`'s output |
+
+#### Threads
+
+In the browser, Python has no threads. It runs on the page's main thread,
+the same one that draws the page and handles clicks:
+
+| In the browser | What happens |
+|---|---|
+| `threading.Thread(...).start()`, `ThreadPoolExecutor` | `RuntimeError: can't start new thread` |
+| `threading.Lock()` and friends | work (harmless with one thread) |
+| `time.sleep()`, a long calculation | work, but the page is frozen until they finish |
+| `await asyncio.to_thread(work)` | works, but runs `work` right there on the main thread |
+
+So, in practice:
+
+- **For waiting** (network, delays, timers), use `async` handlers and
+  `await`, as above. No thread is needed.
+- **For heavy computation**, use `run_in_background` (above). It is the
+  portable choice: a Web Worker in the browser, a thread elsewhere.
+- **For long work that needs the component as it goes**, split it up and
+  give the page a turn every so often:
+
+  ```python
+  async def crunch(self):
+      for i, row in enumerate(self.rows):
+          process(row)
+          if i % 500 == 0:
+              self.progress = i
+              self.state_has_changed()
+              await asyncio.sleep(0)      # the page repaints and handles clicks here
+  ```
+
+- **Never change component state from another thread.** Rendering happens on
+  the main thread, and a thread writing `self.items` halfway through a render
+  can corrupt it. Return the result and assign it after the `await`, as
+  `run_in_background` makes you do. (On the desktop target, real threads
+  will exist and this matters most there.)
 
 ---
 
@@ -225,6 +535,37 @@ Any capitalized tag is a child component. PyWeft resolves `<TodoItem>` to
 uses it, with no import boilerplate.
 Resolution is recursive (children can have children) and a circular reference
 is reported as an error rather than looping.
+
+**Components in folders.** Put a folder name in front of the tag, with a
+dot, the way you would write a Python module path:
+
+| Tag | File |
+|---|---|
+| `<TodoItem />` | `todo_item.weft` next to the file using the tag |
+| `<widgets.Row />` | `widgets/row.weft` |
+| `<forms.inputs.TextField />` | `forms/inputs/text_field.weft` |
+
+A dotted tag is always looked up from the **app root** (the folder holding
+`app.weft`), no matter which file uses it, so `<shared.Icon />` means the same
+file in `app.weft` and in `forms/inputs/text_field.weft`. A plain tag inside a
+folder finds its neighbours in that folder: `forms/field.weft` can use
+`<Label />` for `forms/label.weft`.
+
+```
+myapp/
+  app.weft
+  widgets/
+    row.weft            <widgets.Row />
+  forms/
+    field.weft          <forms.Field />, which can use <Label />
+    label.weft
+  shared/
+    icon.weft           <shared.Icon />, usable from anywhere
+```
+
+Folder names must be valid Python identifiers (letters, digits, underscores);
+only the last part of the tag is capitalized. Two components may share a file
+name in different folders; their `<style>` blocks stay separate.
 
 A complete two-file example, taken from `examples/todo/`:
 
@@ -350,14 +691,18 @@ so their state follows the data when rows reorder.
 false).
 
 **Overriding the file lookup.** A `components` dict in the code block wins
-over the sibling-file convention, which is how you pull a component from
-another directory or give it a different tag name:
+over the file conventions, which is how you give a component a different tag
+name or use one from outside the app folder:
 
 ```python
 from pyweft import load_component
 
 components = {"Row": load_component("widgets/row.weft")}
 ```
+
+A relative path here is relative to the `.weft` file that contains it, not to
+the folder you started the app from, so it works the same in the browser and
+in tests.
 
 From plain Python, `component_from_source(src, components={...})` accepts the
 same dict.
@@ -376,8 +721,9 @@ uv run pyweft run myapp
 ```
 
 (Drop the `uv run` prefix if you installed with pip.) That's it — `new` scaffolds the project, `run` serves it. Open
-`http://127.0.0.1:8642/`, edit a file, refresh: no build step; components are
-compiled in the browser at load time.
+`http://127.0.0.1:8642/`, then edit a file and save: the open page updates in
+place, without losing what you'd clicked or typed (see "Hot reload" below).
+There is no build step; components are compiled in the browser.
 
 A scaffolded app looks like this:
 
@@ -386,10 +732,254 @@ myapp/
   pyproject.toml    # name + dependencies — a completely ordinary pyproject
   app.weft          # root component (must be named app.weft)
   styles.css        # global CSS; component styles go in <style> blocks
+  head.html         # extra <head> tags: CDN stylesheets, scripts, fonts
+  loading.html      # what visitors see while Python starts (see below)
 ```
 
 Add more components as sibling `.weft` files — `<TodoItem>` in a template
-finds `todo_item.weft` automatically.
+finds `todo_item.weft` automatically — or group them in folders and use
+dotted tags such as `<widgets.Row>` (section 4). `pyweft run` and `pyweft
+build` pick up `.weft` and `.css` files in subfolders too. They skip folders
+a tag cannot name (`.venv`, anything starting with `_`), `node_modules`,
+`assets/` (served as-is, see below), and build output such as `dist/`.
+
+### Hot reload
+
+While `pyweft run` is serving, every save shows up in the open page within
+about half a second, and the app keeps its state: todos you added, text
+you'd typed, toggles you'd set. What happens depends on what you saved:
+
+| You save | The page | State |
+|---|---|---|
+| a `.weft` file: template, `<code>` or `<style>` | recompiles it and patches only what changed | kept |
+| a global `.css` file | swaps the stylesheet, in the same place | kept |
+| `pyproject.toml`, `head.html` or `loading.html` | reloads (they only apply at startup) | reset |
+| anything in `assets/` | reloads (an image may be used anywhere) | reset |
+
+How state carries over:
+
+- Values of existing fields are kept. Change `count: int = 0` to
+  `count: int = 5` and a counter that is already at 3 stays at 3; the new
+  default applies to fresh components and after a reload.
+- New fields start at their default, so you can add a field and use it in the
+  template in the same save.
+- `on_init` does not run again for components that are already on the page.
+  Effects in the file you edited do re-run: their cleanup first, then the new
+  code.
+- A child component is identified by its position in the template, as on any
+  re-render. Insert something *before* it and it starts fresh; give it a
+  `key` to keep its state when it moves.
+
+**Mistakes don't break the page.** Save a syntax error or unbalanced markup
+and an overlay at the bottom shows what's wrong and where, for example:
+
+```
+app.weft, line 38: cleared: int = = 0
+SyntaxError: invalid syntax
+```
+
+The page underneath keeps running the last version that worked, so you can
+keep clicking around. Fix the file and save; the overlay goes away and the
+fix applies. An exception raised by an event handler, including an `async`
+one after its `await`, shows in the same overlay with the line in your
+`.weft` file, headed "unhandled error; the page is still running".
+
+A few more details:
+
+- **Saves made while the page is still starting** (Python is loading) are not
+  lost: the page catches up on them as soon as it is ready.
+- **One server per port.** If `pyweft run` says it cannot listen on the port,
+  another `pyweft run` is still running somewhere. Stop it, or start this one
+  with `--port 8700`.
+- **After updating PyWeft itself, restart `pyweft run`.** Your app's files
+  reload on their own, but the server's own code only loads when it starts.
+  If PyWeft changes while the server runs, open pages show an amber
+  "restart `pyweft run`" banner at the top instead of reloading into a
+  half-updated state, and the terminal says the same.
+
+Hot reload is a development feature only: `pyweft build` output contains none
+of it.
+
+### The loading screen
+
+Starting Python in the browser takes a few seconds on the first visit (the
+runtime is downloaded, then cached), so the page shows a loading screen until
+your app has rendered, then fades it out. `pyweft new` gives you the default
+one as `loading.html`: three threads weaving back and forth, with a line of
+progress text underneath. It follows the system's light or dark colors and
+calms down for visitors who prefer reduced motion.
+
+The file is plain HTML and CSS, inserted into the page before anything else
+loads, so change it however you like. Replace the animation, add your logo,
+set your brand colors:
+
+```html
+<style>
+  .splash { position: fixed; inset: 0; display: grid; place-content: center;
+            background: #1e3a5f; color: #fff; font: 600 1.4rem system-ui; }
+  .splash small { display: block; margin-top: .5rem; font-size: .9rem; }
+</style>
+<div class="splash">
+  My Todo App
+  <small data-pyweft-status></small>
+</div>
+```
+
+- **Progress messages** ("Loading Python…", "Installing humanize…") go into
+  every element with a `data-pyweft-status` attribute. Leave it out if you
+  don't want them.
+- **If startup fails**, the error appears in that same element, and the
+  wrapper (`#pyweft-loading`) gets the class `pyweft-failed`, so you can style
+  the failure state: `.pyweft-failed .splash { background: #7a1f1f; }`. The
+  full Python traceback is in the browser console.
+- **Cover the page.** Use `position: fixed; inset: 0` and a background, as
+  above, because the app is rendered underneath while the screen is up.
+- **Delete `loading.html`** to go back to the built-in default; **leave it
+  empty** for no loading screen at all. Projects created before this file
+  existed get the default automatically.
+
+With `pyweft run`, saving `loading.html` reloads the page so you see it
+again; `pyweft build` writes the screen
+into `index.html`, so it appears before any other file has downloaded.
+
+### The page head and the assets folder
+
+**`head.html`** is added to the page's `<head>`, so anything that belongs
+there goes in it: stylesheets and scripts from a CDN, web fonts, a favicon,
+meta tags.
+
+```html
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" />
+<link rel="icon" href="assets/favicon.svg" />
+<meta name="theme-color" content="#4f46e5" />
+```
+
+`pyweft new` creates one with every line commented out, as a menu of common
+uses. Saving it reloads the page.
+
+**Stylesheet order.** The page loads `head.html` first, then your own `.css`
+files in alphabetical order, then the components' `<style>` blocks. When the
+order matters, for example your overrides must come after a framework,
+link your file in `head.html` at the point where it should load:
+
+```html
+<link rel="stylesheet" href="https://cdn.example/framework.css" />
+<link rel="stylesheet" href="app/overrides.css" />
+```
+
+A `.css` file linked this way is not added a second time, and hot reload
+still swaps it in place when you save it.
+
+**The `assets/` folder** holds files the page uses as-is: images, fonts,
+icons, a vendored stylesheet or script. They are served at `assets/...`, so
+`myapp/assets/logo.svg` is `<img src="assets/logo.svg" />` in a template,
+`url("assets/inter.woff2")` in a global `.css` file, or
+`<link rel="stylesheet" href="assets/icons.css" />` in `head.html`. Files in
+`assets/` are never linked or loaded on their own, and `pyweft build` copies
+the folder unchanged.
+
+**The page starts unstyled.** PyWeft styles only its own loading screen and
+error overlay; layout, fonts and colors are yours. New projects get a simple
+centered column in `styles.css`. A project created before this changed had
+that column built in, so to keep it, add this to its `styles.css`:
+
+```css
+body { font-family: system-ui, sans-serif; max-width: 40rem;
+       margin: 3rem auto; padding: 0 1rem; color: #222; }
+```
+
+### Using CSS frameworks
+
+Class names in a template are ordinary HTML classes, so any CSS framework
+works. Delete the `body` rule from `styles.css` first, so it doesn't fight
+the framework's layout.
+
+**Bootstrap.** Link its stylesheet in `head.html`, then use its classes:
+
+```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+```
+
+```xml
+<button class="btn btn-primary" @click="save">Save</button>
+<ul :class="'dropdown-menu show' if open else 'dropdown-menu'">...</ul>
+```
+
+Use Bootstrap's CSS and leave out its JavaScript bundle. Its dropdowns and
+modals open by changing classes on elements PyWeft owns, and the next update
+to that element undoes them. Keep "open" in your component's state instead,
+as above.
+
+**Tailwind, without a build step.** Add Tailwind's browser script to
+`head.html`, optionally with your theme:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+  @theme { --color-brand: #4f46e5; }
+</style>
+```
+
+Then use classes anywhere, with nothing else to run:
+
+```xml
+<button class="bg-brand text-white rounded-lg px-4 py-2" @click="save">Save</button>
+<p :class="f'text-{level}-600'">{{ message }}</p>
+```
+
+The script watches the page and generates CSS for each class as it appears,
+so classes built in Python (the f-string above) work too. It's a large
+download and Tailwind doesn't recommend it for production, so switch to the
+CLI before you deploy.
+
+**Tailwind, with its CLI (for production).** The CLI scans your `.weft`
+files and writes a stylesheet containing only the classes you use. Put its
+input file in a folder starting with `_`, which PyWeft ignores:
+
+```css
+/* myapp/_tailwind/input.css */
+@import "tailwindcss";
+@source "../**/*.weft";
+@theme { --color-brand: #4f46e5; }
+```
+
+Install the CLI in your project, not the app (`pytailwindcss` downloads
+Tailwind's standalone binary, so Node isn't needed; with Node, use
+`npx @tailwindcss/cli` instead):
+
+```bash
+uv add --dev pytailwindcss     # or: pip install pytailwindcss
+```
+
+Run it in watch mode next to `pyweft run`:
+
+```bash
+uv run tailwindcss -i myapp/_tailwind/input.css -o myapp/tailwind.css --watch
+```
+
+and link the output first in `head.html`, so your own CSS comes after it:
+
+```html
+<link rel="stylesheet" href="app/tailwind.css" />
+```
+
+Each save regenerates `tailwind.css` and hot reload swaps it in. Before
+`pyweft build`, run the same command once without `--watch` (add `--minify`).
+
+Two things the CLI can't do, because it reads your files instead of the
+page:
+
+- **Built-up class names.** `f'text-{level}-600'` produces nothing; write the
+  classes out in full, for example
+  `:class="'text-red-600' if late else 'text-green-600'"`.
+- **Variants containing `&`.** Templates are XML, so `[&>li]:py-1` must be
+  written `[&amp;>li]:py-1`, which the CLI does not recognize. Use the
+  browser script while you need these, or give the children their own
+  classes.
+
+`@apply` works in `_tailwind/input.css`, but not in a component's `<style>`
+block, which Tailwind never reads.
 
 ### Using PyPI packages
 
@@ -444,11 +1034,12 @@ def retitle(self):
 
 - **Globals** are attributes of `js`: `js.window`, `js.document`,
   `js.console.log(...)`, `js.navigator.clipboard.writeText(text)`.
-- **Libraries** you load with a `<script>` tag in a custom shell appear the
+- **Libraries** you load with a `<script>` tag in `head.html` appear the
   same way, for example `js.Chart`.
 - **Raw JavaScript** runs with `js.eval("...")` when you need a one-off.
-- **Async APIs** such as `fetch` return promises; `await` them from an
-  `async` method (`await js.fetch(url)`), or use `pyodide.http.pyfetch`.
+- **Async APIs** such as `fetch` return promises; `await` them in an
+  `async` handler (`await js.fetch(url)`), or use `pyodide.http.pyfetch`.
+  See "Async handlers and background work" in section 2.
 - **Callbacks.** Passing a Python function to `js.setTimeout(fn, ms)` works
   for a one-shot call. For a listener that lives on, wrap it with
   `pyodide.ffi.create_proxy(fn)` and call `.destroy()` when you remove it,
@@ -489,9 +1080,14 @@ install on first visit.
 dist/
   index.html        shell: loads Pyodide, installs deps, boots app.weft
   runtime.js        applies DOM patches, sends events back to Python
+  worker.js         the Web Worker for run_in_background (started on first use)
   pyweft-src/*.py   the framework, served to the browser
   app/              your .weft components and .css files, copied as-is
+  assets/           your assets/ folder, copied as-is
 ```
+
+`head.html` and `loading.html` are written into `index.html` rather than
+copied.
 
 **Check it locally** the way a host will serve it before deploying:
 
@@ -558,20 +1154,77 @@ patches = diff(tree, new_tree)        # JSON-serialisable patch ops
 assert app.cheers == 1
 ```
 
+Effects and `on_after_render` run when the host reports that a render is on
+the page, so a test that exercises them calls `renderer.after_render()` after
+each render. It returns `True` when an effect changed state; render again and
+repeat until it returns `False`.
+
+Components with async handlers or an async `on_init` need an event loop, so
+test them inside `asyncio.run`. Call `renderer.init_root()` to run the root's
+`on_init` (child components get theirs automatically), and
+`await renderer.idle()` to wait for every pending handler and task:
+
+```python
+import asyncio
+
+async def main():
+    app = App()
+    renderer = Renderer(app)
+    renderer.init_root()
+    tree = renderer.render()                       # "Loading…"
+    renderer.dispatch(tree[0].events["click"], {})
+    await renderer.idle()                          # the handler has finished
+    assert not app.loading
+    new_tree = renderer.render()                   # the finished state
+
+asyncio.run(main())
+```
+
+`run_in_background` calls run on a thread in tests, through the same
+lookup-by-name and pickling as the browser's worker, so a function or
+argument the worker could not handle fails in the test too.
+
+Errors in async handlers have no caller to raise to; set
+`renderer.on_error` to a function to receive them, as the browser does to
+show them in the overlay.
+
+To see changes made outside a handler, set `renderer.on_invalidate` to a
+function; it is called whenever `state_has_changed()` runs and no render is
+already on its way. The browser uses it to schedule a render; a test can use
+it to assert that one was requested, and `renderer.needs_render()` reports
+whether any component is waiting to be redrawn.
+
 `examples/demo.py` walks the full render → event → diff → apply cycle in the
-terminal, and `tests/test_compose.py` shows the patterns for testing composed
-components.
+terminal, `tests/test_compose.py` shows the patterns for testing composed
+components, `tests/test_effects.py` the patterns for effects, and
+`tests/test_async.py` the patterns for async handlers and tasks.
 
 ---
 
 ## 7. What's here and what's coming
 
-Working today: templates, expression/attribute binding, two-way `@bind`,
-conditionals, keyed lists, components with props + events + lifecycle,
-computed properties, browser rendering via Pyodide, PyPI dependencies via
-pyproject.toml, and the `pyweft new` / `run` / `build` CLI.
+Working today:
 
-Coming next, roughly in order: slots, a pywebview **desktop** host (same
-components, native window), async handlers, hot-reload for `pyweft run`,
-watchers, scoped CSS.
+- **Components:** XML templates with `{{ }}` and `:attr` bindings, two-way
+  `@bind`, event handlers (methods, expressions or inline statements),
+  `<If>`/`<For>` with keyed lists, `@property` computed values.
+- **Composition:** child components with props, events (`emit`) and
+  lifecycle hooks; components in subfolders as `<folder.Name>`.
+- **Reacting to change:** `@effect` methods with automatic dependency
+  tracking and cleanup; `state_has_changed()` for changes from timers and
+  callbacks.
+- **Async:** `async def` handlers and `on_init`, `self.start_task()` for
+  background work, cancellation when a component is removed.
+- **Heavy work:** `run_in_background()` runs a function in a Web Worker, so
+  the page stays responsive; on a thread outside the browser.
+- **Styling:** scoped `<style>` blocks, global `.css` files, `head.html` for
+  CDN stylesheets and scripts, an `assets/` folder, so CSS frameworks such as
+  Tailwind and Bootstrap work.
+- **Tooling:** `pyweft new` / `run` / `build`; hot reload that keeps state,
+  with an error overlay; a customizable loading screen; PyPI dependencies
+  from `pyproject.toml`, installed in the browser.
+
+Coming next, roughly in order: slots (passing markup into a child
+component), and a pywebview **desktop** host (same components, native
+window, real threads).
 

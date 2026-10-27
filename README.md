@@ -11,10 +11,40 @@ write components and start a project.
 
 ## Status
 
-**The render core is done and tested, and the web target works**: components
-run in the browser on Pyodide (CPython in WebAssembly), patching real DOM
-through `static/runtime.js`. Component composition is in — props, `:expr`
-bindings, `emit`, lifecycle, sibling-file component resolution.
+**Working proof of concept; the web target runs today.** Components run in the
+browser on Pyodide (CPython in WebAssembly), patching the real DOM. The desktop
+target (pywebview) is next. APIs may still move.
+
+## Features
+
+- **Components** — `.weft` files: an XML template, a Python `<code>` block and
+  an optional scoped `<style>` block. `{{ }}` and `:attr` bindings, two-way
+  `@bind`, `@click` handlers (a method, an expression or an inline statement),
+  `<If>`/`<ElseIf>`/`<Else>` and keyed `<For>`, `@property` computed values.
+- **Composition** — child components with props, events (`self.emit`) and
+  lifecycle hooks (`on_init`, `on_after_render`, `on_dispose`). Group them in
+  folders and use them as `<widgets.Row>`.
+- **Effects** — `@effect` methods re-run after a render when state they read
+  changed; dependencies are tracked automatically; return a function for
+  cleanup.
+- **Async** — `async def` handlers and `on_init`: the code before the first
+  `await` shows with the click, the rest when it finishes. `self.start_task()`
+  runs background work; a component's tasks are cancelled when it is removed.
+- **Heavy work** — `await run_in_background(fn, *args)` runs a plain function
+  in a Web Worker (a second Python on its own browser thread), so the page
+  stays responsive; outside the browser it runs on a thread.
+  ([Details and rules](docs/getting-started.md#heavy-work-run_in_background);
+  [threads](docs/getting-started.md#threads).)
+- **Styling** — scoped component styles, global `.css` files, `head.html` for
+  CDN stylesheets, scripts and fonts, and an `assets/` folder for images and
+  fonts. CSS frameworks such as Tailwind and Bootstrap work; the guide has
+  [both setups](docs/getting-started.md#using-css-frameworks).
+- **Dev loop** — `pyweft run` serves the app and hot-reloads every save while
+  keeping state (form input, toggles, lists); mistakes show in an error
+  overlay with the `.weft` file and line, while the page keeps running.
+- **Ship** — `pyweft build` writes a static site for any host. PyPI
+  dependencies come from the app's ordinary `pyproject.toml` and install in
+  the browser. A customizable loading screen shows while Python starts.
 
 Use it in a project (not on PyPI yet, so install from GitHub):
 
@@ -29,7 +59,7 @@ Work on the framework itself:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev         # or: pip install -e ".[dev]"
-uv run pytest               # 507 tests
+uv run pytest               # 657 tests
 uv run python examples/demo.py   # render -> event -> diff -> apply, no browser
 uv run pyweft run examples/todo  # the todo app live in the browser at :8642 —
                                  # composed components + a PyPI dep via micropip
@@ -107,7 +137,9 @@ markup is a tarpit; elements sidestep it entirely.
 
 A `<style>` block in the same file is scoped to the component: its selectors
 only match elements that component renders, so `.row` in two components never
-collide. Page-wide CSS goes in `.css` files in the app directory.
+collide. Page-wide CSS goes in `.css` files in the app directory; CDN
+stylesheets and scripts (Tailwind, Bootstrap, web fonts) go in `head.html`, and
+images and fonts in `assets/`.
 
 Split files work too: put the markup in `Counter.weft` and the code in a normal
 module if you prefer code-behind to single-file.
@@ -115,8 +147,12 @@ module if you prefer code-behind to single-file.
 ## Reactivity
 
 No observables, no proxies. A handler runs, the
-component re-renders, the tree is diffed. Mutating state outside a handler (a
-timer, an async callback) means calling `state_has_changed()` yourself.
+component re-renders, the tree is diffed. Handlers may be `async def`: the
+part before the first `await` renders with the click, the rest when the
+handler finishes. Mutating state outside a handler (a timer, a JavaScript
+callback) means calling `state_has_changed()` yourself. `@effect` methods
+are the one place dependencies are tracked: they run against a stand-in for
+`self` that records what they read, and re-run only when that changed.
 
 That's ~30 lines instead of ~800 for a signals system, and it covers almost
 everything. Fine-grained reactivity can be added later without changing the
@@ -154,7 +190,7 @@ simply vanish and a late event against a stale id is a no-op, not a crash.
 ## Testing approach
 
 The differ is tested by **convergence, not op sequences**: apply the patches to
-the old tree and assert the result equals the new tree. 400 of the 507 tests are
+the old tree and assert the result equals the new tree. 400 of the 657 tests are
 randomised trees checked this way. Asserting exact op lists would lock in the
 current algorithm and still miss the index bugs that actually bite.
 
@@ -169,24 +205,32 @@ current algorithm and still miss the index bugs that actually bite.
   the next composition gap to close.
 - Whitespace-only text containing a newline is dropped as formatting.
 - `key` is reserved as an attribute name on elements.
+- No threads in the browser (a Pyodide limit): blocking code freezes the page.
+  Use `async`/`await` for waiting and `run_in_background` for heavy work.
+- `run_in_background` uses one worker, one call at a time, and cannot
+  interrupt a call already running; the function must be a plain
+  (non-`async`) top-level function, and arguments and results must be
+  picklable.
+- `@effect` methods cannot be `async`; start a task from the effect instead.
 
 ## Roadmap
 
-**Done:** the JS runtime mirroring `dommodel.py`; the Pyodide web target;
-component composition (props, `:expr` bindings, `emit`, lifecycle, sibling-file
-resolution).
+**Done:**
 
-**Done:** component-scoped `<style>` blocks.
-
-**Done (continued):** the `pyweft` CLI — `new` scaffolds an app, `run` serves it
-with refresh-on-save, `build` emits a static site; PyPI dependencies declared
-in the app's ordinary `pyproject.toml` (add them with `uv add`/pip) and
-installed in-browser by micropip at load.
+- Render core, differ and the JS runtime; the Pyodide web target.
+- Composition: props, `:expr` bindings, `emit`, lifecycle, sibling-file and
+  folder (`<widgets.Row>`) resolution.
+- Scoped `<style>` blocks; `head.html` and `assets/` for CSS frameworks.
+- `@effect` with automatic dependency tracking and cleanup.
+- Async handlers, async `on_init`, `start_task()`, cancellation on removal.
+- `run_in_background()`: heavy work in a Web Worker in the browser.
+- The `pyweft` CLI: `new`, `run` with state-preserving hot reload and an
+  error overlay, `build` to a static site; PyPI dependencies from
+  `pyproject.toml`; a customizable loading screen.
 
 **Next (finishes the PoC):** slots; a pywebview desktop host with the bridge
-wired both ways; an asyncio render queue so async handlers and re-entrant
-events work; hot-reload for `pyweft run`.
+wired both ways.
 
-**Later:** watchers, provide/inject; Briefcase packaging for
+**Later:** provide/inject; Briefcase packaging for
 mobile; codegen-to-Python-source rendering if the tree-walking interpreter
 gets hot; devtools.

@@ -1,0 +1,62 @@
+<!--
+  Loading screen, shown while Python starts in the browser: a few seconds on
+  the first visit, quicker once the browser has cached it. It disappears as
+  soon as the app has rendered.
+
+  Edit freely; this is plain HTML and CSS.
+  - Any element with a data-pyweft-status attribute receives progress
+    messages ("Installing packages...", and the error if startup fails).
+  - While loading, the wrapper element is #pyweft-loading. It gets the
+    pyweft-failed class if startup fails.
+  - Delete this file to go back to PyWeft's built-in loading screen, or leave
+    it empty to show no loading screen at all.
+-->
+<style>
+  .pyweft-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 1.1rem;
+    background: Canvas;
+    color: CanvasText;
+    font-family: system-ui, sans-serif;
+  }
+  .pyweft-loader__threads {
+    display: grid;
+    gap: 8px;
+    width: 4.5rem;
+  }
+  .pyweft-loader__threads span {
+    height: 5px;
+    border-radius: 3px;
+    background: currentColor;
+    animation: pyweft-weave 1.4s ease-in-out infinite;
+  }
+  .pyweft-loader__threads span:nth-child(2) { animation-delay: -0.45s; }
+  .pyweft-loader__threads span:nth-child(3) { animation-delay: -0.9s; }
+  .pyweft-loader__status {
+    margin: 0 1.5rem;
+    max-width: 36rem;
+    text-align: center;
+    font-size: 0.9rem;
+    opacity: 0.65;
+  }
+  @keyframes pyweft-weave {
+    0%, 100% { transform: translateX(-28%) scaleX(0.45); opacity: 0.35; }
+    50% { transform: translateX(28%) scaleX(0.45); opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pyweft-loader__threads span { animation: none; opacity: 0.5; }
+  }
+  .pyweft-failed .pyweft-loader__threads span { animation: none; background: #c0392b; }
+  .pyweft-failed .pyweft-loader__status { color: #c0392b; opacity: 1; }
+</style>
+<div class="pyweft-loader">
+  <div class="pyweft-loader__threads" aria-hidden="true">
+    <span></span><span></span><span></span>
+  </div>
+  <p class="pyweft-loader__status" data-pyweft-status>Starting…</p>
+</div>

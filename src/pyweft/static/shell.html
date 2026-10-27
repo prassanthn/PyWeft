@@ -6,39 +6,89 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>__PYWEFT_TITLE__</title>
+  <!-- Only PyWeft's own elements are styled here. The page itself is left to
+       the app, so CSS frameworks see browser defaults, not a layout to undo. -->
   <style>
-    body {
-      font-family: system-ui, sans-serif;
-      max-width: 40rem;
-      margin: 3rem auto;
-      padding: 0 1rem;
-      color: #222;
+    /* Fades the loading screen out once the app has rendered. */
+    #pyweft-loading { transition: opacity 0.25s ease; }
+    #pyweft-loading.pyweft-done { opacity: 0; pointer-events: none; }
+    /* Development only (pyweft run): errors from a hot reload or a handler. */
+    #pyweft-dev-error, #pyweft-dev-stale {
+      position: fixed; left: 1rem; right: 1rem; bottom: 1rem; z-index: 2147483647;
+      max-height: 50vh; overflow: auto; padding: 0.9rem 1.1rem;
+      border-left: 4px solid #e5484d; border-radius: 8px;
+      background: #2b1213; color: #ffd8d8;
+      font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
     }
-    #pyweft-status { color: #888; font-size: 0.9rem; }
+    #pyweft-dev-error strong, #pyweft-dev-stale strong { display: block; margin-bottom: 0.35rem; color: #fff; font: 600 14px system-ui, sans-serif; }
+    #pyweft-dev-error pre, #pyweft-dev-stale pre { margin: 0; white-space: pre-wrap; font: inherit; }
+    #pyweft-dev-stale { top: 1rem; bottom: auto; border-left-color: #f5a524; background: #2b2110; color: #ffe7b8; }
   </style>
+  __PYWEFT_HEAD__
   __PYWEFT_CSS__
-  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
-  <script src="runtime.js"></script>
+  <!-- defer: without it nothing paints, loading screen included, until the
+       Pyodide loader has downloaded from the CDN. -->
+  <script defer src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+  <script defer src="runtime.js"></script>
 </head>
 <body>
-  <p id="pyweft-status">Booting Python (WASM)…</p>
+  <div id="pyweft-loading" role="status" aria-live="polite">__PYWEFT_LOADING__</div>
   <div id="app"></div>
 
   <script>
     const MODULES = __PYWEFT_MODULES__;
     const APP_FILES = __PYWEFT_APP_FILES__;
     const PACKAGES = __PYWEFT_PACKAGES__;
+    const DEV = __PYWEFT_DEV__; // pyweft run: hot reload and the error overlay
+    const SINCE = __PYWEFT_SINCE__; // dev server changes already in this page
 
     // The Python half of the bridge. Renders, dispatches, diffs -- and talks
     // JSON strings across the boundary to keep proxy lifetimes out of play.
     const BOOTSTRAP = `
 import json
+import js
 from pyweft import Renderer, collect_styles, diff, load_component, to_dicts
 
 _component_cls = load_component("/app/app.weft")
 _component = _component_cls()
-_component.on_init()
 _renderer = Renderer(_component)
+# state_has_changed() from a timer, JS callback or asyncio task lands here.
+_renderer.on_invalidate = js.pyweftScheduleRender
+
+def _task_error(exc):
+    # A failed async handler or task: nobody is left to raise it to.
+    import traceback
+    from pyweft.hotreload import format_error
+    js.pyweftTaskError(
+        format_error(exc, root="/app"), "".join(traceback.format_exception(exc))
+    )
+
+_renderer.on_error = _task_error
+
+class _WorkerHost:
+    # run_in_background() calls go to pyweftWorker (a Web Worker) and back,
+    # as pickled bytes.
+    async def call(self, request):
+        from pyodide.ffi import JsException, to_js
+        from pyweft.background import BackgroundError
+        job = js.pyweftWorker.call(to_js(request))
+        try:
+            reply = await job.done
+        except JsException as exc:
+            raise BackgroundError(str(exc).removeprefix("Error: ")) from None
+        except BaseException:  # cancelled: drop the call if it hasn't started
+            js.pyweftWorker.cancel(job.id)
+            raise
+        return reply.to_bytes()
+
+    def warm_up(self):
+        js.pyweftWorker.start()
+
+from pyweft import background as _background
+_background.set_host(_WorkerHost())
+
+_renderer.init_root()  # an async on_init keeps running as a task
 _tree = _renderer.render()
 
 def pyweft_initial():
@@ -55,21 +105,295 @@ def pyweft_dispatch(handler_id, event_json):
     ops = diff(_tree, new_tree)
     _tree = new_tree
     return json.dumps(ops)
+
+def pyweft_rerender():
+    # A render requested from outside a handler. null when it was already
+    # covered (an event's render got there first) or nothing is dirty.
+    global _tree
+    if not _renderer.needs_render():
+        return "null"
+    new_tree = _renderer.render()
+    ops = diff(_tree, new_tree)
+    _tree = new_tree
+    return json.dumps(ops)
+
+def pyweft_after_render():
+    # Runs effects and on_after_render now that the patches are on the page.
+    # null means settled; a list is a follow-up render to apply, after which
+    # this must be called again (state can change without changing the DOM).
+    global _tree
+    if not _renderer.after_render():
+        return "null"
+    new_tree = _renderer.render()
+    ops = diff(_tree, new_tree)
+    _tree = new_tree
+    return json.dumps(ops)
+
+def pyweft_hot_reload():
+    # Development: recompile the app from /app (changed files are already
+    # written there) and move the live components onto the new classes,
+    # keeping their state. Returns the patch, or the error to show; on error
+    # the page keeps running the last good version.
+    from pyweft.hotreload import format_error, hot_swap
+    global _component_cls, _tree
+    try:
+        new_cls = load_component("/app/app.weft")
+        changed = hot_swap(_renderer, new_cls)
+        new_tree = _renderer.render()
+        ops = diff(_tree, new_tree)
+    except Exception as exc:
+        return json.dumps({"error": format_error(exc, root="/app")})
+    _component_cls = new_cls
+    _tree = new_tree
+    return json.dumps({"ops": ops, "css": collect_styles(new_cls), "changed": changed})
 `;
 
+    // Progress text goes to every element the loading screen marked for it;
+    // a custom loading screen without one simply shows no messages.
+    const setStatus = (text) => {
+      for (const el of document.querySelectorAll("[data-pyweft-status]")) {
+        el.textContent = text;
+      }
+    };
+
+    function hideLoading() {
+      const el = document.getElementById("pyweft-loading");
+      if (!el) return;
+      el.classList.add("pyweft-done");
+      // Wait for a fade if the loading screen defines one, but never rely on
+      // transitionend alone: a custom screen may have no transition at all.
+      const ms = parseFloat(getComputedStyle(el).transitionDuration) * 1000 || 0;
+      setTimeout(() => el.remove(), ms);
+    }
+
+    // A Python error's message is the whole traceback; its last line is the
+    // error itself.
+    const lastLine = (err) => {
+      const lines = String(err?.message ?? err).trim().split("\n");
+      return lines[lines.length - 1];
+    };
+
+    async function writeAppFile(pyodide, name) {
+      // name may include folders ("widgets/row.weft" for <widgets.Row>).
+      const dir = name.includes("/") ? name.slice(0, name.lastIndexOf("/")) : "";
+      if (dir) pyodide.FS.mkdirTree(`/app/${dir}`);
+      const src = await (await fetch(`app/${name}`)).text();
+      pyodide.FS.writeFile(`/app/${name}`, src);
+      return src;
+    }
+
+    // run_in_background's browser half: one Web Worker (static/worker.js)
+    // running its own Python, started on first use. Calls run one at a time,
+    // in order. The queue lives here rather than in the worker so that a
+    // cancelled call that has not started can simply be dropped.
+    const pyweftWorker = {
+      worker: null,
+      ready: false,
+      queue: [],
+      running: null,
+      nextId: 1,
+
+      start() {
+        if (this.worker) return;
+        this.ready = false;
+        this.worker = new Worker("worker.js");
+        this.worker.onmessage = ({ data }) => this.receive(data);
+        // Fires when worker.js cannot be loaded, or when the running worker
+        // dies (an uncaught error, out of memory).
+        this.worker.onerror = (event) => {
+          event.preventDefault();
+          if (this.ready) {
+            this.fail(`the background worker stopped: ${event.message || "it crashed (out of memory?)"}`);
+          } else {
+            this.explainStartFailure(event.message);
+          }
+        };
+        this.worker.postMessage({
+          type: "init",
+          pyodideUrl: document.querySelector('script[src*="pyodide.js"]').src,
+          modules: MODULES,
+          appFiles: APP_FILES,
+          packages: PACKAGES,
+        });
+      },
+
+      call(request) {
+        // A compact copy we own, so its buffer can be transferred.
+        const job = { id: this.nextId++, request: request.slice() };
+        job.done = new Promise((resolve, reject) => {
+          job.resolve = resolve;
+          job.reject = reject;
+        });
+        this.queue.push(job);
+        this.start();
+        this.pump();
+        return { id: job.id, done: job.done };
+      },
+
+      cancel(id) {
+        // A call already running cannot be stopped short of killing the
+        // worker (and its warm interpreter); its reply is just ignored.
+        this.queue = this.queue.filter((job) => job.id !== id);
+      },
+
+      pump() {
+        if (!this.ready || this.running || !this.queue.length) return;
+        this.running = this.queue.shift();
+        const { id, request } = this.running;
+        this.worker.postMessage({ type: "call", id, request }, [request.buffer]);
+      },
+
+      receive(data) {
+        if (data.type === "ready") {
+          this.ready = true;
+          this.pump();
+        } else if (data.type === "failed") {
+          this.fail(`the background worker could not start: ${data.error}`);
+        } else if (data.type === "reply") {
+          const job = this.running;
+          this.running = null;
+          if (data.error) job.reject(new Error(data.error));
+          else job.resolve(data.reply);
+          this.pump();
+        }
+      },
+
+      // A script that fails to load gives an error event with no message at
+      // all, so ask the server what is wrong with worker.js.
+      async explainStartFailure(message) {
+        let why = message;
+        if (!why) {
+          try {
+            const response = await fetch("worker.js", { cache: "no-store" });
+            if (!response.ok) {
+              why = `worker.js was not found (HTTP ${response.status}). ` + (DEV
+                ? "This `pyweft run` is older than PyWeft's files: restart it."
+                : "Deploy worker.js next to index.html (pyweft build writes it).");
+            }
+          } catch {
+            why = "worker.js could not be downloaded";
+          }
+        }
+        this.fail(`the background worker could not start: ${why || "worker.js failed to load"}`);
+      },
+
+      fail(message) {
+        const jobs = [this.running, ...this.queue].filter(Boolean);
+        this.worker?.terminate();
+        this.worker = null;
+        this.running = null;
+        this.queue = [];
+        for (const job of jobs) job.reject(new Error(message));
+      },
+
+      // Hot reload: the worker has its own copy of the app's files.
+      updateFiles(write, remove) {
+        if (this.worker) this.worker.postMessage({ type: "files", write, remove });
+      },
+    };
+
+    function setComponentCss(text) {
+      let styleEl = document.getElementById("pyweft-component-styles");
+      if (!styleEl) {
+        styleEl = document.createElement("style");
+        styleEl.id = "pyweft-component-styles";
+        document.head.appendChild(styleEl);
+      }
+      styleEl.textContent = text;
+    }
+
+    // ------------------------------------------------- development only
+
+    const RELOAD_ERROR =
+      "PyWeft: fix the error and save; the page keeps its last working version";
+    const RUNTIME_ERROR = "PyWeft: unhandled error; the page is still running";
+
+    function showDevError(text, title = RELOAD_ERROR) {
+      let el = document.getElementById("pyweft-dev-error");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "pyweft-dev-error";
+        el.setAttribute("role", "alert");
+        el.innerHTML = "<strong></strong><pre></pre>";
+        document.body.appendChild(el); // outside #app, which the runtime owns
+      }
+      el.querySelector("strong").textContent = title;
+      el.querySelector("pre").textContent = text;
+    }
+
+    const hideDevError = () => document.getElementById("pyweft-dev-error")?.remove();
+
+    // The dev server's own code changed under it. Separate from the error
+    // overlay (at the top, and not cleared by a successful hot reload)
+    // because nothing but a restart fixes it.
+    function showStaleServer() {
+      if (document.getElementById("pyweft-dev-stale")) return;
+      const el = document.createElement("div");
+      el.id = "pyweft-dev-stale";
+      el.setAttribute("role", "alert");
+      el.innerHTML = "<strong>PyWeft: restart <code>pyweft run</code></strong><pre></pre>";
+      el.querySelector("pre").textContent =
+        "PyWeft was updated, but the server is still running the old code.\n" +
+        "Stop it (Ctrl-C), start `pyweft run` again, then reload this page.";
+      document.body.appendChild(el);
+    }
+
+    // Matched by URL, not by attribute: head.html may link app/ files itself
+    // (to control their order), and those must be swapped in their place.
+    function cssLinks(name) {
+      const target = new URL(`app/${name}`, document.baseURI).href;
+      return [...document.querySelectorAll('link[rel~="stylesheet"]')].filter(
+        (link) => link.href.split(/[?#]/)[0] === target
+      );
+    }
+
+    function refreshCss(name) {
+      const old = cssLinks(name)[0];
+      const link = old ? old.cloneNode() : document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = `app/${name}?v=${Date.now()}`;
+      // Swap once the new sheet has loaded, so the page never goes unstyled.
+      link.onload = () => {
+        for (const other of cssLinks(name)) if (other !== link) other.remove();
+      };
+      (old ?? document.head.lastElementChild).after(link);
+    }
+
+    function watchForChanges(onUpdate) {
+      let serverId = null;
+      // Saves made while the page was starting are replayed from SINCE.
+      const source = new EventSource(`__pyweft/events?since=${SINCE}`);
+      source.onmessage = (message) => {
+        const event = JSON.parse(message.data);
+        if (event.type === "hello") {
+          // Reconnected to a restarted `pyweft run`: start fresh.
+          if (serverId !== null && event.server !== serverId) location.reload();
+          serverId = event.server;
+          if (event.stale) showStaleServer();
+        } else if (event.type === "stale") {
+          showStaleServer();
+        } else if (event.type === "reload") {
+          console.info(`PyWeft: ${event.reason}, reloading the page`);
+          location.reload();
+        } else if (event.type === "update") {
+          onUpdate(event);
+        }
+      };
+    }
+
     async function main() {
-      const status = document.getElementById("pyweft-status");
+      setStatus("Loading Python…");
       const pyodide = await loadPyodide();
       window.pyodide = pyodide; // console/devtools access to the live interpreter
 
       if (PACKAGES.length) {
-        status.textContent = `Installing ${PACKAGES.join(", ")}…`;
+        setStatus(`Installing ${PACKAGES.join(", ")}…`);
         await pyodide.loadPackage("micropip");
         const micropip = pyodide.pyimport("micropip");
         await micropip.install(pyodide.toPy(PACKAGES));
       }
 
-      status.textContent = "Loading pyweft…";
+      setStatus("Loading app…");
       pyodide.FS.mkdirTree("/pyweft-src/pyweft");
       for (const name of MODULES) {
         const src = await (await fetch(`pyweft-src/${name}`)).text();
@@ -79,39 +403,119 @@ def pyweft_dispatch(handler_id, event_json):
 
       pyodide.FS.mkdirTree("/app");
       for (const name of APP_FILES) {
-        const src = await (await fetch(`app/${name}`)).text();
-        pyodide.FS.writeFile(`/app/${name}`, src);
+        await writeAppFile(pyodide, name);
       }
+
+      // Called from Python whenever state changed outside a handler. Many
+      // calls in one task collapse into a single render on the next microtask.
+      let mounted = false;
+      let renderQueued = false;
+      window.pyweftScheduleRender = () => {
+        if (renderQueued) return;
+        renderQueued = true;
+        queueMicrotask(() => {
+          renderQueued = false;
+          if (!mounted) return; // the initial mount renders everything anyway
+          const ops = JSON.parse(pyodide.runPython("pyweft_rerender()"));
+          if (ops !== null) {
+            PyWeftRuntime.applyOps(ops);
+            settle();
+          }
+        });
+      };
+
+      window.pyweftWorker = pyweftWorker; // the `js` module sees globals only
+
+      window.pyweftTaskError = (summary, traceback) => {
+        if (DEV) showDevError(summary, RUNTIME_ERROR);
+        console.error(traceback);
+      };
+
       pyodide.runPython(BOOTSTRAP);
 
       // Component <style> blocks. The core only produces the CSS text; putting
       // it in the document is the host's job, like applying patch ops.
-      const scopedCss = pyodide.runPython("pyweft_styles()");
-      if (scopedCss) {
-        const styleEl = document.createElement("style");
-        styleEl.id = "pyweft-component-styles";
-        styleEl.textContent = scopedCss;
-        document.head.appendChild(styleEl);
-      }
+      setComponentCss(pyodide.runPython("pyweft_styles()"));
 
       const initial = pyodide.globals.get("pyweft_initial");
       const dispatch = pyodide.globals.get("pyweft_dispatch");
+      const afterRender = pyodide.globals.get("pyweft_after_render");
+
+      // Python raises if effects never settle, so this loop terminates.
+      const settle = () => {
+        for (let ops; (ops = JSON.parse(afterRender())) !== null; ) {
+          PyWeftRuntime.applyOps(ops);
+        }
+      };
 
       PyWeftRuntime.init(document.getElementById("app"), (handlerId, event) => {
-        const ops = JSON.parse(dispatch(handlerId, JSON.stringify(event)));
-        PyWeftRuntime.applyOps(ops);
-        pyodide.runPython("_component.on_after_render(False)");
+        try {
+          const ops = JSON.parse(dispatch(handlerId, JSON.stringify(event)));
+          PyWeftRuntime.applyOps(ops);
+          settle();
+        } catch (err) {
+          if (DEV) showDevError(lastLine(err), RUNTIME_ERROR);
+          throw err; // full traceback in the console
+        }
       });
       PyWeftRuntime.mount(JSON.parse(initial()));
-      pyodide.runPython("_component.on_after_render(True)");
+      mounted = true;
+      settle();
+      hideLoading();
 
-      status.textContent =
-        `Running: Python ${pyodide.runPython("import sys; sys.version.split()[0]")} in WebAssembly`;
+      console.info(
+        `PyWeft: Python ${pyodide.runPython("import sys; sys.version.split()[0]")} running in WebAssembly`
+      );
+
+      if (DEV) {
+        // Saved files arrive here; each update waits for the previous one.
+        let queue = Promise.resolve();
+        watchForChanges((event) => {
+          queue = queue
+            .then(() => applyUpdate(pyodide, settle, event))
+            .catch((err) => {
+              showDevError(lastLine(err));
+              console.error(err);
+            });
+        });
+      }
     }
 
-    main().catch((err) => {
-      document.getElementById("pyweft-status").textContent = `Failed to start: ${err}`;
-      throw err;
+    async function applyUpdate(pyodide, settle, event) {
+      for (const name of event.css) refreshCss(name);
+      for (const name of event.css_removed) {
+        for (const link of cssLinks(name)) link.remove();
+      }
+      if (!event.weft.length && !event.weft_removed.length) return;
+
+      const written = {};
+      for (const name of event.weft) written[name] = await writeAppFile(pyodide, name);
+      for (const name of event.weft_removed) {
+        try { pyodide.FS.unlink(`/app/${name}`); } catch {}
+      }
+      pyweftWorker.updateFiles(written, event.weft_removed);
+      const result = JSON.parse(pyodide.runPython("pyweft_hot_reload()"));
+      if (result.error) {
+        showDevError(result.error);
+        return;
+      }
+      setComponentCss(result.css);
+      PyWeftRuntime.applyOps(result.ops);
+      settle();
+      hideDevError();
+      const names = result.changed.map((f) => f.replace(/^\/app\//, ""));
+      console.info(`PyWeft: hot-reloaded ${names.join(", ") || "app"}`);
+    }
+
+    // Deferred scripts (Pyodide, runtime.js) have run by DOMContentLoaded.
+    document.addEventListener("DOMContentLoaded", () => {
+      main().catch((err) => {
+        document.getElementById("pyweft-loading")?.classList.add("pyweft-failed");
+        setStatus(`Failed to start: ${lastLine(err)}`); // full traceback: console
+        // In development, the next save gets a fresh start.
+        if (DEV) watchForChanges(() => location.reload());
+        throw err;
+      });
     });
   </script>
 </body>

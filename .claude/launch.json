@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "pyweft-todo",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "pyweft", "run", "examples/todo", "--port", "8643"],
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "--no-sync", "pyweft", "run", "examples/todo", "--port", "8643"],
       "port": 8643
     }
   ]

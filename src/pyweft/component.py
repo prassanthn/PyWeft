@@ -11,10 +11,13 @@ from __future__ import annotations
 import copy
 import re
 import textwrap
+from contextvars import ContextVar
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
 from .parser import (
+    _CODE_RE,
     TElement,
     TemplateError,
     TFor,
@@ -61,13 +64,36 @@ class Component:
     # ------------------------------------------------------------ lifecycle
 
     def on_init(self) -> None:
-        """Called once before the first render."""
+        """Called once before the first render. May be ``async``: the part
+        before the first ``await`` is in the first render, and the component
+        renders again when it finishes."""
 
     def on_after_render(self, first: bool) -> None:
-        """Called after each render has been applied."""
+        """Called after each render has been applied. May be ``async``."""
 
     def on_dispose(self) -> None:
-        """Called when the component is torn down."""
+        """Called when the component is torn down. Must not be ``async``:
+        the component's tasks are cancelled just before this runs."""
+
+    def start_task(self, awaitable: Any) -> Any:
+        """Run a coroutine (or other awaitable) as a task this component owns,
+        and return the ``asyncio.Task``.
+
+        The component re-renders when the task finishes and the task is
+        cancelled if the component is removed first. Call
+        ``state_has_changed()`` inside it to show progress before the end.
+        Works once the component is rendered, from ``on_init`` onwards.
+        """
+        start = self.__dict__.get("_pw_start")
+        if start is None:
+            if hasattr(awaitable, "close"):
+                awaitable.close()  # no "never awaited" warning on top
+            raise RuntimeError(
+                f"{type(self).__name__}.start_task() needs the component to be "
+                "rendered (call it from on_init or later, not __init__), and "
+                "not yet removed"
+            )
+        return start(awaitable)
 
     # ---------------------------------------------------------------- state
 
@@ -75,6 +101,11 @@ class Component:
         self._dirty = True
         if self._on_change is not None:
             self._on_change(self)
+        # Set by the Renderer that owns this instance; how a change made
+        # outside a handler (timer, JS callback, asyncio task) reaches the host.
+        invalidate = self.__dict__.get("_pw_invalidate")
+        if invalidate is not None:
+            invalidate()
 
     def emit(self, event: str, payload: Any = None) -> Any:
         """Invoke the parent's ``@event`` callback, Vue-style.
@@ -89,20 +120,33 @@ class Component:
         return None
 
 
+def compile_code_block(src: str, filename: str) -> Any:
+    """The ``<code>`` block of a ``.weft`` source, compiled so that line
+    numbers in tracebacks are lines of the file, not of the block.
+    (split_source's own output stays unpadded.)"""
+    _, code_src, _ = split_source(src)
+    match = _CODE_RE.search(src)
+    if match:
+        code_src = "\n" * src.count("\n", 0, match.start(1)) + code_src
+    return compile(textwrap.dedent(code_src), filename, "exec")
+
+
 def component_from_source(
     src: str,
     name: str = "Component",
     base: type = Component,
     components: dict[str, type] | None = None,
     scope: str | None = None,
+    filename: str | None = None,
 ) -> type:
     """``scope`` is the style scope id; it defaults to the snake-cased ``name``
-    and only matters when the source has a ``<style>`` block."""
-    template_src, code_src, style_src = split_source(src)
+    and only matters when the source has a ``<style>`` block. ``filename`` is
+    what tracebacks show for errors in the code block."""
+    template_src, _, style_src = split_source(src)
     nodes = parse_template(template_src)
 
     namespace: dict[str, Any] = {}
-    exec(compile(textwrap.dedent(code_src), f"<{name}.weft>", "exec"), namespace)
+    exec(compile_code_block(src, filename or f"<{name}.weft>"), namespace)
     namespace.pop("__builtins__", None)
     namespace["__template__"] = nodes
     if style_src.strip():
@@ -121,10 +165,16 @@ def component_from_source(
 _CONTROL_TAGS = {"If", "ElseIf", "Else", "For"}
 
 
+def is_component_tag(tag: str) -> bool:
+    """``TodoItem`` and ``widgets.Row`` are components; ``div`` is not. The
+    last dotted segment decides, so folder names can stay lowercase."""
+    return tag.rsplit(".", 1)[-1][:1].isupper() and tag not in _CONTROL_TAGS
+
+
 def _component_tags(nodes: list[Any], found: set[str]) -> set[str]:
     for node in nodes:
         if isinstance(node, TElement):
-            if node.tag[0].isupper() and node.tag not in _CONTROL_TAGS:
+            if is_component_tag(node.tag):
                 found.add(node.tag)
             _component_tags(node.children, found)
         elif isinstance(node, TIf):
@@ -139,39 +189,117 @@ def _snake(name: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
 
 
-def load_component(
-    path: str | Path, name: str | None = None, _loading: set[Path] | None = None
-) -> type:
-    """Load a ``.weft`` file, resolving child components Vue-SFC-style.
+@dataclass
+class _LoadContext:
+    root: Path  # the app root: where dotted tags resolve from
+    loading: set[Path]  # files being loaded right now, for cycle detection
+    current_dir: Path  # folder of the file whose code block is executing
+    # Files already loaded in this load, so a file used by several components
+    # becomes one class: compiled once, and an unambiguous target when hot
+    # reload moves live instances onto freshly compiled classes.
+    loaded: dict[Path, type]
 
-    A capitalised tag like ``<TodoItem>`` is looked up first in the code
-    block's explicit ``components`` dict, then as ``TodoItem.weft`` or
-    ``todo_item.weft`` next to the referencing file.
-    """
-    p = Path(path).resolve()
-    _loading = _loading if _loading is not None else set()
-    if p in _loading:
-        raise TemplateError(f"circular component reference involving {p.name}")
-    _loading.add(p)
+
+# Set while a .weft file is being loaded, so a load_component() call inside
+# its code block resolves relative paths against that file (not the process
+# cwd, which in the browser is not the app folder) and shares the same root
+# and cycle detection.
+_LOAD: ContextVar[_LoadContext | None] = ContextVar("pyweft_load", default=None)
+
+
+def _scope_id(path: Path, root: Path) -> str:
+    """Style scope id: the path below the app root with folders joined by
+    ``-`` (``widgets/row.weft`` -> ``widgets-row``), so equal file names in
+    different folders cannot share styles. Top-level files keep their stem."""
     try:
-        cls = component_from_source(
-            p.read_text(encoding="utf-8"), name or p.stem, scope=p.stem
-        )
+        rel = path.relative_to(root)
+    except ValueError:
+        return path.stem  # loaded from outside the app root
+    return "-".join(rel.with_suffix("").parts)
+
+
+def _find_component(tag: str, referrer: Path, root: Path) -> Path:
+    *folders, leaf = tag.split(".")
+    for folder in folders:
+        if not folder.isidentifier():
+            raise TemplateError(
+                f"<{tag}> in {referrer.name}: {folder!r} is not a valid folder "
+                "name for a component tag (use letters, digits and underscores)"
+            )
+    base = root.joinpath(*folders) if folders else referrer.parent
+    candidates = (base / f"{leaf}.weft", base / f"{_snake(leaf)}.weft")
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    where = (
+        f"in {'/'.join(folders)}/ under the app root"
+        if folders
+        else f"alongside {referrer.name}"
+    )
+    raise TemplateError(
+        f"component <{tag}> used in {referrer.name} but no {candidates[0].name} "
+        f"or {candidates[1].name} found {where}"
+    )
+
+
+def load_component(
+    path: str | Path, name: str | None = None, *, root: str | Path | None = None
+) -> type:
+    """Load a ``.weft`` file and, recursively, the components it uses.
+
+    A capitalised tag is looked up first in the code block's explicit
+    ``components`` dict, then on disk:
+
+    * ``<TodoItem>`` -- ``TodoItem.weft`` or ``todo_item.weft`` next to the
+      file that uses it
+    * ``<widgets.Row>`` -- ``widgets/Row.weft`` or ``widgets/row.weft`` under
+      the app root, whichever file uses it
+
+    ``root`` defaults to the folder of the first file loaded.
+    """
+    ctx = _LOAD.get()
+    p = Path(path)
+    if not p.is_absolute() and ctx is not None:
+        p = ctx.current_dir / p
+    p = p.resolve()
+    if root is not None:
+        root_dir = Path(root).resolve()
+    elif ctx is not None:
+        root_dir = ctx.root
+    else:
+        root_dir = p.parent
+    loading = ctx.loading if ctx is not None else set()
+    loaded = ctx.loaded if ctx is not None else {}
+
+    if p in loaded:
+        return loaded[p]
+    if p in loading:
+        raise TemplateError(f"circular component reference involving {p.name}")
+    loading.add(p)
+    token = _LOAD.set(_LoadContext(root_dir, loading, p.parent, loaded))
+    try:
+        text = p.read_text(encoding="utf-8")
+        try:
+            cls = component_from_source(
+                text, name or p.stem, scope=_scope_id(p, root_dir), filename=str(p)
+            )
+        except TemplateError as exc:
+            try:
+                where = p.relative_to(root_dir).as_posix()
+            except ValueError:
+                where = p.name
+            raise TemplateError(f"{where}: {exc}") from exc
+        cls.__weft_file__ = str(p)
+        cls.__weft_src__ = text
 
         registry = dict(cls.components)
         for tag in sorted(_component_tags(cls.__template__, set())):
-            if tag in registry:
-                continue
-            for candidate in (p.parent / f"{tag}.weft", p.parent / f"{_snake(tag)}.weft"):
-                if candidate.exists():
-                    registry[tag] = load_component(candidate, tag, _loading)
-                    break
-            else:
-                raise TemplateError(
-                    f"component <{tag}> used in {p.name} but no {tag}.weft or "
-                    f"{_snake(tag)}.weft found alongside it"
-                )
+            if tag not in registry:
+                found = _find_component(tag, p, root_dir)
+                registry[tag] = load_component(found, tag.rsplit(".", 1)[-1])
         cls.components = registry
+        loaded[p] = cls
         return cls
     finally:
-        _loading.discard(p)
+        _LOAD.reset(token)
+        loading.discard(p)
