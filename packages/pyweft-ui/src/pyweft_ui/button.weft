@@ -60,4 +60,5 @@ def classes(self):
   animation: ui-button-spin 0.7s linear infinite;
 }
 @keyframes ui-button-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.1s; } }
 </style>

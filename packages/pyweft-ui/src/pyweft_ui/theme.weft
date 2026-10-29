@@ -46,6 +46,8 @@ def overrides(self):
   line-height: 1.5;
   min-height: 100vh;
 }
+/* A theme inside another restyles a part of the page, not a whole screen. */
+.theme .theme { min-height: 0; }
 .theme[data-mode="dark"] {
   --ui-primary: #6366f1;
   --ui-text: #e6edf3;
