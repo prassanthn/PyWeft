@@ -1,0 +1,45 @@
+<template>
+  <section class="card">
+    <If cond="title or subtitle or has_slot('title') or has_slot('actions')">
+      <header class="head">
+        <div>
+          <h3 class="title"><Slot name="title">{{ title }}</Slot></h3>
+          <If cond="subtitle"><p class="subtitle">{{ subtitle }}</p></If>
+        </div>
+        <If cond="has_slot('actions')"><div class="actions"><Slot name="actions" /></div></If>
+      </header>
+    </If>
+    <div class="body"><Slot /></div>
+    <If cond="has_slot('footer')"><footer class="foot"><Slot name="footer" /></footer></If>
+  </section>
+</template>
+
+<code>
+# A panel. Content between the tags is the body; <Fill name="title">,
+# <Fill name="actions"> (top right) and <Fill name="footer"> are optional.
+title: str = ""
+subtitle: str = ""
+</code>
+
+<style>
+.card {
+  background: var(--ui-surface, #fff);
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: calc(var(--ui-radius, 8px) * 1.5);
+  overflow: hidden;
+}
+.head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 16px 20px 0;
+}
+.title { margin: 0; font-size: 1.05rem; font-weight: 650; }
+.subtitle { margin: 2px 0 0; color: var(--ui-muted, #59636e); font-size: 0.9rem; }
+.actions { display: flex; gap: 8px; }
+.body { padding: 16px 20px; }
+.foot {
+  display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;
+  padding: 12px 20px;
+  border-top: 1px solid var(--ui-border, #d1d9e0);
+  background: var(--ui-subtle, #f6f8fa);
+}
+</style>

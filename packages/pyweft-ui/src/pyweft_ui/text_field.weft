@@ -1,0 +1,51 @@
+<template>
+  <label class="field">
+    <If cond="label">
+      <span class="label">{{ label }}<If cond="required"><span class="req" aria-hidden="true"> *</span></If></span>
+    </If>
+    <input class="control" :type="type" :value="value" :name="name or None"
+           :placeholder="placeholder or None" :required="required" :disabled="disabled"
+           :autocomplete="autocomplete or None" :aria-invalid="'true' if error else None"
+           @input="emit('update', event.value)" @keydown.enter="emit('enter', value)" />
+    <If cond="error"><span class="error">{{ error }}</span></If>
+    <ElseIf cond="hint"><span class="hint">{{ hint }}</span></ElseIf>
+  </label>
+</template>
+
+<code>
+# <ui.TextField label="Email" type="email" @bind="email" :error="errors.get('email')" />
+# Emits "update" as you type (that is what @bind uses) and "enter" on Enter.
+label: str = ""
+value: str = ""
+type: str = "text"        # text, email, password, search, url, tel, date, time
+placeholder: str = ""
+hint: str = ""            # small text under the field
+error: str = ""           # shown instead of the hint, in red
+name: str = ""            # the field's name in a <form>
+autocomplete: str = ""
+required: bool = False
+disabled: bool = False
+</code>
+
+<style>
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.label { font-size: 0.9rem; font-weight: 550; }
+.req { color: var(--ui-danger, #d1242f); }
+.control {
+  font: inherit; color: var(--ui-text, #1f2328);
+  background: var(--ui-surface, #fff);
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: var(--ui-radius, 8px);
+  padding: 0.5em 0.75em;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.control:focus {
+  outline: none;
+  border-color: var(--ui-primary, #4f46e5);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 25%, transparent);
+}
+.control:disabled { opacity: 0.6; cursor: not-allowed; }
+.control[aria-invalid="true"] { border-color: var(--ui-danger, #d1242f); }
+.hint { font-size: 0.82rem; color: var(--ui-muted, #59636e); }
+.error { font-size: 0.82rem; color: var(--ui-danger, #d1242f); }
+</style>

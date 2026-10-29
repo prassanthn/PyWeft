@@ -39,5 +39,17 @@ pyweft = "pyweft.cli:main"
 packages = ["src/pyweft"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["tests"]
+pythonpath = ["src", "packages/pyweft-ui/src"]
+testpaths = ["tests", "packages/pyweft-ui/tests"]
+
+# packages/pyweft-ui (the control toolkit) is developed here and released
+# separately. uv installs it, editable, into this environment so `pyweft run`
+# finds it and ships it to the browser; pip users: pip install -e packages/pyweft-ui
+[tool.uv.workspace]
+members = ["packages/pyweft-ui"]
+
+[tool.uv.sources]
+pyweft-ui = { workspace = true }
+
+[dependency-groups]
+dev = ["pyweft-ui"]

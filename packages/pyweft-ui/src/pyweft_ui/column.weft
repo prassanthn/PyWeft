@@ -1,0 +1,23 @@
+<template>
+  <div class="column" :style="layout"><Slot /></div>
+</template>
+
+<code>
+# Children stacked top to bottom.
+gap: str = "md"          # none, xs, sm, md, lg, xl, or a CSS length
+align: str = "stretch"   # stretch, start, center, end (horizontal)
+
+_SPACE = {"none": "0", "xs": "4px", "sm": "8px", "md": "12px", "lg": "20px", "xl": "32px"}
+_FLEX = {"start": "flex-start", "end": "flex-end"}
+
+@property
+def layout(self):
+    return (
+        f"gap: {_SPACE.get(self.gap, self.gap)}; "
+        f"align-items: {_FLEX.get(self.align, self.align)}"
+    )
+</code>
+
+<style>
+.column { display: flex; flex-direction: column; }
+</style>

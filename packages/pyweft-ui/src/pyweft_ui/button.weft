@@ -1,0 +1,63 @@
+<template>
+  <button :type="type" :class="classes" :disabled="disabled or loading"
+          :aria-busy="'true' if loading else None" @click="emit('click', event)">
+    <If cond="loading"><span class="spinner" aria-hidden="true"></span></If>
+    <ElseIf cond="icon"><Icon :name="icon" size="1.15em" /></ElseIf>
+    <Slot />
+  </button>
+</template>
+
+<code>
+# <ui.Button variant="primary" icon="send" @click="save">Send</ui.Button>
+variant: str = "secondary"   # primary, secondary, ghost, danger
+size: str = "md"             # sm, md, lg
+type: str = "button"         # submit inside a form that should submit
+icon: str = ""               # an icon name, shown before the text
+loading: bool = False        # spinner, and not clickable
+disabled: bool = False
+block: bool = False          # full width
+
+@property
+def classes(self):
+    names = ["btn", f"btn-{self.variant}", f"btn-{self.size}"]
+    if self.block:
+        names.append("btn-block")
+    return " ".join(names)
+</code>
+
+<style>
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5em;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius, 8px);
+  font: inherit; font-weight: 550; line-height: 1.2;
+  cursor: pointer; white-space: nowrap;
+  transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 35%, transparent);
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-sm { padding: 0.3em 0.75em; font-size: 0.875rem; }
+.btn-md { padding: 0.5em 1em; font-size: 0.95rem; }
+.btn-lg { padding: 0.7em 1.3em; font-size: 1.05rem; }
+.btn-block { display: flex; width: 100%; }
+.btn-primary { background: var(--ui-primary, #4f46e5); color: var(--ui-on-primary, #fff); }
+.btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-primary, #4f46e5) 88%, black); }
+.btn-secondary {
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+  border-color: var(--ui-border, #d1d9e0);
+}
+.btn-secondary:hover:not(:disabled) { background: var(--ui-subtle, #f6f8fa); }
+.btn-ghost { background: transparent; color: var(--ui-text, #1f2328); }
+.btn-ghost:hover:not(:disabled) { background: var(--ui-subtle, #f6f8fa); }
+.btn-danger { background: var(--ui-danger, #d1242f); color: #fff; }
+.btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-danger, #d1242f) 88%, black); }
+.spinner {
+  width: 1em; height: 1em; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent;
+  animation: ui-button-spin 0.7s linear infinite;
+}
+@keyframes ui-button-spin { to { transform: rotate(360deg); } }
+</style>

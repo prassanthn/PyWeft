@@ -1,0 +1,4 @@
+/* The toolkit styles everything inside <ui.Theme>; the page itself only
+   needs its default margin removed. */
+body { margin: 0; }
+html { scroll-behavior: smooth; }

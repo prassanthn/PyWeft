@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pyweft-ui"
+version = "0.0.1"
+description = "Ready-made controls for PyWeft: buttons, fields, cards, layout, dialogs. No HTML or CSS required."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Prassanth Nicholas" }]
+dependencies = ["pyweft"]
+keywords = ["ui", "components", "controls", "pyweft", "pyodide"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: User Interfaces",
+]
+
+[project.urls]
+Homepage = "https://github.com/prassanthn/PyWeft"
+
+[tool.hatch.build.targets.wheel]
+# The .weft files are the controls; hatchling ships every file in the package.
+packages = ["src/pyweft_ui"]
+
+[tool.uv.sources]
+pyweft = { workspace = true }

@@ -1,0 +1,47 @@
+<template>
+  <div class="shell">
+    <header class="top">
+      <div class="brand"><Slot name="brand">{{ title }}</Slot></div>
+      <div class="actions"><Slot name="actions" /></div>
+    </header>
+    <div class="frame">
+      <If cond="has_slot('nav')">
+        <nav class="side"><Slot name="nav" /></nav>
+      </If>
+      <main class="main" :style="f'max-width: {_WIDTHS.get(width, width)}'"><Slot /></main>
+    </div>
+  </div>
+</template>
+
+<code>
+# The page frame: a header bar, an optional sidebar (<Fill name="nav">) and
+# the content. The sidebar moves above the content on narrow screens.
+title: str = ""
+width: str = "normal"   # narrow, normal, wide, full, or any CSS width
+
+_WIDTHS = {"narrow": "40rem", "normal": "64rem", "wide": "80rem", "full": "none"}
+</code>
+
+<style>
+.shell { display: flex; flex-direction: column; min-height: 100vh; }
+.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--ui-border, #d1d9e0);
+  background: var(--ui-surface, #fff);
+}
+.brand { font-weight: 650; font-size: 1.1rem; }
+.actions { display: flex; align-items: center; gap: 8px; }
+.frame { display: flex; flex: 1; }
+.side {
+  width: 220px; flex-shrink: 0; padding: 16px;
+  border-right: 1px solid var(--ui-border, #d1d9e0);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.main { flex: 1; width: 100%; margin: 0 auto; padding: 24px; box-sizing: border-box; }
+@media (max-width: 720px) {
+  .frame { flex-direction: column; }
+  .side { width: auto; border-right: 0; border-bottom: 1px solid var(--ui-border, #d1d9e0); flex-direction: row; flex-wrap: wrap; }
+  .top, .main { padding-left: 16px; padding-right: 16px; }
+}
+</style>

@@ -1,0 +1,25 @@
+<template>
+  <div class="grid" :style="layout"><Slot /></div>
+</template>
+
+<code>
+# Children in a grid. With cols, that many equal columns; without, as many
+# columns of at least min_width as fit, so it adapts to the screen.
+cols: int = 0
+min_width: str = "14rem"
+gap: str = "md"          # none, xs, sm, md, lg, xl, or a CSS length
+
+_SPACE = {"none": "0", "xs": "4px", "sm": "8px", "md": "12px", "lg": "20px", "xl": "32px"}
+
+@property
+def layout(self):
+    if self.cols:
+        columns = f"repeat({self.cols}, minmax(0, 1fr))"
+    else:
+        columns = f"repeat(auto-fill, minmax(min({self.min_width}, 100%), 1fr))"
+    return f"grid-template-columns: {columns}; gap: {_SPACE.get(self.gap, self.gap)}"
+</code>
+
+<style>
+.grid { display: grid; }
+</style>

@@ -1,0 +1,214 @@
+<template>
+  <ui.Theme :mode="mode" :primary="primary" :radius="radius">
+    <ui.AppShell title="pyweft-ui gallery" width="wide">
+      <Fill name="actions">
+        <ui.Select :options="MODES" @bind="mode" aria-label="Colour mode" />
+        <ui.Select :options="ACCENTS" @bind="primary" aria-label="Accent colour" />
+        <ui.Select :options="RADII" @bind="radius" aria-label="Corners" />
+      </Fill>
+      <Fill name="nav">
+        <For each="section in SECTIONS" key="section">
+          <a class="nav-link" :href="'#' + section.lower()">{{ section }}</a>
+        </For>
+      </Fill>
+
+      <ui.Column gap="xl">
+        <p class="intro">Every control from <b>pyweft-ui</b>, live. Change the theme at the
+          top right; the code under each section is what produced it.</p>
+
+        <ui.Card title="Buttons" id="buttons">
+          <ui.Column>
+            <ui.Row>
+              <ui.Button variant="primary" @click="clicks += 1">Primary</ui.Button>
+              <ui.Button @click="clicks += 1">Secondary</ui.Button>
+              <ui.Button variant="ghost" @click="clicks += 1">Ghost</ui.Button>
+              <ui.Button variant="danger" icon="trash" @click="clicks += 1">Delete</ui.Button>
+            </ui.Row>
+            <ui.Row>
+              <ui.Button size="sm" icon="plus">Small</ui.Button>
+              <ui.Button size="lg" icon="send" variant="primary">Large</ui.Button>
+              <ui.Button :loading="busy" variant="primary" @click="work">{{ "Working" if busy else "Load for 2 s" }}</ui.Button>
+              <ui.Button disabled="true">Disabled</ui.Button>
+            </ui.Row>
+            <p class="note">Clicked {{ clicks }} times.</p>
+            <pre class="code">{{ CODE['buttons'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
+        <ui.Card title="Form fields" id="form" subtitle="Each one is bound with @bind">
+          <ui.Grid min_width="16rem" gap="lg">
+            <ui.TextField label="Name" placeholder="Ada Lovelace" required="true" @bind="name"
+                          :error="'' if len(name) != 1 else 'Too short'" hint="Your full name" />
+            <ui.TextField label="Email" type="email" placeholder="you@example.com" @bind="email" />
+            <ui.NumberField label="Quantity" min="1" max="99" @bind="quantity" />
+            <ui.Select label="Size" placeholder="Choose a size" options="Small, Medium, Large" @bind="size" />
+            <ui.TextField label="Date" type="date" @bind="date" />
+            <ui.TextField label="Password" type="password" @bind="password" />
+          </ui.Grid>
+          <ui.TextArea label="Notes" rows="3" @bind="notes" placeholder="Anything else?" />
+          <pre class="state">{{ form_state }}</pre>
+          <pre class="code">{{ CODE['form'] }}</pre>
+        </ui.Card>
+
+        <ui.Card title="Choices" id="choices">
+          <ui.Grid min_width="14rem" gap="lg">
+            <ui.RadioGroup label="Plan" :options="PLANS" @bind="plan" />
+            <ui.Column gap="sm">
+              <ui.Checkbox label="Send me updates" @bind="updates" />
+              <ui.Checkbox label="I agree to the terms" @bind="agreed" />
+              <ui.Switch label="Dark mode" :value="mode == 'dark'" @update="mode = 'dark' if event else 'light'" />
+            </ui.Column>
+          </ui.Grid>
+          <p class="note">plan = {{ repr(plan) }}, updates = {{ updates }}, agreed = {{ agreed }}</p>
+          <pre class="code">{{ CODE['choices'] }}</pre>
+        </ui.Card>
+
+        <ui.Card title="Feedback" id="feedback">
+          <ui.Column>
+            <ui.Alert kind="info" title="Heads up">A neutral message.</ui.Alert>
+            <ui.Alert kind="success">Saved. Your changes are live.</ui.Alert>
+            <ui.Alert kind="warning" title="Careful">This can't be undone.</ui.Alert>
+            <If cond="show_danger">
+              <ui.Alert kind="danger" title="Failed" dismissible="true" @close="show_danger = False">
+                The server didn't answer. Close me with the X.
+              </ui.Alert>
+            </If>
+            <Else><ui.Button size="sm" @click="show_danger = True">Show the error again</ui.Button></Else>
+            <ui.Row>
+              <ui.Badge>neutral</ui.Badge><ui.Badge kind="primary">primary</ui.Badge>
+              <ui.Badge kind="success">active</ui.Badge><ui.Badge kind="warning">pending</ui.Badge>
+              <ui.Badge kind="danger">failed</ui.Badge><ui.Spinner /><ui.Spinner size="1em" />
+            </ui.Row>
+            <ui.Row gap="sm">
+              <For each="icon in ICONS" key="icon"><span class="icon-cell" :title="icon"><ui.Icon :name="icon" size="1.3em" /></span></For>
+            </ui.Row>
+            <pre class="code">{{ CODE['feedback'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
+        <ui.Card title="Dialog" id="dialog">
+          <ui.Row>
+            <ui.Button variant="danger" icon="trash" @click="confirming = True">Delete project</ui.Button>
+            <span class="note">{{ verdict }}</span>
+          </ui.Row>
+          <ui.Dialog title="Delete project?" @bind="confirming" @close="verdict = verdict or 'Dismissed.'">
+            <p>This removes the project and its 12 files. It can't be undone.</p>
+            <Fill name="footer">
+              <ui.Button @click="answer('Kept it.')">Cancel</ui.Button>
+              <ui.Button variant="danger" @click="answer('Deleted.')">Delete</ui.Button>
+            </Fill>
+          </ui.Dialog>
+          <pre class="code">{{ CODE['dialog'] }}</pre>
+        </ui.Card>
+
+        <ui.Card title="Layout" id="layout" subtitle="Row, Column, Grid and Card: no CSS needed">
+          <ui.Grid cols="3" gap="sm">
+            <For each="n in range(1, 7)" key="n"><div class="tile">{{ n }}</div></For>
+          </ui.Grid>
+          <pre class="code">{{ CODE['layout'] }}</pre>
+        </ui.Card>
+      </ui.Column>
+    </ui.AppShell>
+  </ui.Theme>
+</template>
+
+<code>
+import asyncio
+from pyweft_ui import ui
+
+SECTIONS = ["Buttons", "Form", "Choices", "Feedback", "Dialog", "Layout"]
+MODES = [("light", "Light"), ("dark", "Dark"), ("auto", "System")]
+ACCENTS = [("", "Indigo"), ("#0f766e", "Teal"), ("#c2410c", "Orange"), ("#be185d", "Pink")]
+RADII = [("", "Rounded"), ("2px", "Square"), ("14px", "Round")]
+PLANS = [("free", "Free"), ("pro", "Pro — $8/mo"), ("team", "Team — $20/mo")]
+ICONS = ["check", "x", "plus", "search", "info", "alert", "menu", "trash", "edit", "send",
+         "user", "home", "star", "heart", "download", "copy", "settings", "sun", "moon"]
+
+mode: str = "light"
+primary: str = ""
+radius: str = ""
+clicks: int = 0
+busy: bool = False
+name: str = ""
+email: str = ""
+quantity: int = 1
+size = None
+date: str = ""
+password: str = ""
+notes: str = ""
+plan: str = "pro"
+updates: bool = True
+agreed: bool = False
+show_danger: bool = True
+confirming: bool = False
+verdict: str = ""
+
+async def work(self):
+    self.busy = True
+    await asyncio.sleep(2)
+    self.busy = False
+
+def answer(self, text):
+    self.verdict = text
+    self.confirming = False
+
+@property
+def form_state(self):
+    return (f"name={self.name!r} email={self.email!r} quantity={self.quantity!r}\n"
+            f"size={self.size!r} date={self.date!r} notes={self.notes!r}")
+
+CODE = {
+    "buttons": """<ui.Button variant="primary" @click="save">Primary</ui.Button>
+<ui.Button variant="danger" icon="trash">Delete</ui.Button>
+<ui.Button :loading="busy" @click="work">Load</ui.Button>
+<ui.Button disabled="true">Disabled</ui.Button>""",
+    "form": """<ui.TextField label="Name" required="true" @bind="name" hint="Your full name" />
+<ui.NumberField label="Quantity" min="1" max="99" @bind="quantity" />
+<ui.Select label="Size" options="Small, Medium, Large" @bind="size" />
+<ui.TextArea label="Notes" rows="3" @bind="notes" />""",
+    "choices": """<ui.RadioGroup label="Plan" :options="[('free', 'Free'), ('pro', 'Pro')]" @bind="plan" />
+<ui.Checkbox label="Send me updates" @bind="updates" />
+<ui.Switch label="Dark mode" @bind="dark" />""",
+    "feedback": """<ui.Alert kind="success">Saved.</ui.Alert>
+<ui.Alert kind="danger" title="Failed" dismissible="true" @close="hide()">...</ui.Alert>
+<ui.Badge kind="success">active</ui.Badge>  <ui.Spinner />  <ui.Icon name="star" />""",
+    "dialog": """<ui.Button @click="confirming = True">Delete project</ui.Button>
+<ui.Dialog title="Delete project?" @bind="confirming">
+  <p>This can't be undone.</p>
+  <Fill name="footer">
+    <ui.Button @click="confirming = False">Cancel</ui.Button>
+    <ui.Button variant="danger" @click="delete()">Delete</ui.Button>
+  </Fill>
+</ui.Dialog>""",
+    "layout": """<ui.Grid cols="3" gap="sm"> ... </ui.Grid>
+<ui.Row justify="between"> ... </ui.Row>
+<ui.Column gap="lg"> ... </ui.Column>""",
+}
+</code>
+
+<style>
+.intro { margin: 0; color: var(--ui-muted); }
+.note { margin: 0; color: var(--ui-muted); font-size: 0.9rem; }
+.nav-link {
+  color: var(--ui-text); text-decoration: none;
+  padding: 6px 10px; border-radius: var(--ui-radius);
+}
+.nav-link:hover { background: var(--ui-subtle); }
+.code, .state {
+  margin: 12px 0 0; padding: 12px 14px; overflow-x: auto;
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+  background: var(--ui-subtle); border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius); white-space: pre;
+}
+.state { white-space: pre-wrap; }
+.tile {
+  display: grid; place-items: center; height: 56px; font-weight: 650;
+  border-radius: var(--ui-radius);
+  background: color-mix(in srgb, var(--ui-primary) 14%, transparent);
+  color: var(--ui-primary);
+}
+.icon-cell {
+  display: inline-grid; place-items: center; width: 36px; height: 36px;
+  border: 1px solid var(--ui-border); border-radius: var(--ui-radius);
+}
+</style>

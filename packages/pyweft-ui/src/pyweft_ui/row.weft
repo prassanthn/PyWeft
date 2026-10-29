@@ -1,0 +1,28 @@
+<template>
+  <div class="row" :style="layout"><Slot /></div>
+</template>
+
+<code>
+# Children side by side.
+gap: str = "md"          # none, xs, sm, md, lg, xl, or a CSS length
+align: str = "center"    # start, center, end, stretch, baseline (vertical)
+justify: str = "start"   # start, center, end, between, around (horizontal)
+wrap: bool = True        # move to the next line when out of room
+
+_SPACE = {"none": "0", "xs": "4px", "sm": "8px", "md": "12px", "lg": "20px", "xl": "32px"}
+_FLEX = {"start": "flex-start", "end": "flex-end", "between": "space-between",
+         "around": "space-around", "evenly": "space-evenly"}
+
+@property
+def layout(self):
+    return (
+        f"gap: {_SPACE.get(self.gap, self.gap)}; "
+        f"align-items: {_FLEX.get(self.align, self.align)}; "
+        f"justify-content: {_FLEX.get(self.justify, self.justify)}; "
+        f"flex-wrap: {'wrap' if self.wrap else 'nowrap'}"
+    )
+</code>
+
+<style>
+.row { display: flex; flex-direction: row; }
+</style>

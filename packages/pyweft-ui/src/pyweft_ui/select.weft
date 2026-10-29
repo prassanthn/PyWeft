@@ -1,0 +1,81 @@
+<template>
+  <label class="field">
+    <If cond="label">
+      <span class="label">{{ label }}<If cond="required"><span class="req" aria-hidden="true"> *</span></If></span>
+    </If>
+    <select class="control" :value="current" :name="name or None" :required="required"
+            :disabled="disabled" :aria-invalid="'true' if error else None" @change="picked(event)">
+      <If cond="placeholder"><option value="" disabled="">{{ placeholder }}</option></If>
+      <For each="choice in choices" key="choice[2]">
+        <option :value="choice[2]">{{ choice[1] }}</option>
+      </For>
+    </select>
+    <If cond="error"><span class="error">{{ error }}</span></If>
+    <ElseIf cond="hint"><span class="hint">{{ hint }}</span></ElseIf>
+  </label>
+</template>
+
+<code>
+# <ui.Select label="Size" options="Small, Medium, Large" @bind="size" />
+# options: a comma-separated string, a list of values, a list of
+# (value, label) pairs, or a list of {"value": ..., "label": ...} dicts.
+# The bound field gets the option's value itself, so ints stay ints.
+label: str = ""
+value = None
+options: list = []
+placeholder: str = ""
+hint: str = ""
+error: str = ""
+name: str = ""
+required: bool = False
+disabled: bool = False
+
+@property
+def choices(self):
+    items = self.options
+    if isinstance(items, str):
+        items = [part.strip() for part in items.split(",") if part.strip()]
+    out = []
+    for item in items:
+        if isinstance(item, dict):
+            val = item.get("value")
+            text = item.get("label", val)
+        elif isinstance(item, (tuple, list)) and len(item) == 2:
+            val, text = item
+        else:
+            val, text = item, item
+        out.append((val, str(text), str(val)))
+    return out
+
+@property
+def current(self):
+    return "" if self.value is None else str(self.value)
+
+def picked(self, event):
+    for val, _, key in self.choices:
+        if key == event.value:
+            self.emit("update", val)
+            return
+</code>
+
+<style>
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.label { font-size: 0.9rem; font-weight: 550; }
+.req { color: var(--ui-danger, #d1242f); }
+.control {
+  font: inherit; color: var(--ui-text, #1f2328);
+  background: var(--ui-surface, #fff);
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: var(--ui-radius, 8px);
+  padding: 0.5em 0.75em;
+}
+.control:focus {
+  outline: none;
+  border-color: var(--ui-primary, #4f46e5);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 25%, transparent);
+}
+.control:disabled { opacity: 0.6; cursor: not-allowed; }
+.control[aria-invalid="true"] { border-color: var(--ui-danger, #d1242f); }
+.hint { font-size: 0.82rem; color: var(--ui-muted, #59636e); }
+.error { font-size: 0.82rem; color: var(--ui-danger, #d1242f); }
+</style>

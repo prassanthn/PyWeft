@@ -1,0 +1,79 @@
+<template>
+  <div class="theme" :data-mode="mode" :style="overrides or None"><Slot /></div>
+</template>
+
+<code>
+# Wrap the app in <ui.Theme> to set colours, corners and fonts for every
+# control inside it. Controls also work without it, with these defaults.
+mode: str = "light"   # "light", "dark", or "auto" to follow the system
+primary: str = ""     # the accent colour, any CSS colour: "#0f766e"
+radius: str = ""      # corner rounding: "0", "4px", "12px"
+font: str = ""        # a CSS font-family: "Inter, sans-serif"
+
+@property
+def overrides(self):
+    parts = []
+    if self.primary:
+        parts.append(f"--ui-primary: {self.primary}")
+    if self.radius:
+        parts.append(f"--ui-radius: {self.radius}")
+    if self.font:
+        parts.append(f"--ui-font: {self.font}")
+    return "; ".join(parts)
+</code>
+
+<style>
+.theme {
+  --ui-primary: #4f46e5;
+  --ui-on-primary: #ffffff;
+  --ui-text: #1f2328;
+  --ui-muted: #59636e;
+  --ui-bg: #ffffff;
+  --ui-surface: #ffffff;
+  --ui-subtle: #f6f8fa;
+  --ui-border: #d1d9e0;
+  --ui-danger: #d1242f;
+  --ui-success: #1a7f37;
+  --ui-warning: #9a6700;
+  --ui-info: #0969da;
+  --ui-radius: 8px;
+  --ui-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+  color: var(--ui-text);
+  background: var(--ui-bg);
+  font-family: var(--ui-font);
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+.theme[data-mode="dark"] {
+  --ui-primary: #6366f1;
+  --ui-text: #e6edf3;
+  --ui-muted: #9198a1;
+  --ui-bg: #0d1117;
+  --ui-surface: #151b23;
+  --ui-subtle: #212830;
+  --ui-border: #3d444d;
+  --ui-danger: #f85149;
+  --ui-success: #3fb950;
+  --ui-warning: #d29922;
+  --ui-info: #4493f8;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  .theme[data-mode="auto"] {
+    --ui-primary: #6366f1;
+    --ui-text: #e6edf3;
+    --ui-muted: #9198a1;
+    --ui-bg: #0d1117;
+    --ui-surface: #151b23;
+    --ui-subtle: #212830;
+    --ui-border: #3d444d;
+    --ui-danger: #f85149;
+    --ui-success: #3fb950;
+    --ui-warning: #d29922;
+    --ui-info: #4493f8;
+    color-scheme: dark;
+  }
+}
+</style>

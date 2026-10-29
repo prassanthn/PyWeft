@@ -1,0 +1,48 @@
+<template>
+  <div :class="'alert alert-' + kind" :role="'alert' if kind in ('danger', 'warning') else 'status'">
+    <Icon :name="icon_name" size="1.25em" />
+    <div class="content">
+      <If cond="title"><strong class="title">{{ title }}</strong></If>
+      <div><Slot /></div>
+    </div>
+    <If cond="dismissible">
+      <button class="close" type="button" aria-label="Dismiss" @click="emit('close')"><Icon name="x" /></button>
+    </If>
+  </div>
+</template>
+
+<code>
+# <ui.Alert kind="success" title="Saved">Your changes are live.</ui.Alert>
+# With dismissible="true" it shows an X and emits "close" when clicked.
+kind: str = "info"        # info, success, warning, danger
+title: str = ""
+dismissible: bool = False
+
+_ICONS = {"info": "info", "success": "check", "warning": "alert", "danger": "alert"}
+
+@property
+def icon_name(self):
+    return _ICONS.get(self.kind, "info")
+</code>
+
+<style>
+.alert {
+  --tone: var(--ui-info, #0969da);
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent);
+  border-radius: var(--ui-radius, 8px);
+  background: color-mix(in srgb, var(--tone) 10%, var(--ui-surface, #fff));
+}
+.alert > .icon { color: var(--tone); margin-top: 0.1em; }
+.alert-success { --tone: var(--ui-success, #1a7f37); }
+.alert-warning { --tone: var(--ui-warning, #9a6700); }
+.alert-danger { --tone: var(--ui-danger, #d1242f); }
+.content { flex: 1; min-width: 0; }
+.title { display: block; margin-bottom: 2px; }
+.close {
+  border: 0; background: transparent; color: inherit; cursor: pointer;
+  padding: 2px; border-radius: 4px; line-height: 0; opacity: 0.7;
+}
+.close:hover { opacity: 1; background: color-mix(in srgb, var(--tone) 15%, transparent); }
+</style>

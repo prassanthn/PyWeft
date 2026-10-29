@@ -1,0 +1,69 @@
+<template>
+  <label class="field">
+    <If cond="label">
+      <span class="label">{{ label }}<If cond="required"><span class="req" aria-hidden="true"> *</span></If></span>
+    </If>
+    <input class="control" type="number" :value="shown" :min="min" :max="max" :step="step"
+           :name="name or None" :placeholder="placeholder or None" :required="required"
+           :disabled="disabled" :aria-invalid="'true' if error else None"
+           @input="typed(event)" />
+    <If cond="error"><span class="error">{{ error }}</span></If>
+    <ElseIf cond="hint"><span class="hint">{{ hint }}</span></ElseIf>
+  </label>
+</template>
+
+<code>
+# <ui.NumberField label="Quantity" min="1" max="99" @bind="quantity" />
+# Emits an int while the bound value is an int (or None), else a float.
+# Text that isn't a number yet (an empty box, "-") emits nothing.
+label: str = ""
+value: float | None = None
+min: float | None = None
+max: float | None = None
+step: str = "any"
+placeholder: str = ""
+hint: str = ""
+error: str = ""
+name: str = ""
+required: bool = False
+disabled: bool = False
+
+@property
+def shown(self):
+    return "" if self.value is None else str(self.value)
+
+def typed(self, event):
+    text = event.value.strip()
+    if not text:
+        return
+    wants_int = self.value is None or (isinstance(self.value, int) and not isinstance(self.value, bool))
+    try:
+        number = float(text)
+    except ValueError:
+        return
+    if wants_int and number.is_integer() and "." not in text and "e" not in text.lower():
+        number = int(number)
+    self.emit("update", number)
+</code>
+
+<style>
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.label { font-size: 0.9rem; font-weight: 550; }
+.req { color: var(--ui-danger, #d1242f); }
+.control {
+  font: inherit; color: var(--ui-text, #1f2328);
+  background: var(--ui-surface, #fff);
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: var(--ui-radius, 8px);
+  padding: 0.5em 0.75em;
+}
+.control:focus {
+  outline: none;
+  border-color: var(--ui-primary, #4f46e5);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 25%, transparent);
+}
+.control:disabled { opacity: 0.6; cursor: not-allowed; }
+.control[aria-invalid="true"] { border-color: var(--ui-danger, #d1242f); }
+.hint { font-size: 0.82rem; color: var(--ui-muted, #59636e); }
+.error { font-size: 0.82rem; color: var(--ui-danger, #d1242f); }
+</style>

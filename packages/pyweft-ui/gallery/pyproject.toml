@@ -1,0 +1,4 @@
+[project]
+name = "pyweft-ui-gallery"
+version = "0.1.0"
+dependencies = ["pyweft-ui"]

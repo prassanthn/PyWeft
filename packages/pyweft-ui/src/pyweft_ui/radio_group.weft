@@ -1,0 +1,60 @@
+<template>
+  <fieldset class="group" :disabled="disabled">
+    <If cond="label"><legend class="label">{{ label }}</legend></If>
+    <div :class="'options inline' if inline else 'options'">
+      <For each="choice in choices" key="choice[2]">
+        <label class="option">
+          <input type="radio" :name="_group" :value="choice[2]" :checked="choice[0] == value"
+                 @change="emit('update', choice[0])" />
+          <span>{{ choice[1] }}</span>
+        </label>
+      </For>
+    </div>
+  </fieldset>
+</template>
+
+<code>
+# <ui.RadioGroup label="Plan" options="Free, Pro, Team" @bind="plan" />
+# options: a comma-separated string, a list of values, a list of
+# (value, label) pairs, or a list of {"value": ..., "label": ...} dicts.
+import itertools
+
+label: str = ""
+value = None
+options: list = []
+inline: bool = False      # side by side instead of stacked
+disabled: bool = False
+
+_ids = itertools.count(1)
+
+def on_init(self):
+    # Radios in one group share a name; each group needs its own.
+    self._group = f"ui-radio-{next(_ids)}"
+
+@property
+def choices(self):
+    items = self.options
+    if isinstance(items, str):
+        items = [part.strip() for part in items.split(",") if part.strip()]
+    out = []
+    for item in items:
+        if isinstance(item, dict):
+            val = item.get("value")
+            text = item.get("label", val)
+        elif isinstance(item, (tuple, list)) and len(item) == 2:
+            val, text = item
+        else:
+            val, text = item, item
+        out.append((val, str(text), str(val)))
+    return out
+</code>
+
+<style>
+.group { border: 0; padding: 0; margin: 0; min-width: 0; }
+.label { font-size: 0.9rem; font-weight: 550; padding: 0; margin-bottom: 6px; }
+.options { display: flex; flex-direction: column; gap: 6px; }
+.options.inline { flex-direction: row; flex-wrap: wrap; gap: 16px; }
+.option { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+input { width: 1.05em; height: 1.05em; margin: 0; accent-color: var(--ui-primary, #4f46e5); cursor: inherit; }
+.group:disabled .option { opacity: 0.6; cursor: not-allowed; }
+</style>

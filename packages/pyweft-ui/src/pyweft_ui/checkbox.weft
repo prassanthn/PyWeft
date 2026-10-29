@@ -1,0 +1,26 @@
+<template>
+  <label class="check">
+    <input type="checkbox" :checked="value" :name="name or None" :disabled="disabled"
+           @change="emit('update', event.checked)" />
+    <span><Slot>{{ label }}</Slot></span>
+  </label>
+</template>
+
+<code>
+# <ui.Checkbox label="Remember me" @bind="remember" />
+label: str = ""
+value: bool = False
+name: str = ""
+disabled: bool = False
+</code>
+
+<style>
+.check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+input {
+  width: 1.1em; height: 1.1em; margin: 0;
+  accent-color: var(--ui-primary, #4f46e5);
+  cursor: inherit;
+}
+input:disabled { cursor: not-allowed; }
+input:disabled + span { opacity: 0.6; }
+</style>

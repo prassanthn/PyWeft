@@ -1,0 +1,25 @@
+<template>
+  <span :class="'badge badge-' + kind"><Slot /></span>
+</template>
+
+<code>
+# <ui.Badge kind="success">Active</ui.Badge>
+kind: str = "neutral"     # neutral, primary, info, success, warning, danger
+</code>
+
+<style>
+.badge {
+  --tone: var(--ui-muted, #59636e);
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 0.1em 0.6em;
+  border-radius: 999px;
+  font-size: 0.8rem; font-weight: 600; line-height: 1.5;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+}
+.badge-primary { --tone: var(--ui-primary, #4f46e5); }
+.badge-info { --tone: var(--ui-info, #0969da); }
+.badge-success { --tone: var(--ui-success, #1a7f37); }
+.badge-warning { --tone: var(--ui-warning, #9a6700); }
+.badge-danger { --tone: var(--ui-danger, #d1242f); }
+</style>
