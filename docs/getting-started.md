@@ -27,13 +27,19 @@ JavaScript to write. The same render core will later drive desktop apps
    [heavy work in a Web Worker](#heavy-work-run_in_background),
    [threads](#threads)
 3. [Template syntax reference](#3-template-syntax-reference): bindings,
-   inline handlers, component styles
+   inline handlers, [the event object](#the-event-object),
+   [event modifiers](#event-modifiers),
+   [binding form controls](#binding-form-controls), component styles
 4. [Composing components](#4-composing-components): props, events,
-   components in folders
+   components in folders, [slots](#passing-content-slots),
+   [@bind on components](#bind-on-your-own-components),
+   [attributes on a component tag](#attributes-on-a-component-tag),
+   [components from packages](#components-from-packages)
 5. [Starting a new project](#5-starting-a-new-project):
    [hot reload](#hot-reload), [the loading screen](#the-loading-screen),
    [head.html and assets](#the-page-head-and-the-assets-folder),
    [CSS frameworks (Tailwind, Bootstrap)](#using-css-frameworks),
+   [ready-made controls (pyweft-ui)](#ready-made-controls-pyweft-ui),
    [PyPI packages](#using-pypi-packages),
    [calling JavaScript](#calling-javascript),
    [building for deployment](#building-for-deployment)
@@ -63,7 +69,7 @@ To hack on the framework itself, clone it and install in editable mode:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev      # or: pip install -e ".[dev]"
-uv run pytest            # 657 tests should pass
+uv run pytest            # 754 tests should pass
 ```
 
 To see it working immediately, run the bundled todo app from the clone:
@@ -444,8 +450,9 @@ So, in practice:
 |---|---|
 | `{{ expr }}` | Interpolate a Python expression in text or attribute values |
 | `:attr="expr"` | Bind an attribute to an expression. `None`/`False` drop the attribute, `True` keeps it valueless (`:disabled="busy"`), anything else is stringified. On a component, passes the **typed** value as a prop |
-| `@click="handler"` | A bare name calls that method; an expression is evaluated, so `@click="remove(item)"` works; simple statements run inline, so `@click="count += 1"` and `@click="show = not show"` work without a method |
-| `@bind="field"` | Two-way binding on inputs. Coerces back to the field's existing type, so a bound `int` stays an `int` |
+| `@click="handler"` | A bare name calls that method; an expression is evaluated, so `@click="remove(item)"` works; simple statements run inline, so `@click="count += 1"` and `@click="show = not show"` work without a method. Any DOM event works the same way (`@input`, `@keydown`, `@submit` ...) |
+| `@event.modifier` | `@submit.prevent`, `@keydown.enter`, `@click.stop`, `@keydown.ctrl.s.prevent`: see [event modifiers](#event-modifiers) |
+| `@bind="field"` | Two-way binding on inputs, textareas, selects, checkboxes and radio buttons, converting to the field's declared type. `@bind.lazy`, `.trim`, `.number`: see [binding form controls](#binding-form-controls) |
 | `<If cond="...">` / `<ElseIf cond="...">` / `<Else>` | Conditional rendering. Branch elements must be adjacent siblings |
 | `<For each="item in items" key="item['id']" index="i">` | Loop. `key` gives rows stable identity across reorders (always use it for dynamic lists); `index` is optional |
 | `<PascalCaseTag ... />` | Renders a child component (see below) |
@@ -470,7 +477,7 @@ An event attribute accepts three forms. Pick the smallest one that fits:
    receives the event payload, otherwise it is called with no arguments.
 2. **An expression** is evaluated in the template's scope, so loop variables
    and the `event` payload are available: `@click="remove(item)"`,
-   `@input="search(event['value'])"`. Whatever it returns is returned from
+   `@input="search(event.value)"`. Whatever it returns is returned from
    the dispatch, which matters for `emit` (section 4).
 3. **Statements** run when the value does not parse as an expression.
    Assignment, augmented assignment and `;`-separated statements all work:
@@ -491,6 +498,108 @@ An event attribute accepts three forms. Pick the smallest one that fits:
 After any of the three runs, the component re-renders. Keep inline handlers
 to a statement or two; once logic needs a name, a comment, or a test, move it
 to a method.
+
+### The event object
+
+A handler that declares a parameter, or an expression that uses `event`,
+gets the event's details. It is a dict that also allows attribute access, so
+`event.key` and `event["key"]` both work:
+
+```python
+def on_key(self, event):
+    if event.key == "Enter" and event.ctrlKey:
+        self.send()
+```
+
+| Key | On |
+|---|---|
+| `type` | every event: `"click"`, `"keydown"` ... |
+| `value` | inputs, textareas and selects: the current text |
+| `checked` | checkboxes and radio buttons |
+| `key`, `code`, `repeat` | keyboard events: `key` is the character or name (`"a"`, `"Enter"`, `"ArrowUp"`); `code` the physical key (`"KeyA"`) |
+| `ctrlKey`, `shiftKey`, `altKey`, `metaKey` | keyboard and mouse events |
+| `clientX`, `clientY`, `offsetX`, `offsetY`, `button`, `buttons` | mouse and pointer events (`deltaX`, `deltaY` on `wheel`) |
+| `form` | `submit`: the form's fields as `{name: value}`, a list when several fields share a name (file inputs are left out) |
+
+Asking for a key the event doesn't have raises an `AttributeError` that
+lists the keys it does have.
+
+### Event modifiers
+
+Add modifiers after the event name to handle the browser's behaviour in the
+template instead of in your method:
+
+```xml
+<form @submit.prevent="save">...</form>             <!-- no page reload -->
+<a href="/help" @click.prevent="open_help">help</a> <!-- no navigation -->
+<input @keydown.enter="search" @keydown.esc="clear" />
+<textarea @keydown.ctrl.enter="send"></textarea>
+<div @click="close" class="backdrop">
+  <div @click.stop="" class="dialog">...</div>     <!-- clicks inside don't close it -->
+</div>
+```
+
+| Modifier | Effect |
+|---|---|
+| `.prevent` | `preventDefault()`: no form submission, link navigation, browser shortcut |
+| `.stop` | `stopPropagation()`: parents don't see the event |
+| `.self` | only when the event happened on this element itself, not a child |
+| `.once` | at most once |
+| `.capture`, `.passive` | listener options, for capture-phase and scroll-performance cases |
+| `.enter`, `.tab`, `.esc`, `.space`, `.delete` (Delete or Backspace), `.up`, `.down`, `.left`, `.right` | key events: only for that key |
+| any key name in kebab-case | `.a`, `.f1`, `.page-down`: `KeyboardEvent.key` lower-cased, `PageDown` becomes `page-down` |
+| `.ctrl`, `.alt`, `.shift`, `.meta` | only while that key is held (on keyboard and mouse events) |
+| `.exact` | and no other of those keys: `@click.ctrl.exact` ignores Ctrl+Shift+click |
+| `.left`, `.middle`, `.right` | mouse events: that button. `@click.right` handles right-clicks (the context menu), so add `.prevent` to suppress the menu |
+
+- **Modifiers only:** `@submit.prevent=""` with an empty value prevents the
+  default and calls nothing.
+- **Several handlers for one event** are fine when their modifiers differ:
+  `@keydown.enter="search"` and `@keydown.esc="clear"` on one input.
+- **Filters come first.** `.prevent` and `.stop` apply only when the key,
+  button, `.self` and `.ctrl`-style conditions match, whatever order you
+  write them in. `@keydown.ctrl.s.prevent="save"` blocks the browser's Save
+  dialog for Ctrl+S and leaves every other key alone.
+- **Typos are caught**: `@submit.prevnt` or `@click.enter` is a template
+  error naming the modifier, not a handler that silently never runs.
+- Modifiers belong to page events. A component's own events (`@remove` on
+  `<TodoItem>`) take none.
+
+### Binding form controls
+
+`@bind="field"` keeps a control and a field in sync both ways:
+
+```xml
+<input @bind="name" />                                  <!-- str -->
+<input type="number" @bind="age" />                     <!-- int -->
+<textarea @bind="notes"></textarea>
+<input type="checkbox" @bind="subscribed" />            <!-- bool: checked -->
+<input type="radio" value="s" @bind="size" />
+<input type="radio" value="m" @bind="size" />           <!-- the checked one's value -->
+<select @bind="country">
+  <option value="in">India</option>
+  <option value="nl">Netherlands</option>
+</select>
+```
+
+- **Types follow the field's declaration.** `age: int = 0` stores an `int`;
+  `price: float | None = None` a `float`, or `None` when the box is empty.
+  Text that doesn't fit (letters in a number box, an empty box for a field
+  that can't be `None`) leaves the field at its last good value while the
+  user is still typing, instead of turning it into a string.
+- **Checkboxes** bind a `bool` to the checked state; **radio buttons** store
+  the `value` of the one that is checked (converted, so `value="2"` with
+  `size: int` stores `2`).
+- **Modifiers:** `@bind.lazy` updates when the user leaves the field (the
+  `change` event) rather than on every keystroke; `@bind.trim` strips
+  surrounding spaces; `@bind.number` parses a number even when the field has
+  no declared type.
+- **Your own handler alongside:** `@bind` and `@input` on one element both
+  run, the binding first, so your handler already sees the new value:
+
+  ```xml
+  <input @bind="query" @input="search()" />
+  ```
 
 ### Component styles
 
@@ -707,9 +816,157 @@ in tests.
 From plain Python, `component_from_source(src, components={...})` accepts the
 same dict.
 
-Not yet supported: children inside a component tag (slots) — you'll get a
-clear error, so pass content as a prop for now; and `@bind` directly on a
-component (bind inside the child's own template instead).
+### Passing content: slots
+
+A component can take markup between its tags. It marks where that content
+goes with `<Slot />`:
+
+```xml
+<!-- card.weft -->
+<template>
+  <section class="card">
+    <h3><Slot name="title">Untitled</Slot></h3>
+    <div class="body"><Slot /></div>
+    <If cond="has_slot('footer')"><footer><Slot name="footer" /></footer></If>
+  </section>
+</template>
+```
+
+```xml
+<!-- using it -->
+<Card>
+  <Fill name="title">Sign up</Fill>
+  <p>Hello {{ name }}</p>
+  <Fill name="footer"><button @click="save">Save</button></Fill>
+</Card>
+```
+
+- **Content outside any `<Fill>`** goes to the unnamed `<Slot />`.
+  `<Fill name="...">` targets a named one.
+- **The slot's own children are the fallback** when nothing is passed
+  ("Untitled" above). `has_slot("footer")` tells the component whether
+  content was passed, so it can leave out the wrapper when there is none.
+- **Slot content belongs to the component that wrote it.** `{{ name }}` and
+  `@click="save"` above are the *using* component's state and method,
+  including loop variables when the `<Card>` sits inside a `<For>`, and its
+  scoped styles apply to that content.
+- **Slots can hand data to the content** (handy for lists and tables). Props
+  on `<Slot>` become variables inside the content:
+
+  ```xml
+  <!-- data_list.weft -->
+  <ul><For each="item in items" key="item" index="i">
+    <li><Slot :item="item" :index="i">{{ item }}</Slot></li>
+  </For></ul>
+  ```
+
+  ```xml
+  <DataList :items="fruits"><b>{{ index + 1 }}. {{ item.upper() }}</b></DataList>
+  ```
+
+- **Mistakes are errors, not silence:** content for a slot the component
+  doesn't have, two `<Fill>`s with one name, or a `<Fill>` outside a
+  component tag all fail with a message saying what's wrong.
+
+### @bind on your own components
+
+`@bind` works on a component tag too, so a form control you write is used
+exactly like an `<input>`:
+
+```xml
+<TextField label="Email" @bind="email" />
+```
+
+The component receives the field as its `value` prop and reports a new value
+with `emit("update", new_value)`:
+
+```xml
+<!-- text_field.weft -->
+<template>
+  <label>{{ label }}
+    <input :value="value" @input="emit('update', event.value)" />
+  </label>
+</template>
+
+<code>
+label: str = ""
+value: str = ""
+</code>
+```
+
+The using component's field is updated, then its own `@update` handler runs
+if it has one. `@bind` modifiers (`.lazy` and so on) apply to plain inputs
+only; inside your component, pick the event you emit on.
+
+### Attributes on a component tag
+
+Attributes a component **declares as fields** are props: `variant` and
+`disabled` below set those fields. **Any other attribute** goes onto the
+component's root element, so styling and accessibility attributes just work:
+
+```xml
+<Button variant="primary" class="wide" id="save" aria-label="Save order">Save</Button>
+```
+
+- **Plain values are converted to the field's type**, so attributes read
+  naturally: with `cols: int = 0`, `cols="3"` sets the number 3; with
+  `disabled: bool = False`, `disabled="true"` (or `disabled=""`) sets `True`
+  and `disabled="false"` sets `False`. A value that doesn't fit, such as
+  `cols="three"`, is a template error naming the field.
+- `class` and `style` are **added to** the root element's own; other
+  attributes replace them.
+- `:attr="expr"` works the same way: a prop if declared (passed as is,
+  no conversion), otherwise an attribute (`None`/`False` leave it out,
+  `True` writes it without a value).
+- The component must render a **single root element** to receive them; if
+  it renders several, you get an error naming the attribute.
+- Events (`@click`) are never passed through: the component decides what
+  it emits, typically with `@click="emit('click', event)"` on its button.
+
+### Components from packages
+
+A component class can come from an import, and the tag follows the name you
+imported it under:
+
+```python
+# in the <code> block
+from pyweft_ui import ui          # then <ui.Button>, <ui.Card> ...
+from reports import ChartPanel    # then <ChartPanel>
+```
+
+Imported names win over files of the same name next to your component.
+
+**Writing a component library** takes one line in its `__init__.py`:
+
+```python
+# my_widgets/__init__.py
+from pathlib import Path
+from pyweft import ComponentLibrary
+
+ui = ComponentLibrary(Path(__file__).parent, prefix="ui")
+```
+
+`ui.Button` then loads `button.weft` (or `Button.weft`) from the package
+folder on first use. Inside the library, components use each other as usual.
+The `prefix` keeps the library's scoped styles apart from the app's, so a
+library `.card` and an app `.card` never collide.
+
+**Using a library in an app**: add it to the app's `pyproject.toml` like any
+dependency (`uv add my-widgets`, or edit `dependencies`). How it reaches the
+browser:
+
+- **If it is installed where you run `pyweft run`** (published, a local
+  path, or an editable install while you develop it), PyWeft ships it from
+  there: `run` serves it and `build` copies it into `dist/lib/`. The browser
+  gets exactly the version you have, and an unpublished library works.
+  Editing its files reloads the page. Its own dependencies are installed in
+  the browser from PyPI as usual.
+- **Otherwise** it is installed from PyPI in the browser like any package,
+  which works once it is published as a wheel that includes its `.weft`
+  files (hatchling and uv's build backend include them by default).
+
+A dependency counts as a component library when its package folder contains
+`.weft` files; everything else is an ordinary package.
 
 ---
 
@@ -981,6 +1238,51 @@ page:
 `@apply` works in `_tailwind/input.css`, but not in a component's `<style>`
 block, which Tailwind never reads.
 
+### Ready-made controls: pyweft-ui
+
+If you'd rather not write HTML and CSS at all, `pyweft-ui` gives you styled,
+accessible controls as components:
+
+```xml
+<ui.Theme mode="auto">
+  <ui.AppShell title="Orders">
+    <ui.Card title="New order">
+      <ui.TextField label="Customer" @bind="customer" required="true" />
+      <ui.Select label="Size" options="Small, Medium, Large" @bind="size" />
+      <Fill name="footer">
+        <ui.Button variant="primary" icon="send" @click="submit">Place order</ui.Button>
+      </Fill>
+    </ui.Card>
+  </ui.AppShell>
+</ui.Theme>
+```
+
+with `from pyweft_ui import ui` in the code block. It covers layout
+(`AppShell`, `Row`, `Column`, `Grid`, `Card`), form fields (`TextField`,
+`TextArea`, `NumberField`, `Select`, `RadioGroup`, `Checkbox`, `Switch`),
+actions and feedback (`Button`, `Dialog`, `Alert`, `Badge`, `Spinner`,
+`Icon`) and a `Theme` with light, dark and system modes and your own
+colours. The full reference is in
+[packages/pyweft-ui/README.md](../packages/pyweft-ui/README.md), and the
+gallery shows every control live:
+
+```bash
+uv run pyweft run packages/pyweft-ui/gallery
+```
+
+It is not on PyPI yet. Install it from GitHub into the same environment as
+PyWeft:
+
+```bash
+uv add "pyweft-ui @ git+https://github.com/prassanthn/PyWeft.git#subdirectory=packages/pyweft-ui"
+```
+
+(with pip: `pip install "git+https://github.com/prassanthn/PyWeft.git#subdirectory=packages/pyweft-ui"`),
+then add `"pyweft-ui"` to the `dependencies` in your app's own
+`pyproject.toml`. PyWeft ships it to the browser for you (see "Components
+from packages"). Inside a clone of this repository, `uv sync` already
+installs it.
+
 ### Using PyPI packages
 
 Declare dependencies the normal Python way, with uv or pip:
@@ -1206,10 +1508,15 @@ components, `tests/test_effects.py` the patterns for effects, and
 Working today:
 
 - **Components:** XML templates with `{{ }}` and `:attr` bindings, two-way
-  `@bind`, event handlers (methods, expressions or inline statements),
+  `@bind` for every form control, event handlers (methods, expressions or
+  inline statements) with modifiers (`@submit.prevent`, `@keydown.enter`)
+  and a detailed event object (keys, modifier keys, mouse, form fields),
   `<If>`/`<For>` with keyed lists, `@property` computed values.
 - **Composition:** child components with props, events (`emit`) and
-  lifecycle hooks; components in subfolders as `<folder.Name>`.
+  lifecycle hooks; slots (named, with fallbacks and slot props); `@bind` on
+  components; attributes passed through to a component's root element;
+  components in subfolders as `<folder.Name>`, or imported from packages
+  (`ComponentLibrary`), shipped to the browser from your environment.
 - **Reacting to change:** `@effect` methods with automatic dependency
   tracking and cleanup; `state_has_changed()` for changes from timers and
   callbacks.
@@ -1223,8 +1530,10 @@ Working today:
 - **Tooling:** `pyweft new` / `run` / `build`; hot reload that keeps state,
   with an error overlay; a customizable loading screen; PyPI dependencies
   from `pyproject.toml`, installed in the browser.
+- **Controls:** `pyweft-ui`, 19 ready-made, themeable controls (see
+  "Ready-made controls" in section 5), with a live gallery.
 
-Coming next, roughly in order: slots (passing markup into a child
-component), and a pywebview **desktop** host (same components, native
+Coming next: more controls (tabs, menus, tables, toasts, a date picker,
+form validation), and a pywebview **desktop** host (same components, native
 window, real threads).
 
