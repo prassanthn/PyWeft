@@ -40,6 +40,9 @@
     const MODULES = __PYWEFT_MODULES__;
     const APP_FILES = __PYWEFT_APP_FILES__;
     const PACKAGES = __PYWEFT_PACKAGES__;
+    // Component libraries installed where `pyweft run`/`build` ran, shipped
+    // from there under lib/<name>/ (the rest of PACKAGES comes from PyPI).
+    const LIBRARIES = __PYWEFT_LIBRARIES__;
     const DEV = __PYWEFT_DEV__; // pyweft run: hot reload and the error overlay
     const SINCE = __PYWEFT_SINCE__; // dev server changes already in this page
 
@@ -182,6 +185,16 @@ def pyweft_hot_reload():
       return src;
     }
 
+    async function writeLibraries(pyodide, libraries) {
+      for (const lib of libraries) {
+        for (const name of lib.files) {
+          const path = `/pyweft-libs/${lib.name}/${name}`;
+          pyodide.FS.mkdirTree(path.slice(0, path.lastIndexOf("/")));
+          pyodide.FS.writeFile(path, await (await fetch(`lib/${lib.name}/${name}`)).text());
+        }
+      }
+    }
+
     // run_in_background's browser half: one Web Worker (static/worker.js)
     // running its own Python, started on first use. Calls run one at a time,
     // in order. The queue lives here rather than in the worker so that a
@@ -214,6 +227,7 @@ def pyweft_hot_reload():
           modules: MODULES,
           appFiles: APP_FILES,
           packages: PACKAGES,
+          libraries: LIBRARIES,
         });
       },
 
@@ -399,7 +413,8 @@ def pyweft_hot_reload():
         const src = await (await fetch(`pyweft-src/${name}`)).text();
         pyodide.FS.writeFile(`/pyweft-src/pyweft/${name}`, src);
       }
-      pyodide.runPython(`import sys; sys.path.insert(0, "/pyweft-src")`);
+      await writeLibraries(pyodide, LIBRARIES);
+      pyodide.runPython(`import sys; sys.path[:0] = ["/pyweft-src", "/pyweft-libs"]`);
 
       pyodide.FS.mkdirTree("/app");
       for (const name of APP_FILES) {

@@ -249,14 +249,14 @@ names: list = ["x", "y"]
     assert text_of(ul.children[1].children[0]) == "x: 1"
 
 
-def test_component_children_rejected_until_slots():
+def test_content_for_a_component_without_slots_is_an_error():
     Child = make_child()
     Parent = component_from_source(
         "<template><div><Child><p>slot?</p></Child></div></template><code></code>",
         "Parent",
         components={"Child": Child},
     )
-    with pytest.raises(TemplateError, match="slots"):
+    with pytest.raises(TemplateError, match="would never show it: it has no <Slot>"):
         Renderer(Parent()).render()
 
 

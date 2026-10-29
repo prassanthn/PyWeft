@@ -14,15 +14,18 @@ a no-op rather than a crash.
 from __future__ import annotations
 
 import asyncio
+import functools
 import inspect
 import sys
 from functools import partial
 from typing import Any, Awaitable, Callable
 
-from .component import is_component_tag
+from .binding import KEEP, bind_kind, convert, declared_type, prop_value
+from .component import component_named, declared_props, is_component_tag
 from .effects import dispose_effects, run_effects
+from .events import Event
 from .expressions import ExpressionError, Scope, eval_expr, render_parts, run_handler
-from .parser import TElement, TemplateError, TFor, TIf, TStatic
+from .parser import TElement, TemplateError, TFill, TFor, TIf, TSlot, TStatic
 from .styles import marker
 from .vdom import Element, Node, Text
 
@@ -65,6 +68,45 @@ def _dispose(component: Any) -> None:
     component.on_dispose()
     # A timer the component forgot to cancel must not keep requesting renders.
     component.__dict__.pop("_pw_invalidate", None)
+
+
+@functools.lru_cache(maxsize=1024)
+def slot_names(cls: type) -> frozenset[str]:
+    """The slots a component's template renders, anywhere in it."""
+    found: set[str] = set()
+
+    def walk(nodes: list[Any]) -> None:
+        for node in nodes:
+            if isinstance(node, TSlot):
+                found.add(node.name)
+            if isinstance(node, TIf):
+                for _, children in node.branches:
+                    walk(children)
+            elif isinstance(node, (TElement, TFor, TSlot, TFill)):
+                walk(node.children)
+
+    walk(cls.__template__)
+    return frozenset(found)
+
+
+def _is_blank(tnode: Any) -> bool:
+    """Whitespace between <Fill>s on one line is not default-slot content."""
+    return isinstance(tnode, TStatic) and all(
+        kind == "static" and not text.strip() for kind, text in tnode.parts
+    )
+
+
+def _merge_attrs(attrs: dict[str, str], extra: dict[str, str]) -> None:
+    """Attributes passed to a component, onto its root element: ``class``
+    and ``style`` add to the element's own, anything else replaces it."""
+    for name, value in extra.items():
+        own = attrs.get(name)
+        if name == "class" and own:
+            attrs[name] = f"{own} {value}"
+        elif name == "style" and own:
+            attrs[name] = f"{own.rstrip().rstrip(';')}; {value}"
+        else:
+            attrs[name] = value
 
 
 def _takes_arg(fn: Callable) -> bool:
@@ -287,6 +329,14 @@ class Renderer:
             elif isinstance(tnode, TFor):
                 self._loop(tnode, scope, path, out)
 
+            elif isinstance(tnode, TSlot):
+                self._slot(tnode, scope, path, out, key)
+
+            elif isinstance(tnode, TFill):
+                raise TemplateError(
+                    f'<Fill name="{tnode.name}"> must be directly inside a component tag'
+                )
+
             else:  # pragma: no cover - defensive
                 raise TemplateError(f"unknown template node {tnode!r}")
 
@@ -322,8 +372,12 @@ class Renderer:
         else is a plain element."""
         if not is_component_tag(tag):
             return None
-        registry = getattr(type(scope.component), "components", None)
-        return registry.get(tag) if registry else None
+        owner = type(scope.component)
+        registry = getattr(owner, "components", None)
+        found = registry.get(tag) if registry else None
+        # Classes built with component_from_source (no loader) still find
+        # components they imported.
+        return found if found is not None else component_named(owner, tag)
 
     def _component(
         self,
@@ -334,23 +388,46 @@ class Renderer:
         out: list[Node],
         key: Any,
     ) -> None:
-        if tnode.children:
+        if tnode.bind_mods:
             raise TemplateError(
-                f"<{tnode.tag}> has children, but slots are not supported yet"
+                f"<{tnode.tag}>: @bind on a component takes no modifiers"
             )
-        if tnode.bind:
-            raise TemplateError(f"@bind is not supported on component <{tnode.tag}>")
 
         # Props flow down on every render: interpolated attrs as strings,
         # :attrs as evaluated Python values, @events as on_<event> callbacks
-        # bound to the *parent's* scope (that is what emit() calls).
-        props: dict[str, Any] = {
-            name: render_parts(parts, scope) for name, parts in tnode.attrs.items()
-        }
+        # bound to the *parent's* scope (that is what emit() calls). An
+        # attribute the child does not declare is not a prop: it passes
+        # through to the child's root element (class, style, id, aria-*).
+        declared = declared_props(cls)
+        props: dict[str, Any] = {}
+        passthrough: dict[str, str] = {}
+        for name, parts in tnode.attrs.items():
+            value = render_parts(parts, scope)
+            if name in declared:
+                try:
+                    props[name] = prop_value(cls, name, value)
+                except ValueError as exc:
+                    raise TemplateError(
+                        f'<{tnode.tag} {name}="{value}">: {cls.__name__}.{name} {exc}'
+                    ) from None
+            else:
+                passthrough[name] = value
         for name, expr in tnode.expr_attrs.items():
-            props[name] = eval_expr(expr, scope)
+            value = eval_expr(expr, scope)
+            if name in declared:
+                props[name] = value
+            elif value is not None and value is not False:
+                passthrough[name] = "" if value is True else str(value)
         for event, expr in tnode.events.items():
+            if "." in event:
+                raise TemplateError(
+                    f"<{tnode.tag} @{event}>: modifiers apply to page events, "
+                    "not to a component's own events"
+                )
             props[f"on_{event}"] = self._make_handler(expr, scope)
+        if tnode.bind:
+            self._bind_component(tnode.bind, scope, props)
+        slots = self._collect_slots(cls, tnode, scope)
 
         inst_id = "/".join(path)
         instance = self.instances.get(inst_id)
@@ -365,16 +442,101 @@ class Renderer:
             for name, value in props.items():
                 setattr(instance, name, value)
         self._seen.add(inst_id)
+        # Replaced every render: what the parent passes this time is what the
+        # child's <Slot>s show (and what has_slot() reports).
+        instance.__dict__["_pw_slots"] = slots
 
         before = len(out)
         self._emit(cls.__template__, Scope(instance), path, out, key)
+        roots = [node for node in out[before:] if isinstance(node, Element)]
         # The parent's scoped styles may target the child's root element(s),
         # so those carry the parent's marker as well as the child's own.
         parent_scope = getattr(type(scope.component), "__scope__", None)
         if parent_scope:
-            for node in out[before:]:
-                if isinstance(node, Element):
-                    node.attrs.setdefault(marker(parent_scope), "")
+            for node in roots:
+                node.attrs.setdefault(marker(parent_scope), "")
+        if passthrough:
+            if len(roots) != 1:
+                raise TemplateError(
+                    f"<{tnode.tag}> renders {len(roots)} root elements, so "
+                    f"{', '.join(sorted(passthrough))} has nowhere to go; give "
+                    f"{cls.__name__} a single root element or declare "
+                    "the attribute as a field"
+                )
+            _merge_attrs(roots[0].attrs, passthrough)
+
+    def _bind_component(self, field: str, scope: Scope, props: dict[str, Any]) -> None:
+        """``<TextField @bind="email" />``: the child gets the field as its
+        ``value`` prop and reports changes with ``emit("update", new)``. A
+        parent's own ``@update`` handler runs after the field is set."""
+        parent = scope.component
+        own = props.get("on_update")
+        props["value"] = getattr(parent, field, None)
+
+        def update(new: Any = None) -> Any:
+            setattr(parent, field, new)
+            if own is not None:
+                return own(new)
+            parent.state_has_changed()
+            return None
+
+        props["on_update"] = update
+
+    @staticmethod
+    def _collect_slots(
+        cls: type, tnode: TElement, scope: Scope
+    ) -> dict[str, tuple[list[Any], Scope]]:
+        """Content between a component's tags, by slot name. It is rendered
+        later, inside the child, but in *this* scope: the parent's state,
+        handlers and loop variables."""
+        fills: dict[str, list[Any]] = {}
+        loose: list[Any] = []
+        for child in tnode.children:
+            if isinstance(child, TFill):
+                if child.name in fills:
+                    raise TemplateError(
+                        f'<{tnode.tag}> has two <Fill name="{child.name}">'
+                    )
+                fills[child.name] = child.children
+            elif not _is_blank(child):
+                loose.append(child)
+        if loose:
+            if "default" in fills:
+                raise TemplateError(
+                    f'<{tnode.tag}> has both content outside <Fill> and a <Fill '
+                    'name="default">; use one or the other'
+                )
+            fills["default"] = loose
+        accepted = slot_names(cls)
+        for name in fills:
+            if name not in accepted:
+                where = (
+                    f"it has {', '.join(sorted(accepted))}" if accepted else "it has no <Slot>"
+                )
+                what = "content between its tags" if name == "default" else f'<Fill name="{name}">'
+                raise TemplateError(
+                    f"<{tnode.tag}> was given {what}, but {cls.__name__} would "
+                    f"never show it: {where}"
+                )
+        return {name: (nodes, scope) for name, nodes in fills.items()}
+
+    def _slot(
+        self, tnode: TSlot, scope: Scope, path: list[str], out: list[Node], key: Any
+    ) -> None:
+        provided = scope.component.__dict__.get("_pw_slots", {}).get(tnode.name)
+        if provided is None:
+            # Nothing passed: the slot's own children are the fallback.
+            self._emit(tnode.children, scope, path, out, key)
+            return
+        nodes, fill_scope = provided
+        slot_props = {
+            name: render_parts(parts, scope) for name, parts in tnode.attrs.items()
+        }
+        for name, expr in tnode.expr_attrs.items():
+            slot_props[name] = eval_expr(expr, scope)
+        if slot_props:
+            fill_scope = fill_scope.child(**slot_props)
+        self._emit(nodes, fill_scope, path, out, key)
 
     # -------------------------------------------------------------- elements
 
@@ -399,17 +561,18 @@ class Renderer:
         events: dict[str, str] = {}
         prefix = "/".join(path)
 
-        for event, expr in tnode.events.items():
-            handler_id = f"{prefix}#{event}"
+        for spec, expr in tnode.events.items():
+            if not expr.strip():
+                # @submit.prevent="": modifiers only. The host applies them;
+                # an empty id means there is nothing to call.
+                events[spec] = ""
+                continue
+            handler_id = f"{prefix}#{spec}"
             self.handlers[handler_id] = self._make_handler(expr, scope)
-            events[event] = handler_id
+            events[spec] = handler_id
 
         if tnode.bind:
-            value = getattr(scope.component, tnode.bind, "")
-            attrs.setdefault("value", "" if value is None else str(value))
-            handler_id = f"{prefix}#bind"
-            self.handlers[handler_id] = self._make_bind_handler(tnode.bind, scope)
-            events.setdefault("input", handler_id)
+            self._bind(tnode, scope, attrs, events, prefix)
 
         children: list[Node] = []
         self._emit(tnode.children, scope, path, children)
@@ -449,27 +612,62 @@ class Renderer:
 
         return handler
 
-    def _make_bind_handler(self, field: str, scope: Scope) -> Callable:
+    def _bind(
+        self,
+        tnode: TElement,
+        scope: Scope,
+        attrs: dict[str, str],
+        events: dict[str, str],
+        prefix: str,
+    ) -> None:
+        field, mods = tnode.bind, tnode.bind_mods
+        kind = bind_kind(tnode.tag, attrs)
+        current = getattr(scope.component, field, None)
+        if kind == "checkbox":
+            if current:
+                attrs["checked"] = ""
+        elif kind == "radio":
+            if current is not None and str(current) == attrs.get("value"):
+                attrs["checked"] = ""
+        else:
+            attrs.setdefault("value", "" if current is None else str(current))
+
+        # Checkboxes and radios report a choice on change; .lazy waits for
+        # change (focus leaving the box) instead of every keystroke.
+        spec = "change" if kind != "value" or "lazy" in mods else "input"
+        bind_handler = self._make_bind_handler(field, scope, kind, mods)
+        handler_id = events.get(spec)
+        own = self.handlers.get(handler_id) if handler_id else None
+        if own is None:
+            handler_id = f"{prefix}#bind"
+            self.handlers[handler_id] = bind_handler
+        else:
+            # @bind and the element's own @input: update the field first, so
+            # the handler already sees the new value.
+            def both(event: Any = None) -> Any:
+                bind_handler(event)
+                return own(event)
+
+            self.handlers[handler_id] = both
+        events[spec] = handler_id
+
+    def _make_bind_handler(
+        self, field: str, scope: Scope, kind: str, mods: tuple[str, ...]
+    ) -> Callable:
         component = scope.component
+        target, allows_none = declared_type(type(component), field)
 
         def handler(event: dict | None = None) -> None:
-            value: Any = (event or {}).get("value", "")
-            current = getattr(component, field, None)
-            # Coerce back to the type the state already had, so a bound int
-            # field doesn't silently turn into a string on first keystroke.
-            if isinstance(current, bool):
-                value = bool(value)
-            elif isinstance(current, int):
-                try:
-                    value = int(value)
-                except (TypeError, ValueError):
-                    pass
-            elif isinstance(current, float):
-                try:
-                    value = float(value)
-                except (TypeError, ValueError):
-                    pass
-            setattr(component, field, value)
+            event = event or {}
+            if kind == "checkbox":
+                value: Any = bool(event.get("checked"))
+            else:
+                text = str(event.get("value", ""))
+                if "trim" in mods:
+                    text = text.strip()
+                value = convert(text, target, allows_none, "number" in mods)
+            if value is not KEEP:
+                setattr(component, field, value)
             component.state_has_changed()
 
         return handler
@@ -478,6 +676,8 @@ class Renderer:
         handler = self.handlers.get(handler_id)
         if handler is None:
             return None  # stale id from a since-replaced render
+        if type(event) is dict:
+            event = Event(event)  # event.key as well as event["key"]
         self._busy += 1
         try:
             return handler(event)

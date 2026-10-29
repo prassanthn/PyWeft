@@ -2,7 +2,7 @@
 // runs run_in_background() calls so the page keeps responding. shell.html
 // starts it on first use and sends it one call at a time.
 //
-// Messages in:  {type: "init", pyodideUrl, modules, appFiles, packages}
+// Messages in:  {type: "init", pyodideUrl, modules, appFiles, packages, libraries}
 //               {type: "call", id, request}        request: Uint8Array
 //               {type: "files", write: {name: text}, remove: [name]}
 // Messages out: {type: "ready"} | {type: "failed", error}
@@ -20,7 +20,7 @@ function writeAppFile(name, text) {
   pyodide.FS.writeFile(`/app/${name}`, text);
 }
 
-async function init({ pyodideUrl, modules, appFiles, packages }) {
+async function init({ pyodideUrl, modules, appFiles, packages, libraries = [] }) {
   importScripts(pyodideUrl);
   pyodide = await loadPyodide();
   if (packages.length) {
@@ -35,9 +35,16 @@ async function init({ pyodideUrl, modules, appFiles, packages }) {
   for (const name of appFiles) {
     writeAppFile(name, await (await fetch(`app/${name}`)).text());
   }
+  for (const lib of libraries) {
+    for (const name of lib.files) {
+      const path = `/pyweft-libs/${lib.name}/${name}`;
+      pyodide.FS.mkdirTree(path.slice(0, path.lastIndexOf("/")));
+      pyodide.FS.writeFile(path, await (await fetch(`lib/${lib.name}/${name}`)).text());
+    }
+  }
   pyodide.runPython(`
 import sys
-sys.path.insert(0, "/pyweft-src")
+sys.path[:0] = ["/pyweft-src", "/pyweft-libs"]
 
 def pyweft_worker_call(request):
     from pyodide.ffi import to_js

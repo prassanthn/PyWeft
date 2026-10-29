@@ -18,6 +18,7 @@ import socket
 import sys
 import threading
 import uuid
+from dataclasses import dataclass
 from html.parser import HTMLParser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -151,6 +152,119 @@ def content_type(path: Path) -> str:
     return known or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
 
 
+# --------------------------------------------------------- component libraries
+
+
+@dataclass
+class Library:
+    """A dependency that holds .weft components and is installed where
+    ``pyweft run`` runs: shipped to the browser from there (``/lib/<name>/``)
+    instead of being installed from PyPI."""
+
+    name: str  # the import name
+    folder: Path
+    files: list[str]  # POSIX paths below folder
+
+
+_LIBRARY_SUFFIXES = {".py", ".weft", ".css"}
+
+
+def _requirement_name(spec: str) -> str:
+    match = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", spec)
+    return match.group(1) if match else spec.strip()
+
+
+def _normalise(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _distribution(dist_name: str):
+    from importlib import metadata
+
+    try:
+        return metadata.distribution(dist_name)
+    except metadata.PackageNotFoundError:
+        return None
+
+
+def _import_names(dist_name: str) -> list[str]:
+    """Top-level packages a distribution installs, best effort: its
+    top_level.txt, else its file list, else the name with - as _."""
+    names: list[str] = []
+    dist = _distribution(dist_name)
+    if dist is not None:
+        top = dist.read_text("top_level.txt")
+        if top:
+            names += top.split()
+        for f in dist.files or []:
+            first = f.parts[0]
+            if len(f.parts) > 1 and first.isidentifier() and not first.endswith("-info"):
+                names.append(first)
+    names.append(dist_name.replace("-", "_").replace(".", "_"))
+    return list(dict.fromkeys(names))
+
+
+def find_library(dist_name: str) -> Library | None:
+    import importlib.util
+
+    for import_name in _import_names(dist_name):
+        try:
+            spec = importlib.util.find_spec(import_name)
+        except (ImportError, ValueError):
+            continue
+        if spec is None or not spec.submodule_search_locations:
+            continue
+        folder = Path(next(iter(spec.submodule_search_locations)))
+        files = sorted(
+            p.relative_to(folder).as_posix()
+            for p in folder.rglob("*")
+            if p.is_file()
+            and p.suffix in _LIBRARY_SUFFIXES
+            and "__pycache__" not in p.parts
+        )
+        if any(f.endswith(".weft") for f in files):
+            return Library(import_name, folder, files)
+    return None
+
+
+def app_libraries(app_dir: Path) -> list[Library]:
+    found: dict[str, Library] = {}
+    for spec in app_dependencies(app_dir):
+        name = _requirement_name(spec)
+        if _normalise(name) == "pyweft":
+            continue
+        library = find_library(name)
+        if library is not None:
+            found[library.name] = library
+    return list(found.values())
+
+
+def browser_packages(app_dir: Path) -> list[str]:
+    """What micropip installs in the browser: the app's dependencies minus
+    the libraries shipped from this environment (and PyWeft itself, which
+    ships as pyweft-src), plus those libraries' own requirements."""
+    packages: list[str] = []
+    shipped: set[str] = {"pyweft"}
+    requirements: list[str] = []
+    for spec in app_dependencies(app_dir):
+        name = _requirement_name(spec)
+        if _normalise(name) == "pyweft":
+            continue
+        library = find_library(name)
+        if library is None:
+            packages.append(spec)
+            continue
+        shipped |= {_normalise(name), _normalise(library.name)}
+        dist = _distribution(name)
+        requirements += (dist.requires or []) if dist is not None else []
+    for req in requirements:
+        if re.search(r"extra\s*==", req):
+            continue  # optional extras are not installed
+        if _normalise(_requirement_name(req)) not in shipped:
+            packages.append(req.split(";")[0].strip())
+    return list(dict.fromkeys(packages))
+
+
 _HOST_ONLY = {"cli.py", "__main__.py"}  # never shipped to the browser
 
 
@@ -225,7 +339,11 @@ def render_shell(app_dir: Path, dev: bool = False, since: int = 0) -> str:
         html.replace("__PYWEFT_TITLE__", app_dir.resolve().name)
         .replace("__PYWEFT_MODULES__", json.dumps(pyweft_modules()))
         .replace("__PYWEFT_APP_FILES__", json.dumps(app_pyweft_files(app_dir)))
-        .replace("__PYWEFT_PACKAGES__", json.dumps(app_dependencies(app_dir)))
+        .replace("__PYWEFT_PACKAGES__", json.dumps(browser_packages(app_dir)))
+        .replace(
+            "__PYWEFT_LIBRARIES__",
+            json.dumps([{"name": lib.name, "files": lib.files} for lib in app_libraries(app_dir)]),
+        )
         .replace("__PYWEFT_DEV__", "true" if dev else "false")
         .replace("__PYWEFT_SINCE__", str(since))
         .replace("__PYWEFT_CSS__", css)
@@ -344,6 +462,11 @@ def cmd_build(app_dir: Path, out: Path) -> None:
         target = out / ASSETS_DIR / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(app_dir / ASSETS_DIR / name, target)
+    for lib in app_libraries(app_dir):
+        for name in lib.files:
+            target = out / "lib" / lib.name / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(lib.folder / name, target)
     print(f"built {out}/ -- serve it with any static file server")
 
 
@@ -353,6 +476,7 @@ def cmd_build(app_dir: Path, out: Path) -> None:
 _STARTUP_FILES = ("pyproject.toml", LOADING_FILE, HEAD_FILE)
 _FRAMEWORK = "pyweft:"  # snapshot key prefix for the framework's own files
 _ASSET = ASSETS_DIR + "/"  # snapshot key prefix for assets/ files
+_LIB = "lib:"  # snapshot key prefix for component library files
 # Everything else of the framework is re-read per request; this is not.
 _SERVER_CODE = _FRAMEWORK + "cli.py"
 _STALE_MESSAGE = (
@@ -372,6 +496,9 @@ def snapshot(app_dir: Path) -> dict[str, tuple[int, int]]:
         entries[name] = app_dir / name
     for rel in app_assets(app_dir):
         entries[_ASSET + rel] = app_dir / ASSETS_DIR / rel
+    for lib in app_libraries(app_dir):
+        for rel in lib.files:
+            entries[f"{_LIB}{lib.name}/{rel}"] = lib.folder / rel
     for path in [*_PKG_DIR.glob("*.py"), *_STATIC.iterdir()]:
         entries[_FRAMEWORK + path.name] = path
 
@@ -397,7 +524,7 @@ def describe_change(old: dict, new: dict) -> dict | None:
     if not touched:
         return None
     for key in touched:
-        if key.startswith((_FRAMEWORK, _ASSET)) or key in _STARTUP_FILES:
+        if key.startswith((_FRAMEWORK, _ASSET, _LIB)) or key in _STARTUP_FILES:
             name = key[len(_FRAMEWORK) :] if key.startswith(_FRAMEWORK) else key
             return {"type": "reload", "reason": f"{name} changed"}
 
@@ -512,6 +639,13 @@ def make_dev_server(
                 if rel in app_pyweft_files(app_dir) or rel in app_css_files(app_dir):
                     ctype = "text/css" if rel.endswith(".css") else "text/plain"
                     return self._file(app_dir / rel, ctype)
+            if route.startswith("/lib/"):
+                # Only files of a library the app depends on, listed by name.
+                lib_name, _, rel = route[len("/lib/") :].partition("/")
+                for lib in app_libraries(app_dir):
+                    if lib.name == lib_name and rel in lib.files:
+                        ctype = "text/css" if rel.endswith(".css") else "text/plain"
+                        return self._file(lib.folder / rel, ctype)
             if route.startswith(f"/{_ASSET}"):
                 path = _asset_path(app_dir, unquote(route[len(_ASSET) + 1 :]))
                 if path is not None:

@@ -31,6 +31,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from typing import Any
 
+from .events import parse_bind_modifiers, parse_event_spec
 from .expressions import parse_interpolation
 
 
@@ -52,8 +53,10 @@ class TStatic:
 class TElement:
     tag: str
     attrs: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
+    # Event spec ("click", "keydown.enter") -> handler source; see events.py.
     events: dict[str, str] = field(default_factory=dict)
     bind: str | None = None
+    bind_mods: tuple[str, ...] = ()
     key_expr: str | None = None
     children: list[Any] = field(default_factory=list)
     # ``:name="expr"`` bindings -- evaluated as Python, unlike ``attrs`` which
@@ -74,6 +77,27 @@ class TFor:
     iter_src: str
     index_var: str | None = None
     key_expr: str | None = None
+    children: list[Any] = field(default_factory=list)
+
+
+@dataclass
+class TSlot:
+    """``<Slot name="footer" :item="row">fallback</Slot>`` in a component's
+    template: where the content its parent passed is rendered. ``attrs`` and
+    ``expr_attrs`` are slot props, handed to that content as variables."""
+
+    name: str = "default"
+    attrs: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
+    expr_attrs: dict[str, str] = field(default_factory=dict)
+    children: list[Any] = field(default_factory=list)
+
+
+@dataclass
+class TFill:
+    """``<Fill name="footer">...</Fill>`` directly inside a component tag:
+    content for one of its named slots."""
+
+    name: str
     children: list[Any] = field(default_factory=list)
 
 
@@ -205,6 +229,11 @@ def _convert_children(el: ET.Element) -> list[Any]:
             out += _text_nodes(child.tail)
             i += 1
             continue
+        if child.tag in ("Slot", "Fill"):
+            out.append(_convert_slot(child) if child.tag == "Slot" else _convert_fill(child))
+            out += _text_nodes(child.tail)
+            i += 1
+            continue
         out.append(_convert_element(child))
         out += _text_nodes(child.tail)
         i += 1
@@ -251,11 +280,62 @@ def _convert_for(el: ET.Element) -> TFor:
     )
 
 
+_SLOT_NAME = re.compile(r"^[A-Za-z_][\w-]*$")
+
+
+def _slot_name(el: ET.Element, required: bool) -> str:
+    name = el.get("name")
+    if name is None:
+        if required:
+            raise TemplateError('<Fill> requires name="...", the slot it fills')
+        return "default"
+    if not _SLOT_NAME.match(name):
+        raise TemplateError(f"<{el.tag} name={name!r}>: not a valid slot name")
+    return name
+
+
+def _convert_slot(el: ET.Element) -> TSlot:
+    attrs: dict[str, list[tuple[str, str]]] = {}
+    expr_attrs: dict[str, str] = {}
+    for name, value in el.attrib.items():
+        if name == "name":
+            continue
+        if name.startswith("py-at-"):
+            raise TemplateError(f"<Slot> takes no events (@{name[6:]})")
+        if name.startswith("py-colon-"):
+            name, target = name[len("py-colon-") :], expr_attrs
+        else:
+            target = attrs
+        if not name.isidentifier():
+            raise TemplateError(
+                f"<Slot> prop {name!r} must be a Python name: the content that "
+                "fills the slot sees it as a variable"
+            )
+        if target is expr_attrs:
+            expr_attrs[name] = value
+        else:
+            attrs[name] = parse_interpolation(value)
+    return TSlot(
+        name=_slot_name(el, required=False),
+        attrs=attrs,
+        expr_attrs=expr_attrs,
+        children=_convert_children(el),
+    )
+
+
+def _convert_fill(el: ET.Element) -> TFill:
+    extra = sorted(set(el.attrib) - {"name"})
+    if extra:
+        raise TemplateError(f"<Fill> takes only name=, not {', '.join(extra)}")
+    return TFill(name=_slot_name(el, required=True), children=_convert_children(el))
+
+
 def _convert_element(el: ET.Element) -> TElement:
     attrs: dict[str, list[tuple[str, str]]] = {}
     events: dict[str, str] = {}
     expr_attrs: dict[str, str] = {}
     bind: str | None = None
+    bind_mods: tuple[str, ...] = ()
     key_expr: str | None = None
 
     for name, value in el.attrib.items():
@@ -265,14 +345,18 @@ def _convert_element(el: ET.Element) -> TElement:
             expr_attrs[name[len("py-colon-") :]] = value
         elif name.startswith("py-at-"):
             directive = name[len("py-at-") :]
-            if directive == "bind":
-                if not value.isidentifier():
-                    raise TemplateError(
-                        f"@bind takes a plain state name, got {value!r}"
-                    )
-                bind = value
-            else:
-                events[directive] = value
+            try:
+                if directive == "bind" or directive.startswith("bind."):
+                    if not value.isidentifier():
+                        raise TemplateError(
+                            f"@bind takes a plain state name, got {value!r}"
+                        )
+                    bind = value
+                    bind_mods = parse_bind_modifiers(directive)
+                else:
+                    events[parse_event_spec(directive)] = value
+            except ValueError as exc:
+                raise TemplateError(f"<{el.tag}> {exc}") from None
         else:
             attrs[name] = parse_interpolation(value)
 
@@ -281,6 +365,7 @@ def _convert_element(el: ET.Element) -> TElement:
         attrs=attrs,
         events=events,
         bind=bind,
+        bind_mods=bind_mods,
         key_expr=key_expr,
         children=_convert_children(el),
         expr_attrs=expr_attrs,

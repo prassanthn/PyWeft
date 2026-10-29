@@ -9,8 +9,11 @@ sent. If you mutate state outside a handler (a timer, an async callback), call
 from __future__ import annotations
 
 import copy
+import functools
+import inspect
 import re
 import textwrap
+import types
 from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,8 +23,10 @@ from .parser import (
     _CODE_RE,
     TElement,
     TemplateError,
+    TFill,
     TFor,
     TIf,
+    TSlot,
     parse_template,
     split_source,
 )
@@ -107,6 +112,11 @@ class Component:
         if invalidate is not None:
             invalidate()
 
+    def has_slot(self, name: str = "default") -> bool:
+        """Whether the parent passed content for this slot, for wrappers that
+        should only render around it: ``<If cond="has_slot('footer')">``."""
+        return name in self.__dict__.get("_pw_slots", {})
+
     def emit(self, event: str, payload: Any = None) -> Any:
         """Invoke the parent's ``@event`` callback, Vue-style.
 
@@ -162,13 +172,52 @@ def component_from_source(
     return type(name, (base,), namespace)
 
 
-_CONTROL_TAGS = {"If", "ElseIf", "Else", "For"}
+_CONTROL_TAGS = {"If", "ElseIf", "Else", "For", "Slot", "Fill"}
 
 
 def is_component_tag(tag: str) -> bool:
     """``TodoItem`` and ``widgets.Row`` are components; ``div`` is not. The
     last dotted segment decides, so folder names can stay lowercase."""
     return tag.rsplit(".", 1)[-1][:1].isupper() and tag not in _CONTROL_TAGS
+
+
+def component_named(cls: type, tag: str) -> type | None:
+    """The component a tag names through the code block's own names:
+    ``from pyweft_ui import ui`` makes ``<ui.Button>`` resolve, and
+    ``from widgets import Row`` makes ``<Row>`` resolve."""
+    target: Any = cls
+    for part in tag.split("."):
+        target = getattr(target, part, None)
+        if target is None:
+            return None
+    if isinstance(target, type) and issubclass(target, Component):
+        return target
+    return None
+
+
+# Not props even though they live on the class: imports, nested classes,
+# methods, computed values.
+_NOT_PROPS = (types.ModuleType, type, property, staticmethod, classmethod)
+
+
+@functools.lru_cache(maxsize=1024)
+def declared_props(cls: type) -> frozenset[str]:
+    """Names a parent may set on this component: its fields (annotated or
+    given a default in the code block), including ``on_<event>`` callbacks.
+    Any other attribute written on its tag goes to its root element."""
+    names: set[str] = set()
+    for klass in cls.__mro__:
+        if klass is Component or klass is object:
+            continue
+        try:
+            names.update(inspect.get_annotations(klass))
+        except Exception:
+            pass
+        for name, value in vars(klass).items():
+            if callable(value) or isinstance(value, _NOT_PROPS):
+                continue
+            names.add(name)
+    return frozenset(n for n in names if not n.startswith("_") and n != "components")
 
 
 def _component_tags(nodes: list[Any], found: set[str]) -> set[str]:
@@ -180,7 +229,7 @@ def _component_tags(nodes: list[Any], found: set[str]) -> set[str]:
         elif isinstance(node, TIf):
             for _, children in node.branches:
                 _component_tags(children, found)
-        elif isinstance(node, TFor):
+        elif isinstance(node, (TFor, TSlot, TFill)):
             _component_tags(node.children, found)
     return found
 
@@ -198,6 +247,9 @@ class _LoadContext:
     # becomes one class: compiled once, and an unambiguous target when hot
     # reload moves live instances onto freshly compiled classes.
     loaded: dict[Path, type]
+    # Prepended to style scope ids, so a library's button.weft and an app's
+    # button.weft cannot share styles.
+    scope_prefix: str | None = None
 
 
 # Set while a .weft file is being loaded, so a load_component() call inside
@@ -243,17 +295,22 @@ def _find_component(tag: str, referrer: Path, root: Path) -> Path:
 
 
 def load_component(
-    path: str | Path, name: str | None = None, *, root: str | Path | None = None
+    path: str | Path,
+    name: str | None = None,
+    *,
+    root: str | Path | None = None,
+    scope_prefix: str | None = None,
 ) -> type:
     """Load a ``.weft`` file and, recursively, the components it uses.
 
-    A capitalised tag is looked up first in the code block's explicit
-    ``components`` dict, then on disk:
+    A capitalised tag is looked up, in order:
 
-    * ``<TodoItem>`` -- ``TodoItem.weft`` or ``todo_item.weft`` next to the
-      file that uses it
-    * ``<widgets.Row>`` -- ``widgets/Row.weft`` or ``widgets/row.weft`` under
-      the app root, whichever file uses it
+    * in the code block's explicit ``components`` dict
+    * through the code block's own names: after ``from pyweft_ui import ui``,
+      ``<ui.Button>`` is ``ui.Button``
+    * on disk: ``<TodoItem>`` is ``TodoItem.weft`` or ``todo_item.weft`` next
+      to the file that uses it; ``<widgets.Row>`` is ``widgets/Row.weft`` or
+      ``widgets/row.weft`` under the app root
 
     ``root`` defaults to the folder of the first file loaded.
     """
@@ -266,6 +323,7 @@ def load_component(
         root_dir = Path(root).resolve()
     elif ctx is not None:
         root_dir = ctx.root
+        scope_prefix = scope_prefix or ctx.scope_prefix
     else:
         root_dir = p.parent
     loading = ctx.loading if ctx is not None else set()
@@ -276,12 +334,15 @@ def load_component(
     if p in loading:
         raise TemplateError(f"circular component reference involving {p.name}")
     loading.add(p)
-    token = _LOAD.set(_LoadContext(root_dir, loading, p.parent, loaded))
+    token = _LOAD.set(_LoadContext(root_dir, loading, p.parent, loaded, scope_prefix))
     try:
         text = p.read_text(encoding="utf-8")
+        scope = _scope_id(p, root_dir)
+        if scope_prefix:
+            scope = f"{scope_prefix}-{scope}"
         try:
             cls = component_from_source(
-                text, name or p.stem, scope=_scope_id(p, root_dir), filename=str(p)
+                text, name or p.stem, scope=scope, filename=str(p)
             )
         except TemplateError as exc:
             try:
@@ -295,6 +356,10 @@ def load_component(
         registry = dict(cls.components)
         for tag in sorted(_component_tags(cls.__template__, set())):
             if tag not in registry:
+                imported = component_named(cls, tag)
+                if imported is not None:
+                    registry[tag] = imported
+                    continue
                 found = _find_component(tag, p, root_dir)
                 registry[tag] = load_component(found, tag.rsplit(".", 1)[-1])
         cls.components = registry
@@ -303,3 +368,59 @@ def load_component(
     finally:
         _LOAD.reset(token)
         loading.discard(p)
+
+
+class ComponentLibrary:
+    """A folder of ``.weft`` components, as attributes. This is how a package
+    ships components::
+
+        # my_widgets/__init__.py
+        from pathlib import Path
+        from pyweft import ComponentLibrary
+
+        ui = ComponentLibrary(Path(__file__).parent, prefix="ui")
+
+    and how an app uses them: ``from my_widgets import ui`` in its code
+    block, then ``<ui.Button>``, ``<ui.Card>`` in its template.
+
+    ``ui.Button`` loads ``Button.weft`` or ``button.weft`` on first use.
+    Inside the folder, components refer to each other as usual (siblings by
+    name, subfolders by dotted tags from the folder). ``prefix`` keeps the
+    library's scoped styles apart from the app's.
+    """
+
+    def __init__(self, folder: str | Path, prefix: str | None = None):
+        self._folder = Path(folder).resolve()
+        self._prefix = prefix or self._folder.name
+
+    def __getattr__(self, name: str) -> type:
+        if name.startswith("_") or not name[:1].isupper():
+            raise AttributeError(name)
+        for candidate in (self._folder / f"{name}.weft", self._folder / f"{_snake(name)}.weft"):
+            if candidate.is_file():
+                break
+        else:
+            raise AttributeError(
+                f"{self._prefix} has no component {name} (no {name}.weft or "
+                f"{_snake(name)}.weft in {self._folder})"
+            )
+        # A load of its own: the library's root, prefix and cache must not
+        # mix with those of the app that happens to be loading it.
+        token = _LOAD.set(None)
+        try:
+            cls = load_component(candidate, name, root=self._folder, scope_prefix=self._prefix)
+        finally:
+            _LOAD.reset(token)
+        setattr(self, name, cls)  # loaded once; __getattr__ is not asked again
+        return cls
+
+    def __dir__(self) -> list[str]:
+        """Component names, for completion: text_field.weft -> TextField."""
+        stems = (p.stem for p in self._folder.glob("*.weft"))
+        return sorted(
+            s if s[:1].isupper() else "".join(w.capitalize() for w in s.split("_"))
+            for s in stems
+        )
+
+    def __repr__(self) -> str:
+        return f"<ComponentLibrary {self._prefix} at {self._folder}>"
