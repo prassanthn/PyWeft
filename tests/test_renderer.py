@@ -33,6 +33,31 @@ def render(component):
     return renderer, renderer.render()
 
 
+def test_imported_functions_are_called_as_plain_functions(tmp_path, monkeypatch):
+    (tmp_path / "helpers_for_test.py").write_text(
+        "def shout(text):\n    return text.upper()\n\n"
+        "def greeting(self):\n    return 'hi ' + self.name\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    comp = component_from_source(
+        """
+        <template><p @click="said.append(shout('click'))">{{ shout(name) }} {{ greeting() }} {{ local() }}</p></template>
+        <code>
+        from helpers_for_test import shout, greeting
+        name: str = "ada"
+        said: list = []
+        def local(self):
+            return shout(self.name[::-1])
+        </code>
+        """
+    )()
+    renderer, tree = render(comp)
+    assert tree[0].children[0].text == "ADA hi ada ADA"
+    renderer.dispatch(tree[0].events["click"])
+    assert comp.said == ["CLICK"]
+
+
 def test_renders_interpolated_text():
     comp = component_from_source(COUNTER, "Counter")()
     _, tree = render(comp)

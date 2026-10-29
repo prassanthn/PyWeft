@@ -141,6 +141,19 @@ def compile_code_block(src: str, filename: str) -> Any:
     return compile(textwrap.dedent(code_src), filename, "exec")
 
 
+def _imported_helper(value: Any) -> bool:
+    """A function imported into a code block (``from x import toast``), to be
+    called as itself: as a class attribute it would otherwise become a
+    method, and ``toast("Saved")`` in a template would get the component as
+    its message. Functions the code block defines have no ``__module__``
+    (the exec namespace has no ``__name__``); an imported one whose first
+    parameter is ``self`` is meant as a method and stays one."""
+    if not isinstance(value, types.FunctionType) or value.__module__ is None:
+        return False
+    names = value.__code__.co_varnames[: value.__code__.co_argcount]
+    return not names or names[0] != "self"
+
+
 def component_from_source(
     src: str,
     name: str = "Component",
@@ -158,6 +171,9 @@ def component_from_source(
     namespace: dict[str, Any] = {}
     exec(compile_code_block(src, filename or f"<{name}.weft>"), namespace)
     namespace.pop("__builtins__", None)
+    for key, value in namespace.items():
+        if _imported_helper(value):
+            namespace[key] = staticmethod(value)
     namespace["__template__"] = nodes
     if style_src.strip():
         scope = scope or _snake(name)
