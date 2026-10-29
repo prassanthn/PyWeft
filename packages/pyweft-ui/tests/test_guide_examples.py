@@ -118,6 +118,56 @@ def test_confirm_dialog_recipe(app_dir):
     assert app.status == "Deleted Website redesign." and app.confirming is False
 
 
+def test_tabs_recipe(app_dir):
+    block = next(b for b in FULL if "<ui.Tabs" in b)
+    app, r = load(app_dir, block)
+    tree = r.render()
+    assert find_text(tree, "input") is not None  # Profile shows the name field
+    tabs = [n for n in walk(tree) if n.attrs.get("role") == "tab"]
+    r.dispatch(tabs[2].events["click"], {})
+    assert app.tab == "Billing"
+    panel = next(n for n in walk(r.render()) if n.attrs.get("role") == "tabpanel")
+    assert text(panel) == "You're on the free plan."
+
+
+def test_table_recipe(app_dir):
+    block = next(b for b in FULL if "<ui.Table" in b)
+    app, r = load(app_dir, block)
+    tree = r.render()
+    rows = [n for n in walk(tree) if n.tag == "tr" and "clickable" in n.attrs.get("class", "")]
+    assert [text(n.children[3]) for n in rows] == ["1,250.00", "89.90"]  # sorted, largest first
+    assert any("badge-success" in n.attrs.get("class", "") for n in walk([rows[0]]))
+    r.dispatch(rows[1].events["click"], {})
+    assert app.message == "Order 1042 for Grace Hopper"
+    app.orders = []
+    assert "No orders yet." in [text(n) for n in walk(r.render()) if n.tag == "td"]
+
+
+def test_toast_recipe(app_dir, toasts):
+    block = next(b for b in FULL if "<ui.Toaster" in b)
+
+    async def main():
+        app, r = load(app_dir, block)
+        tree = r.render()
+        save, archive = [n for n in walk(tree) if n.tag == "button"]
+        r.dispatch(archive.events["click"], {})
+        assert app.notes == ["Groceries", "Ideas"]
+        assert [t.message for t in toasts._toasts] == ["Archived “Books”."]
+        undo = next(n for n in walk(r.render()) if "action" in n.attrs.get("class", ""))
+        r.dispatch(undo.events["click"], {})
+        assert app.notes == ["Groceries", "Ideas", "Books"] and toasts._toasts == []
+        r.dispatch(save.events["click"], {})
+        assert toasts._toasts[0].kind == "success"
+        toasts._toasts[0].close()
+        await r.idle()
+
+    asyncio.run(main())
+
+
+def find_text(nodes, tag):
+    return next((n for n in walk(nodes) if n.tag == tag), None)
+
+
 def test_stat_cards_and_email_field(app_dir):
     stats = next(b for b in FULL if "<StatCard" in b)
     _, r = load(app_dir, stats)

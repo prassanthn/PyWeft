@@ -14,11 +14,14 @@ fields; this guide is the how-to.
 5. [Buttons](#5-buttons)
 6. [Messages, badges and loading](#6-messages-badges-and-loading)
 7. [Dialogs](#7-dialogs)
-8. [Icons](#8-icons)
-9. [Themes](#9-themes)
-10. [Changing how a control looks](#10-changing-how-a-control-looks)
-11. [Building your own components from controls](#11-building-your-own-components-from-controls)
-12. [Accessibility and keyboard](#12-accessibility-and-keyboard)
+8. [Tabs](#8-tabs)
+9. [Tables](#9-tables)
+10. [Toasts](#10-toasts)
+11. [Icons](#11-icons)
+12. [Themes](#12-themes)
+13. [Changing how a control looks](#13-changing-how-a-control-looks)
+14. [Building your own components from controls](#14-building-your-own-components-from-controls)
+15. [Accessibility and keyboard](#15-accessibility-and-keyboard)
 
 ---
 
@@ -486,7 +489,202 @@ what was typed into it:
 X); when your own code sets the field to `False`, you're already there to do
 whatever's needed.
 
-## 8. Icons
+## 8. Tabs
+
+`Tabs` shows a row of tabs. Bind it to a field, and put what each tab shows
+between its tags:
+
+```xml
+<template>
+  <ui.Theme>
+    <ui.Tabs label="Account" options="Profile, Security, Billing" @bind="tab">
+      <If cond="tab == 'Profile'">
+        <ui.TextField label="Display name" @bind="display_name" />
+      </If>
+      <ElseIf cond="tab == 'Security'">
+        <ui.Switch label="Two-step sign-in" @bind="two_step" />
+      </ElseIf>
+      <Else>
+        <p>You're on the free plan.</p>
+      </Else>
+    </ui.Tabs>
+  </ui.Theme>
+</template>
+
+<code>
+from pyweft_ui import ui
+
+tab: str = "Profile"
+display_name: str = "Ada"
+two_step: bool = False
+</code>
+```
+
+- **`options`** takes the same forms as `Select`'s: a comma-separated
+  string, a list, `(value, label)` pairs or dicts. Your field gets the value.
+- **Start your field at one of the values**, as `tab = "Profile"` does above.
+  Until it is, the first tab is shown.
+- **`tab` inside the tags is always the chosen tab**, even without `@bind`,
+  for tabs nothing else needs to know about:
+
+  ```xml
+  <ui.Tabs options="Day, Week, Month" variant="pills">
+    <p>Sales this {{ tab.lower() }}: {{ sales[tab] }}</p>
+  </ui.Tabs>
+  ```
+
+- **`variant`** is `line` (underlined, the default) or `pills`.
+- **`label`** names the tab row for screen readers.
+- Leave the tags empty (`<ui.Tabs ... />`) to use the tab row on its own,
+  for example to switch what a whole page shows.
+
+Only the chosen tab's content exists on the page, so what's typed into a
+field on another tab lives in your fields, not in the hidden tab.
+
+## 9. Tables
+
+`Table` shows a list of dicts (or objects) as rows. Name the fields to show
+as columns:
+
+```xml
+<ui.Table :rows="orders" columns="id, customer, total" />
+```
+
+Leave out `columns` and every field of the first row becomes a column.
+Headings come from the field names (`order_date` becomes "Order date"), and
+columns of numbers line up on the right by themselves.
+
+A complete example: headings to click for sorting, a formatted amount, a
+badge in the status column, and a row the user can pick:
+
+```xml
+<template>
+  <ui.Theme>
+    <ui.Table :rows="orders" :columns="COLUMNS" row_key="id"
+              sortable="true" sort="-total" @select="open_order">
+      <Fill name="cell">
+        <If cond="column == 'status'">
+          <ui.Badge :kind="'success' if value == 'paid' else 'warning'">{{ text }}</ui.Badge>
+        </If>
+        <Else>{{ text }}</Else>
+      </Fill>
+      <Fill name="empty">No orders yet.</Fill>
+    </ui.Table>
+    <p>{{ message }}</p>
+  </ui.Theme>
+</template>
+
+<code>
+from pyweft_ui import ui
+
+COLUMNS = [
+    ("id", "Order"),
+    "customer",
+    "status",
+    {"key": "total", "label": "Amount", "format": ",.2f"},
+]
+
+orders: list = [
+    {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
+    {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
+]
+message: str = "Click an order."
+
+def open_order(self, order):
+    self.message = f"Order {order['id']} for {order['customer']}"
+</code>
+```
+
+**Columns** can be written in four ways, mixed freely: a field name,
+`(field, heading)`, or a dict with `key` and any of:
+
+| Key | Meaning |
+|---|---|
+| `label` | the heading |
+| `format` | a format such as `",.2f"` (1,250.00), `".0%"` or `"%d %b %Y"` for dates, or a function from the value to text |
+| `align` | `start`, `center` or `end` |
+| `sortable` | `False` to stop one column from sorting |
+
+**Sorting:** `sortable="true"` lets the user click a heading to sort, and
+again to reverse. `sort="total"` starts sorted by `total`, `sort="-total"`
+largest first. Text sorts ignoring case, and empty cells always go last.
+
+**Picking a row:** `@select` makes rows clickable (and reachable with Tab,
+then Enter) and gives your handler the row. Without it, rows are plain.
+
+**Your own cell content:** `<Fill name="cell">` replaces every cell. Inside
+it, `row` is the row, `column` the column's field name, `value` the raw
+value and `text` the formatted text, so `<Else>{{ text }}</Else>` keeps the
+other columns as they were. A button in a cell also counts as a click on
+its row; write `@click.stop` on it to keep the two apart.
+
+**Rows that change:** give `row_key` a field that identifies each row, such
+as `"id"`. Rows then keep their identity when the list is re-ordered or
+filtered. Without it, rows are matched by their position in your list.
+
+Other fields: `striped="true"` shades every other row, `dense="true"`
+tightens the spacing, `caption` adds a title above the table, and `empty`
+is the text shown when there are no rows ("Nothing to show"; the `empty`
+fill replaces it with anything). On a narrow screen the table scrolls
+sideways inside its frame.
+
+## 10. Toasts
+
+Toasts are short messages that appear in a corner of the page and go away
+by themselves: "Saved", "Copied", "Message sent". Put one `<ui.Toaster />` on
+the page, inside your `Theme`, then call `toast()` from any handler:
+
+```xml
+<template>
+  <ui.Theme>
+    <ui.Row>
+      <ui.Button variant="primary" @click="save">Save</ui.Button>
+      <ui.Button variant="danger" @click="archive">Archive</ui.Button>
+    </ui.Row>
+    <p>{{ len(notes) }} notes</p>
+    <ui.Toaster />
+  </ui.Theme>
+</template>
+
+<code>
+from pyweft_ui import toast, ui
+
+notes: list = ["Groceries", "Ideas", "Books"]
+
+def save(self):
+    toast("Your changes are saved.", "success")
+
+def archive(self):
+    gone = self.notes.pop()
+    toast(f"Archived “{gone}”.", action="Undo", on_action=lambda: self.notes.append(gone))
+</code>
+```
+
+`toast(message, kind, ...)` takes:
+
+| Argument | Meaning |
+|---|---|
+| `kind` | `info` (the default), `success`, `warning` or `danger` |
+| `title` | bold text above the message |
+| `duration` | seconds before it closes, `4` by default; `None` keeps it until the user closes it |
+| `action`, `on_action` | a button such as "Undo", and the function it calls (which may be `async`) |
+
+Good to know:
+
+- **It works from anywhere:** a handler, an `async` task after an `await`,
+  or a plain Python module of yours. The Toaster shows every toast, whichever
+  component raised it.
+- **Timers pause** while the pointer is over the toasts or focus is in them,
+  so nobody loses a message they're reading.
+- **`toast()` returns the toast**; call `.close()` on it to take it away
+  early, for example a "Uploading…" toast with `duration=None` that you close
+  when the upload finishes. `clear_toasts()` closes them all.
+- **`<ui.Toaster>` fields:** `position` (`bottom-right`, the default;
+  `bottom-left`, `bottom-center`, `top-left`, `top-center`, `top-right`) and
+  `limit` (at most 5 at once by default; older ones wait their turn).
+- Toasts raised before the Toaster is on the page appear once it is.
+
+## 11. Icons
 
 ```xml
 <ui.Icon name="star" />
@@ -501,7 +699,7 @@ Available names: `check`, `x`, `plus`, `minus`, `search`, `info`, `alert`,
 `trash`, `edit`, `send`, `user`, `home`, `star`, `heart`, `download`,
 `upload`, `external`, `copy`, `settings`, `sun`, `moon`.
 
-## 9. Themes
+## 12. Themes
 
 ```xml
 <ui.Theme mode="auto" primary="#0f766e" radius="12px" font="Inter, sans-serif">
@@ -564,7 +762,7 @@ Every colour the controls use is a CSS variable. Set any of them on the
 A `Theme` inside another restyles just that part of the page, for example a
 dark sidebar in a light app.
 
-## 10. Changing how a control looks
+## 13. Changing how a control looks
 
 From the lightest touch to the heaviest:
 
@@ -590,7 +788,7 @@ What happens *inside* a control, such as the exact padding of a text field,
 is styled by the toolkit. Prefer the theme variables over overriding those
 details, so your app keeps working as the toolkit improves.
 
-## 11. Building your own components from controls
+## 14. Building your own components from controls
 
 Your own components can use controls in their templates and pass content
 through to them.
@@ -679,7 +877,7 @@ email: str = ""
 </code>
 ```
 
-## 12. Accessibility and keyboard
+## 15. Accessibility and keyboard
 
 The controls are built on standard HTML elements, so keyboards, screen
 readers and mobile devices work the way people expect:
@@ -693,15 +891,26 @@ readers and mobile devices work the way people expect:
   and `success` wait politely.
 - **Dialogs** are announced as dialogs, move focus into themselves when they
   open (so Esc closes them straight away), and close with Esc.
+- **Tabs** are announced as tabs, with the chosen one marked, and their
+  content as the chosen tab's panel.
+- **Tables** use real table headings, and tell screen readers which column
+  is sorted and which way.
+- **Toasts** are read out politely when they appear (`danger` ones
+  interrupt), and pause while someone is reading them.
 - **Motion is reduced** for visitors who ask their system for it: spinners
-  slow down and dialogs appear without animating.
+  slow down, and dialogs and toasts appear without animating.
 
 What you should add yourself:
 
 - A text alternative for buttons with only an icon:
   `aria-label="Close"`.
 - An `aria-label` on fields with no visible `label`, like the colour-mode
-  `Select` in section 9.
+  `Select` in section 12, and a `label` on `Tabs`.
+- Don't put the only copy of something important in a toast: it goes away.
+  Show errors that need fixing next to what needs fixing.
 
-Not done yet: dialogs don't keep Tab inside themselves, and don't return
-focus to the button that opened them when they close.
+Not done yet:
+
+- Dialogs don't keep Tab inside themselves, and don't return focus to the
+  button that opened them when they close.
+- Each tab is its own Tab stop; the arrow keys don't move between tabs.

@@ -1,0 +1,223 @@
+<template>
+  <div :class="classes">
+    <table>
+      <If cond="caption"><caption>{{ caption }}</caption></If>
+      <thead>
+        <tr>
+          <For each="col in cols" key="str(col['key'])">
+            <th scope="col" :class="'align-' + col['align']" :aria-sort="aria_sort(col)">
+              <If cond="col['sortable']">
+                <button type="button" :class="'sort sorted' if col['key'] == _sort_key else 'sort'"
+                        @click="sort_by(col['key'])">
+                  {{ col['label'] }}<Icon :name="sort_icon(col)" size="0.95em" />
+                </button>
+              </If>
+              <Else>{{ col['label'] }}</Else>
+            </th>
+          </For>
+        </tr>
+      </thead>
+      <tbody>
+        <If cond="body">
+          <For each="item in body" key="item[0]">
+            <tr :class="'clickable' if clickable else None" :tabindex="'0' if clickable else None"
+                @click="pick(item[1])" @keydown.enter="pick(item[1])">
+              <For each="cell in item[2]" key="cell[0]">
+                <td :class="'align-' + cell[3]"><Slot name="cell" :row="item[1]" :column="cell[0]"
+                    :value="cell[1]" :text="cell[2]">{{ cell[2] }}</Slot></td>
+              </For>
+            </tr>
+          </For>
+        </If>
+        <Else>
+          <tr><td class="empty" :colspan="max(len(cols), 1)"><Slot name="empty">{{ empty }}</Slot></td></tr>
+        </Else>
+      </tbody>
+    </table>
+  </div>
+</template>
+
+<code>
+# <ui.Table :rows="orders" columns="id, customer, total" sortable="true" @select="open_order" />
+# rows: a list of dicts or objects. columns: a comma-separated string of
+# field names, (field, heading) pairs, or dicts with "key" and optionally
+# "label", "align" (start, center, end), "format" (a format spec such as
+# ",.2f", or a function) and "sortable". Left out, they come from the
+# first row. Number columns line up on the right by themselves.
+from collections.abc import Mapping
+
+rows: list = []
+columns: list = []
+row_key: str = ""         # a field that identifies a row, such as "id"
+sortable: bool = False    # click a heading to sort by that column
+sort: str = ""            # the starting sort: "total", or "-total" for largest first
+striped: bool = False
+dense: bool = False
+caption: str = ""
+empty: str = "Nothing to show"
+
+_sort_key = ""
+_descending = False
+
+def on_init(self):
+    # Read once: the sort then belongs to the table, so a heading click
+    # isn't undone by the attribute on the next render.
+    self._sort_key = self.sort.lstrip("-")
+    self._descending = self.sort.startswith("-")
+
+@property
+def classes(self):
+    names = ["table"]
+    if self.striped:
+        names.append("striped")
+    if self.dense:
+        names.append("dense")
+    return " ".join(names)
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+@property
+def cols(self):
+    spec = self.columns
+    if isinstance(spec, str):
+        spec = [part.strip() for part in spec.split(",") if part.strip()]
+    if not spec and self.rows:
+        first = self.rows[0]
+        spec = list(first) if isinstance(first, Mapping) else list(vars(first))
+    out = []
+    for item in spec:
+        if isinstance(item, Mapping):
+            col = dict(item)
+        elif isinstance(item, (tuple, list)) and len(item) == 2:
+            col = {"key": item[0], "label": item[1]}
+        else:
+            col = {"key": item}
+        col.setdefault("label", str(col["key"]).replace("_", " ").capitalize())
+        col.setdefault("sortable", self.sortable)
+        col.setdefault("format", None)
+        if not col.get("align"):
+            col["align"] = "end" if self.is_numeric(col["key"]) else "start"
+        out.append(col)
+    return out
+
+@property
+def body(self):
+    # (row id, row, cells) with cells as (column, value, text, align), worked
+    # out once per render rather than once per cell expression.
+    cols = self.cols
+    items = list(enumerate(self.rows))
+    if self._sort_key:
+        items = self.sorted_items(items)
+    out = []
+    for index, row in items:
+        rid = str(self.value_of(row, self.row_key)) if self.row_key else str(index)
+        cells = []
+        for col in cols:
+            value = self.value_of(row, col["key"])
+            cells.append((str(col["key"]), value, self.show(value, col), col["align"]))
+        out.append((rid, row, cells))
+    return out
+
+def value_of(self, row, key):
+    if isinstance(row, Mapping):
+        return row.get(key)
+    return getattr(row, key, None)
+
+def is_numeric(self, key):
+    values = [self.value_of(row, key) for row in self.rows]
+    values = [v for v in values if v is not None]
+    return bool(values) and all(
+        isinstance(v, (int, float)) and not isinstance(v, bool) for v in values
+    )
+
+def show(self, value, col):
+    fmt = col["format"]
+    if value is None:
+        return ""
+    if callable(fmt):
+        return str(fmt(value))
+    if fmt:
+        return format(value, fmt)
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    return str(value)
+
+def sorted_items(self, items):
+    key = self._sort_key
+    present = [it for it in items if self.value_of(it[1], key) is not None]
+    missing = [it for it in items if self.value_of(it[1], key) is None]
+
+    def order(item):
+        value = self.value_of(item[1], key)
+        return value.casefold() if isinstance(value, str) else value
+
+    try:
+        present.sort(key=order, reverse=self._descending)
+    except TypeError:  # a column mixing numbers and text sorts as text
+        present.sort(key=lambda it: str(order(it)), reverse=self._descending)
+    return present + missing  # blanks last either way
+
+def sort_by(self, key):
+    if self._sort_key == key:
+        self._descending = not self._descending
+    else:
+        self._sort_key, self._descending = key, False
+
+def aria_sort(self, col):
+    if col["key"] != self._sort_key:
+        return None
+    return "descending" if self._descending else "ascending"
+
+def sort_icon(self, col):
+    if col["key"] == self._sort_key and not self._descending:
+        return "chevron-up"
+    return "chevron-down"
+
+def pick(self, row):
+    self.emit("select", row)
+</code>
+
+<style>
+.table {
+  overflow-x: auto;
+  background: var(--ui-surface, #fff);
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: var(--ui-radius, 8px);
+}
+table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+caption { caption-side: top; text-align: start; padding: 12px 14px 4px; font-weight: 600; }
+th, td {
+  padding: 10px 14px; text-align: start; vertical-align: middle;
+  border-bottom: 1px solid var(--ui-border, #d1d9e0);
+}
+th {
+  background: var(--ui-subtle, #f6f8fa); color: var(--ui-muted, #59636e);
+  font-size: 0.85rem; font-weight: 600; white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: 0; }
+.align-end { text-align: end; font-variant-numeric: tabular-nums; }
+.align-center { text-align: center; }
+.dense th, .dense td { padding: 6px 10px; }
+.striped tbody tr:nth-child(even) { background: color-mix(in srgb, var(--ui-subtle, #f6f8fa) 70%, transparent); }
+.clickable { cursor: pointer; }
+.clickable:hover { background: var(--ui-subtle, #f6f8fa); }
+.clickable:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ui-primary, #4f46e5) 60%, transparent);
+  outline-offset: -2px;
+}
+.sort {
+  display: inline-flex; align-items: center; gap: 4px;
+  font: inherit; color: inherit; background: none; border: 0; padding: 0;
+  cursor: pointer; border-radius: 4px;
+}
+.sort:hover, .sorted { color: var(--ui-text, #1f2328); }
+.sort:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 35%, transparent);
+}
+.sort > .icon { opacity: 0.35; }
+.sorted > .icon { opacity: 1; }
+.empty { text-align: center; color: var(--ui-muted, #59636e); padding: 28px 14px; }
+</style>

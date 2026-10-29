@@ -235,6 +235,240 @@ def test_dialog_not_dismissible(tmp_path):
     assert a.open is True
 
 
+# -------------------------------------------------------------------- tabs
+
+
+def test_tabs_bind_and_show_the_chosen_panel(tmp_path):
+    _, a, r, tree = app(
+        tmp_path,
+        """
+        <div><ui.Tabs label="Sections" options="Overview, Settings" @bind="tab">
+          <If cond="tab == 'Overview'"><p>first</p></If>
+          <Else><p>second</p></Else>
+        </ui.Tabs></div>
+        """,
+        'tab: str = "Overview"',
+    )
+    tabs = [n for n in _walk(tree) if n.attrs.get("role") == "tab"]
+    assert [t.attrs["aria-selected"] for t in tabs] == ["true", "false"]
+    panel = find(tree, cls("panel"))
+    assert panel.attrs["aria-labelledby"] == tabs[0].attrs["id"]
+    assert tabs[0].attrs["aria-controls"] == panel.attrs["id"]
+    assert "aria-controls" not in tabs[1].attrs
+    assert text([panel]) == "first"
+    r.dispatch(tabs[1].events["click"], {})
+    assert a.tab == "Settings"
+    tree = cycle(r, tree)
+    assert text([find(tree, cls("panel"))]) == "second"
+    tabs = [n for n in _walk(tree) if n.attrs.get("role") == "tab"]
+    assert find(tree, cls("panel")).attrs["aria-labelledby"] == tabs[1].attrs["id"]
+
+
+def test_tabs_without_bind_use_the_tab_slot_prop(tmp_path):
+    _, a, r, tree = app(
+        tmp_path,
+        """
+        <div><ui.Tabs :options="[(1, 'One'), (2, 'Two')]" variant="pills">
+          <p>showing {{ tab }}</p>
+        </ui.Tabs></div>
+        """,
+    )
+    assert "tabs-pills" in tree[0].children[0].attrs["class"]
+    assert text([find(tree, cls("panel"))]) == "showing 1"  # the first, before any click
+    r.dispatch([n for n in _walk(tree) if n.attrs.get("role") == "tab"][1].events["click"], {})
+    assert text([find(cycle(r, tree), cls("panel"))]) == "showing 2"
+
+
+def test_tabs_alone_render_no_panel(tmp_path):
+    _, a, r, tree = app(tmp_path, '<div><ui.Tabs options="a, b" @bind="t" /></div>', "t = None")
+    assert find(tree, cls("panel")) is None
+    assert find(tree, cls("active")).children[0].text == "a"
+
+
+# ------------------------------------------------------------------- table
+
+ORDERS = """
+orders: list = [
+    {"id": 7, "customer": "Grace", "total": 12.5, "paid": True},
+    {"id": 3, "customer": "ada", "total": 1200.0, "paid": False},
+    {"id": 9, "customer": "Linus", "total": None, "paid": True},
+]
+"""
+
+
+def _cells(tree):
+    return [[text([td]) for td in tr.children] for tr in _walk(tree) if tr.tag == "tr" and tr.children[0].tag == "td"]
+
+
+def test_table_columns_formats_and_alignment(tmp_path):
+    _, a, r, tree = app(
+        tmp_path,
+        """<div><ui.Table :rows="orders" row_key="id" caption="Orders"
+             :columns="['customer', ('total', 'Amount'), {'key': 'paid', 'align': 'center'}]" /></div>""",
+        ORDERS,
+    )
+    heads = [n for n in _walk(tree) if n.tag == "th"]
+    assert [text([h]) for h in heads] == ["Customer", "Amount", "Paid"]
+    assert [h.attrs["class"] for h in heads] == ["align-start", "align-end", "align-center"]
+    assert _cells(tree) == [["Grace", "12.5", "Yes"], ["ada", "1200.0", "No"], ["Linus", "", "Yes"]]
+    assert text([find(tree, tag("caption"))]) == "Orders"
+    assert find(tree, cls("clickable")) is None and find(tree, tag("button")) is None
+
+
+def test_table_infers_columns_and_formats(tmp_path):
+    _, a, r, tree = app(
+        tmp_path,
+        """<div><ui.Table :rows="orders" :columns="[{'key': 'total', 'format': ',.2f'}, {'key': 'id', 'format': lambda v: f'#{v}'}]" />
+           <ui.Table :rows="orders" /></div>""",
+        ORDERS,
+    )
+    first, second = tree[0].children
+    assert _cells([first])[1] == ["1,200.00", "#3"]
+    assert [text([h]) for h in _walk([second]) if h.tag == "th"] == ["Id", "Customer", "Total", "Paid"]
+
+
+def test_table_sorts_on_heading_clicks(tmp_path):
+    _, a, r, tree = app(
+        tmp_path,
+        '<div><ui.Table :rows="orders" columns="customer, total" sortable="true" sort="-total" /></div>',
+        ORDERS,
+    )
+    assert [row[0] for row in _cells(tree)] == ["ada", "Grace", "Linus"]  # blanks last
+    heads = [n for n in _walk(tree) if n.tag == "th"]
+    assert heads[1].attrs["aria-sort"] == "descending" and "aria-sort" not in heads[0].attrs
+    r.dispatch(find([heads[0]], tag("button")).events["click"], {})
+    tree = cycle(r, tree)
+    assert [row[0] for row in _cells(tree)] == ["ada", "Grace", "Linus"]  # case-insensitive
+    r.dispatch(find([n for n in _walk(tree) if n.tag == "th"][:1], tag("button")).events["click"], {})
+    tree = cycle(r, tree)
+    assert [row[0] for row in _cells(tree)] == ["Linus", "Grace", "ada"]
+    assert [n for n in _walk(tree) if n.tag == "th"][0].attrs["aria-sort"] == "descending"
+
+
+def test_table_mixed_column_sorts_as_text(tmp_path):
+    _, a, r, tree = app(
+        tmp_path,
+        '<div><ui.Table :rows="rows" columns="v" sortable="true" sort="v" /></div>',
+        'rows: list = [{"v": 10}, {"v": "b"}, {"v": 2}]',
+    )
+    assert [row[0] for row in _cells(tree)] == ["10", "2", "b"]
+
+
+def test_table_row_select_cell_slot_and_empty(tmp_path):
+    _, a, r, tree = app(
+        tmp_path,
+        """
+        <div><ui.Table :rows="orders" columns="customer, paid" row_key="id" @select="picked.append(event['id'])">
+          <Fill name="cell">
+            <If cond="column == 'paid'"><ui.Badge :kind="'success' if value else 'warning'">{{ text }}</ui.Badge></If>
+            <Else><b>{{ text }}</b></Else>
+          </Fill>
+          <Fill name="empty">No orders yet</Fill>
+        </ui.Table></div>
+        """,
+        ORDERS + "picked: list = []",
+    )
+    rows = [n for n in _walk(tree) if "clickable" in n.attrs.get("class", "")]
+    assert len(rows) == 3 and rows[0].attrs["tabindex"] == "0"
+    assert find([rows[1]], cls("badge-warning")) is not None and find([rows[1]], tag("b")) is not None
+    r.dispatch(rows[1].events["click"], {})
+    r.dispatch(rows[2].events["keydown.enter"], {"key": "Enter"})
+    assert a.picked == [3, 9]
+    a.orders = []
+    tree = cycle(r, tree)
+    empty = find(tree, cls("empty"))
+    assert text([empty]) == "No orders yet" and empty.attrs["colspan"] == "2"
+
+
+def test_table_rows_keep_identity_when_sorted(tmp_path):
+    _, a, r, tree = app(
+        tmp_path,
+        '<div><ui.Table :rows="orders" columns="customer" row_key="id" sortable="true" /></div>',
+        ORDERS,
+    )
+    keys = [n.key for n in _walk(tree) if n.tag == "tr" and n.key is not None]
+    r.dispatch(find(tree, cls("sort")).events["click"], {})
+    tree = cycle(r, tree)
+    assert sorted(keys) == sorted(n.key for n in _walk(tree) if n.tag == "tr" and n.key is not None)
+
+
+# ------------------------------------------------------------------ toasts
+# `toasts` is the module holding the toast list (conftest.py empties it).
+
+
+def test_toasts_show_close_and_expire(tmp_path, toasts):
+    import asyncio
+
+    async def main():
+        _, a, r, tree = app(
+            tmp_path,
+            '<div><ui.Button @click="save">Save</ui.Button><ui.Toaster position="top-center" /></div>',
+            "from pyweft_ui import toast\n"
+            "def save(self):\n"
+            "    toast('Saved', 'success', title='Done', duration=0.3)\n",
+        )
+        toaster = find(tree, cls("toaster"))
+        assert "top-center" in toaster.attrs["class"] and toaster.attrs["aria-live"] == "polite"
+        r.dispatch(find(tree, tag("button")).events["click"], {})
+        tree = cycle(r, tree)
+        item = find(tree, cls("toast"))
+        assert "toast-success" in item.attrs["class"] and "role" not in item.attrs
+        assert text([find(tree, cls("content"))]) == "DoneSaved"
+        await asyncio.sleep(0.6)
+        assert toasts._toasts == []
+        assert find(cycle(r, tree), cls("toast")) is None
+
+    asyncio.run(main())
+
+
+def test_toast_pauses_while_hovered_and_action_runs(tmp_path, toasts):
+    import asyncio
+
+    async def main():
+        _, a, r, tree = app(
+            tmp_path,
+            "<div><ui.Toaster /></div>",
+            "undone: list = []",
+        )
+        from pyweft_ui import toast
+
+        toast("Deleted", "danger", duration=0.3, action="Undo", on_action=lambda: a.undone.append(1))
+        sticky = toast("Stays", duration=None)
+        tree = cycle(r, tree)
+        section = find(tree, cls("toaster"))
+        r.dispatch(section.events["mouseenter"], {})
+        await asyncio.sleep(0.6)
+        tree = cycle(r, tree)
+        items = [n for n in _walk(tree) if "toast" in n.attrs.get("class", "").split()]
+        assert len(items) == 2 and items[0].attrs["role"] == "alert"
+        r.dispatch(find([items[0]], cls("action")).events["click"], {})
+        assert a.undone == [1] and toasts._toasts == [sticky]
+        r.dispatch(section.events["mouseleave"], {})
+        sticky.close()
+        assert find(cycle(r, tree), cls("toast")) is None
+        await r.idle()  # closing cancelled the timers rather than leaving them asleep
+
+    asyncio.run(main())
+
+
+def test_toasts_raised_before_the_toaster_wait_for_it(tmp_path, toasts):
+    import asyncio
+
+    from pyweft_ui import clear_toasts, toast
+
+    async def main():
+        toast("early", duration=None)
+        for n in range(6):
+            toast(f"n{n}", duration=None)
+        _, a, r, tree = app(tmp_path, '<div><ui.Toaster limit="3" /></div>')
+        shown = [text([n]) for n in _walk(tree) if "content" in n.attrs.get("class", "").split()]
+        assert shown == ["n3", "n4", "n5"]
+        clear_toasts()
+        assert find(cycle(r, tree), cls("toast")) is None
+
+    asyncio.run(main())
+
+
 # ------------------------------------------------------------------ layout
 
 
@@ -270,12 +504,13 @@ def test_every_control_renders_and_styles_are_prefixed(tmp_path):
         <ui.Theme><ui.Column>
           <ui.Row><ui.Spinner /><ui.Icon name="check" /><ui.Badge>b</ui.Badge></ui.Row>
           <ui.Grid><ui.TextArea label="Notes" rows="3" @bind="notes" /></ui.Grid>
+          <ui.Tabs options="a, b" /><ui.Table :rows="[{'x': 1}]" />
         </ui.Column></ui.Theme>
         """,
         'notes: str = ""',
     )
     css = collect_styles(App)
-    for name in ["theme", "column", "row", "spinner", "icon", "badge", "grid", "text_area"]:
+    for name in ["theme", "column", "row", "spinner", "icon", "badge", "grid", "text_area", "tabs", "table"]:
         assert f"[data-w-ui-{name}]" in css, name
     assert find(tree, tag("textarea")).attrs["rows"] == "3"
     assert find(tree, tag("path")).attrs["d"].startswith("M5 12.5")

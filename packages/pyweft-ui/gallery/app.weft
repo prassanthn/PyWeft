@@ -101,6 +101,43 @@
           <pre class="code">{{ CODE['dialog'] }}</pre>
         </ui.Card>
 
+        <ui.Card title="Tabs" id="tabs">
+          <ui.Column gap="lg">
+            <ui.Tabs label="Project" options="Overview, Activity, Settings" @bind="tab">
+              <If cond="tab == 'Overview'"><p class="panel-text">Three people are working on this project.</p></If>
+              <ElseIf cond="tab == 'Activity'"><p class="panel-text">Ada pushed 4 commits an hour ago.</p></ElseIf>
+              <Else><ui.Switch label="Email me about changes" @bind="updates" /></Else>
+            </ui.Tabs>
+            <ui.Tabs variant="pills" :options="[('day', 'Day'), ('week', 'Week'), ('month', 'Month')]">
+              <p class="panel-text">Showing one {{ tab }}.</p>
+            </ui.Tabs>
+          </ui.Column>
+          <pre class="code">{{ CODE['tabs'] }}</pre>
+        </ui.Card>
+
+        <ui.Card title="Table" id="table" subtitle="Click a heading to sort, a row to pick it">
+          <ui.Table :rows="ORDERS" row_key="id" sortable="true" sort="-total" @select="picked = event"
+                    :columns="[('id', '#'), 'customer', 'status', {'key': 'total', 'format': ',.2f'}]">
+            <Fill name="cell">
+              <If cond="column == 'status'"><ui.Badge :kind="STATUS_KINDS[value]">{{ text }}</ui.Badge></If>
+              <Else>{{ text }}</Else>
+            </Fill>
+          </ui.Table>
+          <p class="note below">Picked: {{ picked['customer'] + ', order ' + str(picked['id']) if picked else 'nothing yet' }}</p>
+          <pre class="code">{{ CODE['table'] }}</pre>
+        </ui.Card>
+
+        <ui.Card title="Toasts" id="toasts" subtitle="Messages that go away by themselves">
+          <ui.Row>
+            <ui.Button variant="primary" icon="check" @click="toast('Changes saved.', 'success')">Save</ui.Button>
+            <ui.Button icon="info" @click="toast('A new version is ready.', title='Update')">Info</ui.Button>
+            <ui.Button icon="alert" @click="toast('Disk almost full.', 'warning', duration=None)">Stays until closed</ui.Button>
+            <ui.Button variant="danger" icon="trash" @click="delete_item">Delete with undo</ui.Button>
+          </ui.Row>
+          <p class="note below">Items: {{ items }}</p>
+          <pre class="code">{{ CODE['toasts'] }}</pre>
+        </ui.Card>
+
         <ui.Card title="Layout" id="layout" subtitle="Row, Column, Grid and Card: no CSS needed">
           <ui.Grid cols="3" gap="sm">
             <For each="n in range(1, 7)" key="n"><div class="tile">{{ n }}</div></For>
@@ -109,14 +146,22 @@
         </ui.Card>
       </ui.Column>
     </ui.AppShell>
+    <ui.Toaster />
   </ui.Theme>
 </template>
 
 <code>
 import asyncio
-from pyweft_ui import ui
+from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Choices", "Feedback", "Dialog", "Layout"]
+SECTIONS = ["Buttons", "Form", "Choices", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
+ORDERS = [
+    {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
+    {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
+    {"id": 1043, "customer": "Alan Turing", "status": "refunded", "total": 410.0},
+    {"id": 1044, "customer": "Katherine Johnson", "status": "paid", "total": 72.5},
+]
+STATUS_KINDS = {"paid": "success", "pending": "warning", "refunded": "neutral"}
 MODES = [("light", "Light"), ("dark", "Dark"), ("auto", "System")]
 ACCENTS = [("", "Indigo"), ("#0f766e", "Teal"), ("#c2410c", "Orange"), ("#be185d", "Pink")]
 RADII = [("", "Rounded"), ("2px", "Square"), ("14px", "Round")]
@@ -142,6 +187,17 @@ agreed: bool = False
 show_danger: bool = True
 confirming: bool = False
 verdict: str = ""
+tab: str = "Overview"
+picked = None
+items: int = 3
+
+def delete_item(self):
+    if self.items:
+        self.items -= 1
+        toast("Item deleted.", action="Undo", on_action=self.undo)
+
+def undo(self):
+    self.items += 1
 
 async def work(self):
     self.busy = True
@@ -180,6 +236,23 @@ CODE = {
     <ui.Button variant="danger" @click="delete()">Delete</ui.Button>
   </Fill>
 </ui.Dialog>""",
+    "tabs": """<ui.Tabs options="Overview, Activity, Settings" @bind="tab">
+  <If cond="tab == 'Overview'"> ... </If>
+  <ElseIf cond="tab == 'Activity'"> ... </ElseIf>
+  <Else> ... </Else>
+</ui.Tabs>""",
+    "table": """<ui.Table :rows="orders" row_key="id" sortable="true" @select="open_order"
+          :columns="[('id', '#'), 'customer', 'status', {'key': 'total', 'format': ',.2f'}]">
+  <Fill name="cell">
+    <If cond="column == 'status'"><ui.Badge>{{ text }}</ui.Badge></If>
+    <Else>{{ text }}</Else>
+  </Fill>
+</ui.Table>""",
+    "toasts": """<ui.Toaster />   <!-- once, inside <ui.Theme> -->
+
+from pyweft_ui import toast
+toast("Changes saved.", "success")
+toast("Item deleted.", action="Undo", on_action=self.undo)""",
     "layout": """<ui.Grid cols="3" gap="sm"> ... </ui.Grid>
 <ui.Row justify="between"> ... </ui.Row>
 <ui.Column gap="lg"> ... </ui.Column>""",
@@ -189,6 +262,8 @@ CODE = {
 <style>
 .intro { margin: 0; color: var(--ui-muted); }
 .note { margin: 0; color: var(--ui-muted); font-size: 0.9rem; }
+.note.below { margin-top: 12px; }
+.panel-text { margin: 0; }
 .nav-link {
   color: var(--ui-text); text-decoration: none;
   padding: 6px 10px; border-radius: var(--ui-radius);

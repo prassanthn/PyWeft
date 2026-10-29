@@ -69,7 +69,7 @@ To hack on the framework itself, clone it and install in editable mode:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev      # or: pip install -e ".[dev]"
-uv run pytest            # 786 tests should pass
+uv run pytest            # 807 tests should pass
 ```
 
 To see it working immediately, run the bundled todo app from the clone:
@@ -154,6 +154,12 @@ def on_message(self, msg):        # invoked by something other than the UI
 The re-render happens right after your code returns, not inside the call, so
 calling `state_has_changed()` many times in a row (in a loop, say) still
 costs one render. It works the same in a child component as in the root.
+
+Functions you import into the code block stay plain functions:
+`from textwrap import shorten` lets the template call `{{ shorten(title, 40) }}`
+and a method call `shorten(self.title, 40)`, without `self` being slipped in
+as the first argument. (An imported function whose first parameter is named
+`self` is taken to be a method you want to share, and becomes one.)
 
 State belongs to the instance that declared it. To share data between
 components, pass it down as props and send changes up with `emit` (section
@@ -1260,10 +1266,11 @@ accessible controls as components:
 with `from pyweft_ui import ui` in the code block. It covers layout
 (`AppShell`, `Row`, `Column`, `Grid`, `Card`), form fields (`TextField`,
 `TextArea`, `NumberField`, `Select`, `RadioGroup`, `Checkbox`, `Switch`),
-actions and feedback (`Button`, `Dialog`, `Alert`, `Badge`, `Spinner`,
+data and navigation (`Table` with sorting, `Tabs`), actions and feedback
+(`Button`, `Dialog`, `Alert`, `Toaster` with `toast()`, `Badge`, `Spinner`,
 `Icon`) and a `Theme` with light, dark and system modes and your own
 colours. The [pyweft-ui guide](../packages/pyweft-ui/docs/guide.md) shows how
-to build pages, forms and dialogs with them;
+to build pages, forms, tables and dialogs with them;
 [packages/pyweft-ui/README.md](../packages/pyweft-ui/README.md) is the
 reference; and the gallery shows every control live:
 
@@ -1531,10 +1538,9 @@ Working today:
 - **Tooling:** `pyweft new` / `run` / `build`; hot reload that keeps state,
   with an error overlay; a customizable loading screen; PyPI dependencies
   from `pyproject.toml`, installed in the browser.
-- **Controls:** `pyweft-ui`, 19 ready-made, themeable controls (see
+- **Controls:** `pyweft-ui`, 22 ready-made, themeable controls (see
   "Ready-made controls" in section 5), with a live gallery.
 
-Coming next: more controls (tabs, menus, tables, toasts, a date picker,
-form validation), and a pywebview **desktop** host (same components, native
-window, real threads).
+Coming next: more controls (menus, a date picker, form validation), and a
+pywebview **desktop** host (same components, native window, real threads).
 

@@ -73,7 +73,8 @@ to `myapp/dist/` that any web host can serve, such as GitHub Pages or Netlify.
 
 [`pyweft-ui`](packages/pyweft-ui/README.md) gives you styled, accessible
 controls as components: buttons, text fields, selects, checkboxes, switches,
-cards, dialogs, alerts, layout and light/dark themes.
+cards, tabs, sortable tables, dialogs, alerts, toasts, layout and light/dark
+themes.
 
 ```bash
 uv add "pyweft-ui @ git+https://github.com/prassanthn/PyWeft.git#subdirectory=packages/pyweft-ui"
@@ -190,7 +191,7 @@ place where PyWeft tracks which fields you read.
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev          # also installs packages/pyweft-ui, editable
-uv run pytest                # 786 tests, including pyweft-ui's
+uv run pytest                # 807 tests, including pyweft-ui's
 uv run python examples/demo.py              # render -> event -> diff -> apply, no browser
 uv run pyweft run examples/todo             # the todo app
 uv run pyweft run packages/pyweft-ui/gallery  # every control
@@ -223,10 +224,9 @@ Under the hood:
 props, events, slots and component libraries; events with modifiers and
 `@bind` for every form control; effects; async handlers and Web Worker
 background work; scoped styles and CSS framework support; the `pyweft` CLI
-with hot reload and static builds; `pyweft-ui` with 19 controls and a gallery.
+with hot reload and static builds; `pyweft-ui` with 22 controls and a gallery.
 
-**Next:** more controls (tabs, menus, tables, toasts, a date picker, form
-validation); publishing `pyweft` and `pyweft-ui` to PyPI; a desktop host
+**Next:** more controls (menus, a date picker, form validation); publishing `pyweft` and `pyweft-ui` to PyPI; a desktop host
 using pywebview.
 
 **Later:** shared state across components, mobile packaging with Briefcase,

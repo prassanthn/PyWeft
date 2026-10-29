@@ -1,0 +1,117 @@
+<template>
+  <section :class="'toaster ' + position" aria-label="Notifications" aria-live="polite"
+           @mouseenter="_paused = True" @mouseleave="_paused = False"
+           @focusin="_paused = True" @focusout="_paused = False">
+    <For each="t in shown" key="t.id">
+      <div :class="'toast toast-' + t.kind" :role="'alert' if t.kind == 'danger' else None">
+        <Icon :name="_ICONS.get(t.kind, 'info')" size="1.2em" />
+        <div class="content">
+          <If cond="t.title"><strong class="title">{{ t.title }}</strong></If>
+          <div>{{ t.message }}</div>
+        </div>
+        <If cond="t.action">
+          <button class="action" type="button" @click="act(t)">{{ t.action }}</button>
+        </If>
+        <button class="close" type="button" aria-label="Dismiss" @click="t.close()"><Icon name="x" /></button>
+      </div>
+    </For>
+  </section>
+</template>
+
+<code>
+# Put <ui.Toaster /> once on the page, inside your <ui.Theme>, then from any
+# handler or task:
+#     from pyweft_ui import toast
+#     toast("Saved", "success")
+import asyncio
+from pyweft_ui import toasts as _store
+
+position: str = "bottom-right"   # top-left, top-center, top-right, bottom-left, bottom-center
+limit: int = 5                   # the most shown at once, newest kept
+
+_ICONS = {"info": "info", "success": "check", "warning": "alert", "danger": "alert"}
+_paused = False
+
+def on_init(self):
+    _store._toasters.append(self)
+    self._refresh()
+
+def on_dispose(self):
+    if self in _store._toasters:
+        _store._toasters.remove(self)
+    _store._changed()  # its timers were cancelled: another Toaster takes them over
+
+@property
+def shown(self):
+    return _store._toasts[-self.limit:] if self.limit > 0 else list(_store._toasts)
+
+def act(self, t):
+    t.close()
+    if t.on_action is not None:
+        return t.on_action()  # may be async: the renderer runs it as a task
+
+def _refresh(self):
+    for t in _store._toasts:
+        if t.duration and (t._timer is None or t._timer.done()):
+            t._timer = self.start_task(self._expire(t))
+    self.state_has_changed()
+
+async def _expire(self, t):
+    # Short sleeps so time on the clock stops while someone is reading.
+    left = t.duration
+    while left > 0:
+        step = min(left, 0.25)
+        await asyncio.sleep(step)
+        if not self._paused:
+            left -= step
+    t._timer = None  # finishing, not cancelled: close() mustn't cancel this task
+    t.close()
+</code>
+
+<style>
+.toaster {
+  position: fixed; z-index: 1100;
+  display: flex; flex-direction: column; gap: 8px;
+  width: min(24rem, 100vw); box-sizing: border-box; padding: 16px;
+  pointer-events: none;  /* the empty corner mustn't swallow clicks */
+}
+.top-left, .top-center, .top-right { top: 0; }
+.bottom-left, .bottom-center, .bottom-right { bottom: 0; }
+.top-left, .bottom-left { left: 0; }
+.top-right, .bottom-right { right: 0; }
+.top-center, .bottom-center { left: 50%; transform: translateX(-50%); }
+.toast {
+  --tone: var(--ui-info, #0969da);
+  pointer-events: auto;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 12px 12px 14px;
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-left: 4px solid var(--tone);
+  border-radius: var(--ui-radius, 8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+  animation: ui-toaster-in 0.18s ease-out;
+}
+.toast > .icon { color: var(--tone); margin-top: 0.1em; flex: none; }
+.toast-success { --tone: var(--ui-success, #1a7f37); }
+.toast-warning { --tone: var(--ui-warning, #9a6700); }
+.toast-danger { --tone: var(--ui-danger, #d1242f); }
+.content { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.title { display: block; margin-bottom: 2px; }
+.action {
+  font: inherit; font-weight: 600; color: var(--ui-primary, #4f46e5);
+  background: none; border: 0; padding: 2px 6px; border-radius: 4px; cursor: pointer;
+}
+.action:hover { background: var(--ui-subtle, #f6f8fa); }
+.close {
+  border: 0; background: transparent; color: var(--ui-muted, #59636e); cursor: pointer;
+  padding: 3px; border-radius: 4px; line-height: 0;
+}
+.close:hover { background: var(--ui-subtle, #f6f8fa); color: var(--ui-text, #1f2328); }
+.action:focus-visible, .close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 35%, transparent);
+}
+@keyframes ui-toaster-in { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+</style>

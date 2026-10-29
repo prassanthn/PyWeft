@@ -1,0 +1,107 @@
+<template>
+  <div :class="'tabs tabs-' + variant">
+    <div class="list" role="tablist" :aria-label="label or None">
+      <For each="choice in choices" key="choice[2]" index="i">
+        <button type="button" role="tab" :id="_id + '-' + str(i)"
+                :class="'tab active' if choice[0] == current else 'tab'"
+                :aria-selected="'true' if choice[0] == current else 'false'"
+                :aria-controls="_id + '-panel' if choice[0] == current else None"
+                @click="select(choice[0])">{{ choice[1] }}</button>
+      </For>
+    </div>
+    <If cond="has_slot()">
+      <div class="panel" role="tabpanel" tabindex="0" :id="_id + '-panel'"
+           :aria-labelledby="_id + '-' + str(current_index)"><Slot :tab="current" /></div>
+    </If>
+  </div>
+</template>
+
+<code>
+# <ui.Tabs options="Overview, Settings" @bind="tab">
+#   <If cond="tab == 'Overview'"> ... </If>
+#   <ElseIf cond="tab == 'Settings'"> ... </ElseIf>
+# </ui.Tabs>
+# The content between the tags is the panel; `tab` inside it is the chosen
+# tab's value, so it also works without @bind. options take the same forms
+# as Select's.
+import itertools
+
+label: str = ""           # names the tab list for screen readers
+value = None
+options: list = []
+variant: str = "line"     # line (underlined) or pills
+
+_ids = itertools.count(1)
+_picked = None
+
+def on_init(self):
+    self._id = f"ui-tabs-{next(_ids)}"
+
+@property
+def choices(self):
+    items = self.options
+    if isinstance(items, str):
+        items = [part.strip() for part in items.split(",") if part.strip()]
+    out = []
+    for item in items:
+        if isinstance(item, dict):
+            val = item.get("value")
+            text = item.get("label", val)
+        elif isinstance(item, (tuple, list)) and len(item) == 2:
+            val, text = item
+        else:
+            val, text = item, item
+        out.append((val, str(text), str(val)))
+    return out
+
+@property
+def current(self):
+    # The bound value wins; without @bind the last click does; before
+    # either, the first tab is shown rather than none.
+    values = [choice[0] for choice in self.choices]
+    for candidate in (self.value, self._picked):
+        if candidate is not None and candidate in values:
+            return candidate
+    return values[0] if values else None
+
+@property
+def current_index(self):
+    values = [choice[0] for choice in self.choices]
+    return values.index(self.current) if self.current in values else 0
+
+def select(self, val):
+    self._picked = val
+    self.emit("update", val)
+</code>
+
+<style>
+.list { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.tabs-line .list { box-shadow: inset 0 -1px 0 var(--ui-border, #d1d9e0); }
+.tab {
+  font: inherit; font-size: 0.95rem; font-weight: 550; line-height: 1.2;
+  padding: 9px 14px; border: 0; background: transparent;
+  color: var(--ui-muted, #59636e); cursor: pointer; white-space: nowrap;
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s;
+}
+.tab:hover { color: var(--ui-text, #1f2328); }
+.tab:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ui-primary, #4f46e5) 45%, transparent);
+}
+.tabs-line .tab {
+  border-bottom: 2px solid transparent;
+  border-radius: var(--ui-radius, 8px) var(--ui-radius, 8px) 0 0;
+}
+.tabs-line .tab.active { color: var(--ui-text, #1f2328); border-bottom-color: var(--ui-primary, #4f46e5); }
+.tabs-pills .tab { border-radius: 999px; }
+.tabs-pills .tab:hover { background: var(--ui-subtle, #f6f8fa); }
+.tabs-pills .tab.active {
+  color: var(--ui-primary, #4f46e5);
+  background: color-mix(in srgb, var(--ui-primary, #4f46e5) 13%, transparent);
+}
+.panel { padding-top: 16px; outline: none; }
+.panel:focus-visible {
+  border-radius: var(--ui-radius, 8px);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 35%, transparent);
+}
+</style>
