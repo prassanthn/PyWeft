@@ -69,7 +69,7 @@ To hack on the framework itself, clone it and install in editable mode:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev      # or: pip install -e ".[dev]"
-uv run pytest            # 754 tests should pass
+uv run pytest            # 786 tests should pass
 ```
 
 To see it working immediately, run the bundled todo app from the clone:
@@ -1262,9 +1262,10 @@ with `from pyweft_ui import ui` in the code block. It covers layout
 `TextArea`, `NumberField`, `Select`, `RadioGroup`, `Checkbox`, `Switch`),
 actions and feedback (`Button`, `Dialog`, `Alert`, `Badge`, `Spinner`,
 `Icon`) and a `Theme` with light, dark and system modes and your own
-colours. The full reference is in
-[packages/pyweft-ui/README.md](../packages/pyweft-ui/README.md), and the
-gallery shows every control live:
+colours. The [pyweft-ui guide](../packages/pyweft-ui/docs/guide.md) shows how
+to build pages, forms and dialogs with them;
+[packages/pyweft-ui/README.md](../packages/pyweft-ui/README.md) is the
+reference; and the gallery shows every control live:
 
 ```bash
 uv run pyweft run packages/pyweft-ui/gallery

@@ -42,6 +42,10 @@ async def submit(self):
 </code>
 ```
 
+**New to the toolkit? Read the [guide](docs/guide.md)**: page layout, forms
+with validation, dialogs, themes and building your own components, with
+complete examples. This README is the compact reference.
+
 ## Install
 
 It isn't on PyPI yet, so install it from GitHub, into the same environment

@@ -147,7 +147,7 @@ To see every control live, clone this repository and run
 | Handle forms and keyboard input | [Binding form controls](docs/getting-started.md#binding-form-controls), [event modifiers](docs/getting-started.md#event-modifiers) |
 | Load data, run async code, do heavy work | [Async handlers](docs/getting-started.md#async-handlers-and-background-work), [`run_in_background`](docs/getting-started.md#heavy-work-run_in_background) |
 | Style with Tailwind or Bootstrap | [Using CSS frameworks](docs/getting-started.md#using-css-frameworks) |
-| Use the ready-made controls | [pyweft-ui reference](packages/pyweft-ui/README.md) |
+| Build screens with the ready-made controls | [pyweft-ui guide](packages/pyweft-ui/docs/guide.md), then the [reference](packages/pyweft-ui/README.md) |
 | Deploy your app | [Building for deployment](docs/getting-started.md#building-for-deployment) |
 | Test components without a browser | [Using the engine from plain Python](docs/getting-started.md#6-using-the-engine-from-plain-python) |
 
@@ -190,7 +190,7 @@ place where PyWeft tracks which fields you read.
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev          # also installs packages/pyweft-ui, editable
-uv run pytest                # 754 tests, including pyweft-ui's
+uv run pytest                # 786 tests, including pyweft-ui's
 uv run python examples/demo.py              # render -> event -> diff -> apply, no browser
 uv run pyweft run examples/todo             # the todo app
 uv run pyweft run packages/pyweft-ui/gallery  # every control
