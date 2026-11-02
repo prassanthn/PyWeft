@@ -36,6 +36,35 @@ def test_code_block_with_angle_brackets_does_not_break_parsing():
     parse_template(template)  # must not raise
 
 
+def test_markup_code_and_template_elements_stay_in_the_template():
+    src = (
+        "<template>\n  <p>Run <code>pyweft run</code> or <code>build</code>.</p>\n"
+        "  <template><b>inert</b></template>\n</template>\n"
+        "<code>\nx = 1\n</code>\n"
+    )
+    template, code, _ = split_source(src)
+    assert "<code>pyweft run</code>" in template and "<b>inert</b></template>" in template
+    assert code.strip() == "x = 1"
+
+
+def test_closing_tags_inside_python_strings_stay_in_the_code():
+    src = '<template><p/></template>\n<code>\nHTML = "<code>x</code> and </code>!"\ny = 2\n</code>\n<style>p {}</style>'
+    _, code, style = split_source(src)
+    assert 'HTML = "<code>x</code> and </code>!"' in code and "y = 2" in code
+    assert style == "p {}"
+
+
+def test_blocks_in_any_order_and_comments_skipped():
+    src = "<!-- a <code> example -->\n<code>\nz = 3\n</code>\n<template><i/></template>"
+    template, code, _ = split_source(src)
+    assert template == "<i/>" and code.strip() == "z = 3"
+
+
+def test_unclosed_block_raises():
+    with pytest.raises(TemplateError, match="<code> block is not closed"):
+        split_source("<template><p/></template><code>x = 1")
+
+
 def test_missing_template_block_raises():
     with pytest.raises(TemplateError):
         split_source("<code>x = 1</code>")

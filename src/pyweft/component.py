@@ -20,13 +20,13 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .parser import (
-    _CODE_RE,
     TElement,
     TemplateError,
     TFill,
     TFor,
     TIf,
     TSlot,
+    block_spans,
     parse_template,
     split_source,
 )
@@ -135,9 +135,9 @@ def compile_code_block(src: str, filename: str) -> Any:
     numbers in tracebacks are lines of the file, not of the block.
     (split_source's own output stays unpadded.)"""
     _, code_src, _ = split_source(src)
-    match = _CODE_RE.search(src)
-    if match:
-        code_src = "\n" * src.count("\n", 0, match.start(1)) + code_src
+    span = block_spans(src).get("code")
+    if span:
+        code_src = "\n" * src.count("\n", 0, span[0]) + code_src
     return compile(textwrap.dedent(code_src), filename, "exec")
 
 

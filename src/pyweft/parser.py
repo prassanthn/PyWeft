@@ -103,27 +103,76 @@ class TFill:
 
 # ------------------------------------------------------------ source slicing
 
-_TEMPLATE_RE = re.compile(r"<template\s*>(.*)</template\s*>", re.S)
-_CODE_RE = re.compile(r"<code\s*>(.*)</code\s*>", re.S)
-_STYLE_RE = re.compile(r"<style\s*>(.*)</style\s*>", re.S)
+_BLOCK_OPEN = re.compile(r"<(template|code|style)\s*>")
+_TEMPLATE_TAG = re.compile(r"<(/?)template\b[^>]*?(/?)>")
+_AFTER_BLOCK = re.compile(r"\s*(?:$|<(?:template|code|style)\s*>|<!--)")
+
+
+def _template_end(src: str, start: int) -> re.Match[str] | None:
+    # Balanced, so a <template> element inside the markup can't end it.
+    depth = 1
+    for tag in _TEMPLATE_TAG.finditer(src, start):
+        if tag.group(1):
+            depth -= 1
+            if depth == 0:
+                return tag
+        elif not tag.group(2):
+            depth += 1
+    return None
+
+
+def _raw_end(src: str, start: int, name: str) -> re.Match[str] | None:
+    # Python and CSS aren't markup, so nothing can be balanced: the block
+    # ends at the first closing tag followed by another block or the end,
+    # so "</code>" inside a string mostly stays in. Failing that, the last.
+    closes = list(re.finditer(rf"</{name}\s*>", src[start:]))
+    for close in closes:
+        if _AFTER_BLOCK.match(src, start + close.end()):
+            break
+    else:
+        if not closes:
+            return None
+        close = closes[-1]
+    return re.compile(rf"</{name}\s*>").match(src, start + close.start())
+
+
+def block_spans(src: str) -> dict[str, tuple[int, int]]:
+    """Where the top-level ``<template>``, ``<code>`` and ``<style>`` blocks'
+    contents are: ``{"code": (start, end), ...}``. Blocks are found by
+    scanning, not by regex over the whole file, so markup inside the
+    template (an HTML ``<code>`` element, say) is not taken for a block."""
+    spans: dict[str, tuple[int, int]] = {}
+    pos = 0
+    while (opening := _BLOCK_OPEN.search(src, pos)) is not None:
+        comment = src.find("<!--", pos, opening.start())
+        if comment != -1:
+            close = src.find("-->", comment + 4)
+            pos = len(src) if close == -1 else close + 3
+            continue
+        name = opening.group(1)
+        end = (
+            _template_end(src, opening.end())
+            if name == "template"
+            else _raw_end(src, opening.end(), name)
+        )
+        if end is None:
+            raise TemplateError(f"<{name}> block is not closed")
+        spans.setdefault(name, (opening.end(), end.start()))
+        pos = end.end()
+    return spans
 
 
 def split_source(src: str) -> tuple[str, str, str]:
     """Return (template_source, code_source, style_source)."""
-    code = ""
-    match = _CODE_RE.search(src)
-    if match:
-        code = match.group(1)
-        src = src[: match.start()] + src[match.end() :]
-    style = ""
-    match = _STYLE_RE.search(src)
-    if match:
-        style = match.group(1)
-        src = src[: match.start()] + src[match.end() :]
-    tmpl = _TEMPLATE_RE.search(src)
-    if not tmpl:
+    spans = block_spans(src)
+    if "template" not in spans:
         raise TemplateError("no <template> block found")
-    return tmpl.group(1), textwrap.dedent(code), textwrap.dedent(style)
+
+    def content(name: str) -> str:
+        start, end = spans.get(name, (0, 0))
+        return src[start:end]
+
+    return content("template"), textwrap.dedent(content("code")), textwrap.dedent(content("style"))
 
 
 _AT_ATTR = re.compile(r"@([A-Za-z_][\w.\-]*)\s*=")
