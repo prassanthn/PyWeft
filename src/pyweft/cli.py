@@ -288,7 +288,8 @@ def browser_packages(app_dir: Path) -> list[str]:
     return list(dict.fromkeys(packages))
 
 
-_HOST_ONLY = {"cli.py", "__main__.py", "prerender.py"}  # never shipped to the browser
+# Never shipped to the browser: they run where `pyweft` runs.
+_HOST_ONLY = {"cli.py", "__main__.py", "prerender.py", "desktop.py"}
 
 
 def pyweft_modules() -> list[str]:
@@ -873,11 +874,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     for p in (p_run, p_build):
         p.add_argument("--no-prerender", action="store_true", help=no_prerender)
+    p_run.add_argument(
+        "--desktop",
+        action="store_true",
+        help="open the app in a native window, with Python running on this "
+        'machine (needs pywebview: uv add "pyweft[desktop]")',
+    )
 
     args = parser.parse_args(argv)
     try:
         if args.command == "new":
             cmd_new(args.path)
+        elif args.command == "run" and args.desktop:
+            from .desktop import run_desktop
+
+            run_desktop(args.app_dir)
         elif args.command == "run":
             cmd_run(args.app_dir, args.port, prerender=not args.no_prerender)
         else:

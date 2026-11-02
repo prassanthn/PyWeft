@@ -1,9 +1,9 @@
 # PyWeft
 
-**Build web apps in Python.** Write components as `.weft` files, an XML
-template plus a Python code block, and PyWeft runs them in the browser with
-real CPython compiled to WebAssembly. No JavaScript to write, no build step,
-and the same components are designed to run as desktop apps later.
+**Build web and desktop apps in Python.** Write components as `.weft` files,
+an XML template plus a Python code block, and PyWeft runs them in the browser
+with real CPython compiled to WebAssembly, or in a native window with Python
+running on your machine. No JavaScript to write, no build step.
 
 *PyWeft: the weft is the thread woven through the warp to make fabric.*
 
@@ -25,9 +25,9 @@ count: int = 0
 Type in the box and the heading follows; click and the count goes up. State
 is plain Python fields, and the page updates itself after every event.
 
-> **Status:** a working proof of concept. The web target runs today; a
-> desktop target is planned. APIs may still change. Not on PyPI yet, so you
-> install from GitHub (below).
+> **Status:** a working proof of concept. Web and desktop apps run today;
+> packaging desktop apps as installers is planned. APIs may still change.
+> Not on PyPI yet, so you install from GitHub (below).
 
 ## Quick start
 
@@ -69,6 +69,14 @@ myapp/
 
 When you're ready to publish, `uv run pyweft build myapp` writes a static site
 to `myapp/dist/` that any web host can serve, such as GitHub Pages or Netlify.
+
+The same app also runs as a desktop app, in a native window with Python on
+your machine:
+
+```bash
+uv add "pyweft[desktop]"
+uv run pyweft run myapp --desktop
+```
 
 ## Ready-made controls (no HTML or CSS needed)
 
@@ -165,6 +173,7 @@ To see every control live, clone this repository and run
 | Style with Tailwind or Bootstrap | [Using CSS frameworks](docs/getting-started.md#using-css-frameworks) |
 | Build screens with the ready-made controls | [pyweft-ui guide](packages/pyweft-ui/docs/guide.md), then the [reference](packages/pyweft-ui/README.md) |
 | Deploy your app | [Building for deployment](docs/getting-started.md#building-for-deployment) |
+| Run it as a desktop app | [A desktop app](docs/getting-started.md#a-desktop-app-pyweft-run---desktop) |
 | Test components without a browser | [Using the engine from plain Python](docs/getting-started.md#6-using-the-engine-from-plain-python) |
 
 `examples/todo/` is a small complete app, and `examples/shop/` one with
@@ -193,8 +202,8 @@ with Python running natively and the same instructions crossing a bridge.
 
 | Target | Where Python runs | What draws the page |
 |---|---|---|
-| Web (today) | Pyodide, in the browser | the browser |
-| Desktop (planned) | CPython on the machine | a webview (WebView2, WKWebView, WebKitGTK) |
+| Web | Pyodide, in the browser | the browser |
+| Desktop (`pyweft run --desktop`) | CPython on the machine | a webview (WebView2, WKWebView, WebKitGTK) |
 | Mobile (later) | CPython via Briefcase | a webview |
 
 There is no reactive state system to learn: a handler runs, the component
@@ -206,7 +215,7 @@ place where PyWeft tracks which fields you read.
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev          # also installs packages/pyweft-ui, editable
-uv run pytest                # 868 tests, including pyweft-ui's
+uv run pytest                # 875 tests, including pyweft-ui's
 uv run python examples/demo.py              # render -> event -> diff -> apply, no browser
 uv run pyweft run examples/todo             # the todo app
 uv run pyweft run packages/pyweft-ui/gallery  # every control
@@ -235,17 +244,17 @@ Under the hood:
 
 ## Roadmap
 
-**Done:** the render core and differ; the browser target; components with
-props, events, slots and component libraries; pages and navigation; shared
-state with stores; events
-with modifiers and `@bind` for every form control; moving focus from
-Python; effects; async handlers and Web Worker background work; scoped
-styles and CSS framework support; the `pyweft` CLI with hot reload and
-static builds; `pyweft-ui` with 22 keyboard-accessible controls and a
+**Done:** the render core and differ; the browser target; the desktop target
+(pywebview); components with props, events, slots and component libraries;
+pages and navigation; shared state with stores; events with modifiers and
+`@bind` for every form control; moving focus from Python; effects; async
+handlers and Web Worker background work; scoped styles and CSS framework
+support; the `pyweft` CLI with hot reload, static builds and pre-rendered
+first screens; `pyweft-ui` with 22 keyboard-accessible controls and a
 gallery.
 
 **Next:** more controls (menus, a date picker, form validation); publishing
-`pyweft` and `pyweft-ui` to PyPI; a desktop host using pywebview.
+`pyweft` and `pyweft-ui` to PyPI; packaging desktop apps as installers.
 
 **Later:** mobile packaging with Briefcase, developer tools.
 

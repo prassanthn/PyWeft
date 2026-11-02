@@ -13,6 +13,9 @@
 const PyWeftRuntime = (() => {
   let container = null;
   let dispatch = null; // (handlerId, eventPayload) -> void
+  // Host hooks. typing(el): true while events from el are still on their way
+  // to Python, so a value from an older render must not overwrite it.
+  const options = { typing: null };
 
   function init(el, dispatchFn) {
     container = el;
@@ -83,7 +86,9 @@ const PyWeftRuntime = (() => {
       // re-render never updates an input the user has typed in. Skip the write
       // when it already matches so the caret position survives.
       if (name === "value" && liveValue(el)) {
-        if (el.value !== value) el.value = value;
+        // A host whose events reach Python asynchronously (the desktop
+        // bridge) can be a keystroke behind: don't type over the user.
+        if (el.value !== value && !(options.typing && options.typing(el))) el.value = value;
       } else if (name === "checked" && "checked" in el) {
         // Present means checked: the renderer writes checked="" (valueless),
         // and drops the attribute for unchecked.
@@ -329,5 +334,5 @@ const PyWeftRuntime = (() => {
     }
   }
 
-  return { init, mount, applyOps, runCommands };
+  return { init, mount, applyOps, runCommands, options };
 })();

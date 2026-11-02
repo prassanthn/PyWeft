@@ -26,6 +26,9 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]
+# `pyweft run --desktop`: the app in a native window. Optional, so the core
+# stays dependency-free and web-only apps never install it.
+desktop = ["pywebview>=5"]
 
 [project.urls]
 Homepage = "https://github.com/prassanthn/PyWeft"

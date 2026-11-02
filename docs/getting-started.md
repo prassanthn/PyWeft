@@ -6,8 +6,9 @@ whenever state changes.
 
 Your component code runs in **real CPython**. In the browser it runs on
 Pyodide (CPython compiled to WebAssembly), so there is no transpilation and no
-JavaScript to write. The same render core will later drive desktop apps
-(pywebview) and mobile — only the transport differs.
+JavaScript to write. The same render core drives desktop apps in a native
+window ([`pyweft run --desktop`](#a-desktop-app-pyweft-run---desktop)), and
+later mobile: only the transport differs.
 
 ```
 .weft file ──parse──▶ template ──render──▶ virtual DOM ──diff──▶ patch ops ──▶ real DOM
@@ -48,7 +49,8 @@ JavaScript to write. The same render core will later drive desktop apps
    [ready-made controls (pyweft-ui)](#ready-made-controls-pyweft-ui),
    [PyPI packages](#using-pypi-packages),
    [calling JavaScript](#calling-javascript),
-   [building for deployment](#building-for-deployment)
+   [building for deployment](#building-for-deployment),
+   [a desktop app](#a-desktop-app-pyweft-run---desktop)
 6. [Using the engine from plain Python](#6-using-the-engine-from-plain-python):
    headless tests, including async ones
 7. [What's here and what's coming](#7-whats-here-and-whats-coming)
@@ -75,7 +77,7 @@ To hack on the framework itself, clone it and install in editable mode:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev      # or: pip install -e ".[dev]"
-uv run pytest            # 868 tests should pass
+uv run pytest            # 875 tests should pass
 ```
 
 To see it working immediately, run the bundled todo app from the clone:
@@ -403,8 +405,9 @@ def build_report(rows, title=""):     # a plain function: no self
 
 In the browser the call runs in a **Web Worker**: a second Python on its own
 browser thread. The page keeps responding while it works, and you `await` the
-result like any other async call. Headless (tests), and on the desktop target
-when it arrives, the same call runs on a thread instead.
+result like any other async call. Headless (tests), and in a
+[desktop app](#a-desktop-app-pyweft-run---desktop), the same call runs on a
+thread instead.
 
 The worker is a separate copy of Python, which sets the rules:
 
@@ -520,8 +523,8 @@ So, in practice:
 - **Never change component state from another thread.** Rendering happens on
   the main thread, and a thread writing `self.items` halfway through a render
   can corrupt it. Return the result and assign it after the `await`, as
-  `run_in_background` makes you do. (On the desktop target, real threads
-  will exist and this matters most there.)
+  `run_in_background` makes you do. (In a desktop app, real threads exist,
+  so this matters most there.)
 
 ---
 
@@ -1843,9 +1846,49 @@ works:
   rebuild after every change you want deployed.
 - Subpath hosting works without configuration: every reference in
   `index.html` is relative, so the app runs at `/` or `/myapp/` alike.
-- A desktop executable is not available yet; the pywebview host and
-  Briefcase packaging are on the roadmap. The static site is the only
-  shippable form today.
+- Packaging a desktop app as an installer or executable (Briefcase) is on
+  the roadmap; today the static site is the only form you can hand out. To
+  run an app as a desktop app yourself, see below.
+
+### A desktop app: `pyweft run --desktop`
+
+The same app runs in a native window, with Python running on your own
+machine instead of in a browser:
+
+```bash
+uv add "pyweft[desktop]"          # once: installs pywebview
+uv run pyweft run myapp --desktop
+```
+
+With pip: `pip install "pyweft[desktop]"`, then `pyweft run myapp --desktop`.
+
+Nothing in the app changes. The window is a webview (WebView2 on Windows,
+WebKit on macOS, GTK or Qt on Linux) showing the same page; your components
+run in ordinary Python, and each event and update crosses between the two.
+
+- **What you gain:** Python starts at once, with no download; your code
+  can use the machine (files, sockets, databases, any installed package,
+  including ones with C extensions that can't run in a browser); and
+  `run_in_background` runs functions on real threads.
+- **What works the same:** templates, handlers, `@bind`, async handlers,
+  effects, focus, pages and Back/Forward, stores, `pyweft-ui`, scoped styles,
+  your `.css` files, `head.html` and `assets/`.
+- **Hot reload:** saving a `.weft` or `.css` file updates the open window
+  and keeps its state, as in the browser. Editing a `.py` module or PyWeft
+  itself needs a restart, since Python keeps imported modules loaded; the
+  terminal says so.
+- **Errors** in a handler are shown in the window and printed in the
+  terminal, and the app keeps running.
+- **Browser-only code** (`import js`, `pyodide`) doesn't exist on the
+  desktop. Code that needs both should check, for example
+  `import sys; in_browser = sys.platform == "emscripten"`.
+- **Your code runs one thing at a time**, on a single thread, as in the
+  browser. If you start threads of your own, hand results back with
+  `run_in_background` or asyncio rather than changing component state from
+  another thread.
+
+Close the window to stop. Running an app as a desktop app for other people,
+packaged as an installer, is the next step on the roadmap.
 
 ---
 
@@ -1948,6 +1991,8 @@ Working today:
 - **Styling:** scoped `<style>` blocks, global `.css` files, `head.html` for
   CDN stylesheets and scripts, an `assets/` folder, so CSS frameworks such as
   Tailwind and Bootstrap work.
+- **Desktop:** `pyweft run --desktop` opens the same app in a native window,
+  with Python running on your machine and hot reload included.
 - **Tooling:** `pyweft new` / `run` / `build`; hot reload that keeps state,
   with an error overlay; the first screen rendered ahead of time, so pages
   appear at once; a customizable loading screen that shows real progress;
@@ -1955,6 +2000,6 @@ Working today:
 - **Controls:** `pyweft-ui`, 22 ready-made, themeable controls (see
   "Ready-made controls" in section 5), with a live gallery.
 
-Coming next: more controls (menus, a date picker, form validation), and a
-pywebview **desktop** host (same components, native window, real threads).
+Coming next: more controls (menus, a date picker, form validation), and
+packaging desktop apps as installers you can hand out.
 

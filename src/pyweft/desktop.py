@@ -1,0 +1,422 @@
+"""The desktop host: an app in a native window, Python running as ordinary
+CPython on the user's machine (``pyweft run APP --desktop``).
+
+The window is a webview (pywebview: WebView2 on Windows, WebKit on macOS,
+GTK or Qt on Linux) showing a small page with the same runtime.js the
+browser uses. This file is the bridge the architecture was built for: the
+core's patch ops cross pywebview's JavaScript bridge as JSON, and events come
+back the same way. Nothing in the core changes.
+
+Threads. pywebview's GUI loop owns the main thread; its JavaScript-to-Python
+calls arrive on threads of their own. Every piece of app code runs on one
+asyncio loop thread instead, one thing at a time, as in the browser: the
+bridge only hands work to that loop. Python then drives each cycle itself,
+as shell.html does in the browser: render, push the ops (evaluate_js waits
+until they're applied), settle effects, push focus requests.
+
+Host-only, like cli.py: never shipped to the browser.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import concurrent.futures
+import json
+import sys
+import threading
+import traceback
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any, Callable
+from urllib.parse import unquote
+
+from . import routing
+from .component import load_component
+from .differ import diff
+from .hotreload import format_error, hot_swap
+from .renderer import Renderer
+from .styles import collect_styles
+from .vdom import to_dicts
+
+_STATIC = Path(__file__).parent / "static"
+
+_PAGE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>__TITLE__</title>
+  <style>
+    #pyweft-dev-error {
+      position: fixed; left: 1rem; right: 1rem; bottom: 1rem; z-index: 2147483647;
+      max-height: 50vh; overflow: auto; padding: 0.9rem 1.1rem;
+      border-left: 4px solid #e5484d; border-radius: 8px;
+      background: #2b1213; color: #ffd8d8; white-space: pre-wrap;
+      font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+  </style>
+  __HEAD__
+  __CSS__
+  <style id="pyweft-component-styles"></style>
+  <script src="runtime.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // The desktop bridge: events go to Python through pywebview's js_api;
+    // Python calls apply()/commands() back with evaluate_js.
+    const pyweftDesktop = (() => {
+      let sent = 0;  // events handed to Python
+      let done = 0;  // events Python has rendered
+      // Still typing: the input's latest keystrokes haven't come back yet.
+      PyWeftRuntime.options.typing = (el) => sent > done && el === document.activeElement;
+
+      async function start() {
+        const api = window.pywebview.api;
+        const here = location.hash.startsWith("#/") ? location.hash.slice(1) : "/";
+        const first = await api.mount(here);
+        setCss(first.css);
+        PyWeftRuntime.init(document.getElementById("app"), (id, event) => {
+          sent += 1;
+          api.dispatch(id, JSON.stringify(event), sent);
+        });
+        PyWeftRuntime.mount(first.tree);
+        window.addEventListener("hashchange", () => {
+          if (!location.hash.startsWith("#/")) return; // an in-page anchor
+          api.location(location.hash.slice(1));
+          window.scrollTo(0, 0);
+        });
+        await api.mounted();
+      }
+
+      function setCss(text) {
+        document.getElementById("pyweft-component-styles").textContent = text;
+      }
+
+      window.addEventListener("pywebviewready", start);
+      return {
+        apply(ops, seq) {
+          PyWeftRuntime.applyOps(ops);
+          if (seq) done = Math.max(done, seq);
+        },
+        commands: (list) => PyWeftRuntime.runCommands(list),
+        css: setCss,
+        error(text) {
+          let el = document.getElementById("pyweft-dev-error");
+          if (!el) {
+            el = document.createElement("div");
+            el.id = "pyweft-dev-error";
+            document.body.appendChild(el);
+          }
+          el.textContent = text;
+        },
+        clearError: () => document.getElementById("pyweft-dev-error")?.remove(),
+        refreshCss(name) {
+          for (const link of document.querySelectorAll("link[rel=stylesheet]")) {
+            if (link.getAttribute("href").split("?")[0] === "app/" + name) {
+              link.href = "app/" + name + "?v=" + Date.now();
+            }
+          }
+        },
+      };
+    })();
+  </script>
+</body>
+</html>
+"""
+
+
+class _Location:
+    """routing's host: the location after the # in the window's address."""
+
+    def __init__(self, app: DesktopApp):
+        self.app = app
+
+    def current(self) -> str:
+        return self.app.here
+
+    def push(self, url: str) -> None:
+        self.app.here = url
+        self.app.js(f"location.hash = {json.dumps(url)}")
+
+    def replace(self, url: str) -> None:
+        self.app.here = url
+        self.app.js(f"history.replaceState(null, '', {json.dumps('#' + url)})")
+
+    def back(self) -> None:
+        self.app.js("history.back()")  # comes back through hashchange
+
+
+class _Api:
+    """What the page can call (window.pywebview.api.*). pywebview exposes
+    every public method, so this holds nothing else."""
+
+    def __init__(self, app: DesktopApp):
+        self._app = app
+
+    def mount(self, here: str) -> dict:
+        return self._app.call(self._app.mount, here)
+
+    def mounted(self) -> None:
+        self._app.call(self._app.settle)
+
+    def dispatch(self, handler_id: str, event_json: str, seq: int) -> None:
+        self._app.post(self._app.dispatch, handler_id, json.loads(event_json), seq)
+
+    def location(self, url: str) -> None:
+        self._app.post(self._app.location, url)
+
+
+class DesktopApp:
+    """One app, one window. ``window`` is anything with ``evaluate_js``:
+    a pywebview window, or a stand-in in tests."""
+
+    def __init__(self, app_dir: Path, window: Any = None):
+        self.app_dir = Path(app_dir).resolve()
+        self.window = window
+        self.here = "/"
+        self.tree: list = []
+        self.renderer: Renderer | None = None
+        self.cls: type | None = None
+        self._render_queued = False
+        self.loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(target=self.loop.run_forever, daemon=True)
+        self.api = _Api(self)
+
+    # ---------------------------------------------------- the loop thread
+
+    def start(self) -> None:
+        self._thread.start()
+        self.call(self._load)
+
+    def stop(self) -> None:
+        self.loop.call_soon_threadsafe(self.loop.stop)
+        self._thread.join(timeout=5)
+
+    def call(self, fn: Callable, *args: Any) -> Any:
+        """Run ``fn`` on the loop thread and wait for its result."""
+        future: concurrent.futures.Future = concurrent.futures.Future()
+
+        def run() -> None:
+            try:
+                future.set_result(fn(*args))
+            except BaseException as exc:  # noqa: BLE001 - re-raised in the caller
+                future.set_exception(exc)
+
+        self.loop.call_soon_threadsafe(run)
+        return future.result()
+
+    def post(self, fn: Callable, *args: Any) -> None:
+        """Run ``fn`` on the loop thread, without waiting."""
+        self.loop.call_soon_threadsafe(self._guarded, fn, *args)
+
+    def _guarded(self, fn: Callable, *args: Any) -> None:
+        try:
+            fn(*args)
+        except Exception as exc:  # noqa: BLE001 - shown, the app keeps running
+            self.report(exc)
+
+    def js(self, script: str) -> Any:
+        if self.window is not None:
+            return self.window.evaluate_js(script)
+        return None
+
+    # ------------------------------------------------------- the app cycle
+
+    def _load(self) -> None:
+        sys.path.insert(0, str(self.app_dir))  # the app's own modules
+        routing.set_host(_Location(self))
+        self.cls = load_component(self.app_dir / "app.weft")
+        self.renderer = Renderer(self.cls())
+        # Already on the loop thread whenever app code changes state, except
+        # code that made its own thread: call_soon_threadsafe covers both.
+        self.renderer.on_invalidate = self._schedule_render
+        self.renderer.on_error = self.report
+        self.renderer.init_root()
+
+    def mount(self, here: str) -> dict:
+        """The page (re)loaded: the whole current page, where it is now."""
+        routing.location_changed(here)
+        self.here = here
+        self.tree = self.renderer.render()
+        return {"tree": to_dicts(self.tree), "css": collect_styles(self.cls)}
+
+    def _render(self) -> list[dict]:
+        new = self.renderer.render()
+        ops = diff(self.tree, new)
+        self.tree = new
+        return ops
+
+    def _push(self, ops: list[dict], seq: int = 0) -> None:
+        if ops or seq:
+            self.js(f"pyweftDesktop.apply({json.dumps(ops)}, {seq})")
+
+    def settle(self) -> None:
+        """What happens after every render is on the page: effects and
+        on_after_render (rendering again while they change state), then
+        focus and scroll requests."""
+        while self.renderer.after_render():
+            self._push(self._render())
+        commands = self.renderer.take_commands()
+        if commands:
+            self.js(f"pyweftDesktop.commands({json.dumps(commands)})")
+
+    def dispatch(self, handler_id: str, event: dict, seq: int) -> None:
+        try:
+            self.renderer.dispatch(handler_id, event)
+        finally:
+            # Rendered even when the handler failed: it may have changed
+            # state first, and the page must learn the event was handled.
+            self._push(self._render(), seq)
+        self.settle()
+
+    def location(self, url: str) -> None:
+        self.here = url
+        routing.location_changed(url)
+
+    def _schedule_render(self) -> None:
+        # Many state changes in one go become one render.
+        if not self._render_queued:
+            self._render_queued = True
+            self.loop.call_soon_threadsafe(self._rerender)
+
+    def _rerender(self) -> None:
+        self._render_queued = False
+        if self.renderer.needs_render():
+            self._guarded(lambda: (self._push(self._render()), self.settle()))
+
+    def report(self, exc: BaseException) -> None:
+        summary = format_error(exc, root=str(self.app_dir))
+        print(f"pyweft: {summary}", file=sys.stderr)
+        traceback.print_exception(exc, file=sys.stderr)
+        self.js(f"pyweftDesktop.error({json.dumps(summary)})")
+
+    # ------------------------------------------------------- hot reload
+
+    def hot_reload(self) -> None:
+        """A .weft file changed: recompile, move live components onto the
+        new classes keeping their state, and patch the page."""
+        new_cls = load_component(self.app_dir / "app.weft")
+        changed = hot_swap(self.renderer, new_cls)
+        ops = self._render()
+        self.cls = new_cls
+        self.js(f"pyweftDesktop.css({json.dumps(collect_styles(new_cls))})")
+        self._push(ops)
+        self.js("pyweftDesktop.clearError()")
+        self.settle()
+        names = [str(Path(f).relative_to(self.app_dir)) for f in changed]
+        print(f"pyweft: hot-reloaded {', '.join(names) or 'app'}")
+
+
+# ---------------------------------------------------------------- serving
+
+
+def page(app_dir: Path) -> str:
+    from .cli import app_css_files, head_extras, linked_app_css
+
+    head = head_extras(app_dir)
+    linked = linked_app_css(head)
+    css = "\n  ".join(
+        f'<link rel="stylesheet" href="app/{name}" />'
+        for name in app_css_files(app_dir)
+        if name not in linked
+    )
+    html = _PAGE.replace("__TITLE__", app_dir.resolve().name).replace("__CSS__", css)
+    return html.replace("__HEAD__", head)  # last: the app's own text
+
+
+def make_server(app_dir: Path) -> ThreadingHTTPServer:
+    """The window's page, runtime.js, the app's CSS and assets, on a free
+    local port. Only those: nothing else on disk is reachable."""
+    from .cli import _asset_path, app_css_files, content_type
+
+    class Handler(SimpleHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802 (stdlib naming)
+            route = unquote(self.path.split("?", 1)[0])
+            if route in ("/", "/index.html"):
+                return self._send("text/html", page(app_dir).encode())
+            if route == "/runtime.js":
+                return self._send("text/javascript", (_STATIC / "runtime.js").read_bytes())
+            if route.startswith("/app/") and route[5:] in app_css_files(app_dir):
+                return self._send("text/css", (app_dir / route[5:]).read_bytes())
+            if route.startswith("/assets/"):
+                path = _asset_path(app_dir, route[len("/assets/") :])
+                if path is not None:
+                    return self._send(content_type(path), path.read_bytes())
+            self.send_error(404)
+
+        def _send(self, ctype: str, body: bytes):
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, fmt, *args):
+            pass
+
+    return ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+
+
+def watch(app: DesktopApp, stop: threading.Event, interval: float = 0.3) -> None:
+    """Hot reload for the window, from the same file snapshot as the
+    browser's dev server."""
+    from .cli import snapshot
+
+    current = snapshot(app.app_dir)
+    while not stop.wait(interval):
+        new = snapshot(app.app_dir)
+        changed = {k for k in current.keys() | new.keys() if current.get(k) != new.get(k)}
+        current = new
+        if not changed:
+            continue
+        if any(k.endswith(".py") or k.startswith("pyweft:") for k in changed):
+            # Imported Python stays cached in this process; only a restart
+            # picks up a changed module or a changed PyWeft.
+            names = ", ".join(sorted(k.removeprefix("pyweft:") for k in changed))
+            print(f"pyweft: {names} changed; restart `pyweft run --desktop` to use it")
+            continue
+        weft = [k for k in changed if k.endswith(".weft")]
+        if weft:
+            app.post(app.hot_reload)
+        for name in sorted(k for k in changed if k.endswith(".css")):
+            app.js(f"pyweftDesktop.refreshCss({json.dumps(name)})")
+        if any(not k.endswith((".weft", ".css")) for k in changed):
+            app.js("location.reload()")  # head.html, assets: the page remounts
+
+
+def run_desktop(app_dir: Path, width: int = 1100, height: int = 800) -> None:
+    from .cli import CliError, app_pyweft_files
+
+    app_pyweft_files(app_dir)  # fails fast without an app.weft
+    try:
+        import webview
+    except ImportError:
+        raise CliError(
+            "the desktop window needs pywebview: "
+            'uv add "pyweft[desktop]"  (or: pip install "pyweft[desktop]")'
+        ) from None
+
+    app = DesktopApp(app_dir)
+    try:
+        app.start()
+    except Exception as exc:  # noqa: BLE001 - shown as a CLI error
+        app.stop()
+        raise CliError(format_error(exc, root=str(Path(app_dir).resolve()))) from None
+    server = make_server(app_dir)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+    app.window = webview.create_window(
+        Path(app_dir).resolve().name, url, js_api=app.api, width=width, height=height
+    )
+    stop = threading.Event()
+    threading.Thread(target=watch, args=(app, stop), daemon=True).start()
+    print(f"pyweft: {app_dir} in a desktop window (close it to stop)")
+    print("  hot reload is on: saved .weft and .css files appear in the window")
+    try:
+        webview.start()  # until the window closes
+    finally:
+        stop.set()
+        server.shutdown()
+        app.stop()
