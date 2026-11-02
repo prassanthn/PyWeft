@@ -135,7 +135,9 @@ To see every control live, clone this repository and run
 - **Pages:** a `pages/` folder becomes your app's screens, with links, Back
   and Forward, typed values from the address (`/orders/{id}`), and a
   not-found page.
-- **Effects:** `@effect` methods re-run when the state they read changes.
+- **Lifecycle and effects:** `on_init`, `on_after_render` and `on_dispose`
+  run as a component appears, updates and goes away; `@effect` methods
+  re-run when the state they read changes.
 - **Async:** `async def` handlers, plus `run_in_background()` to run heavy
   Python in a Web Worker so the page never freezes.
 - **Styling your way:** scoped styles, plain CSS files, or frameworks such as
@@ -152,6 +154,7 @@ To see every control live, clone this repository and run
 | You want to | Read |
 |---|---|
 | Learn the basics: state, templates, events | [Getting started](docs/getting-started.md), sections 1–3 |
+| Run code when a component appears, updates or goes away | [Lifecycle](docs/getting-started.md#lifecycle-when-your-code-runs) |
 | Split an app into components, use slots | [Composing components](docs/getting-started.md#4-composing-components) |
 | Build an app with several pages | [Pages and navigation](docs/getting-started.md#pages-and-navigation) |
 | Handle forms and keyboard input | [Binding form controls](docs/getting-started.md#binding-form-controls), [event modifiers](docs/getting-started.md#event-modifiers) |

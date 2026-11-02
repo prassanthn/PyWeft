@@ -22,6 +22,7 @@ JavaScript to write. The same render core will later drive desktop apps
 
 1. [Install](#1-install)
 2. [Your first component](#2-your-first-component): how state works,
+   [lifecycle](#lifecycle-when-your-code-runs),
    [effects](#effects-reacting-to-state-changes),
    [async handlers, background work](#async-handlers-and-background-work),
    [heavy work in a Web Worker](#heavy-work-run_in_background),
@@ -170,6 +171,75 @@ components, pass it down as props and send changes up with `emit` (section
 4). A cross-component store is on the roadmap; it will sit on top of this
 model, not replace it.
 
+### Lifecycle: when your code runs
+
+Besides handlers, a component can define methods that PyWeft calls at set
+moments in its life:
+
+| Method | When it runs | `async`? |
+|---|---|---|
+| `on_init(self)` | once, when the component first appears, before its first render; its props are already set | yes |
+| `on_after_render(self, first)` | after every render, once the changes are on the page; `first` is `True` the first time | yes |
+| `on_dispose(self)` | once, when the component is removed: its `<If>` turned false, its row left a `<For>`, you left its page | no |
+| an `@effect` method | after the first render, then after any render in which a field it reads changed | no |
+
+```python
+from pyweft import effect
+
+orders = None
+query: str = ""
+
+async def on_init(self):
+    self.orders = await fetch_orders()   # the part before the await is in the first render
+
+def on_after_render(self, first):
+    if first:
+        self.focus("search")             # the elements are on the page now
+
+@effect
+def remember_query(self):                # runs again whenever self.query changes
+    save_setting("query", self.query)
+
+def on_dispose(self):
+    close_connection()
+```
+
+**What each is for:**
+
+- **`on_init`**: loading data and setting things up. An `async` one shows
+  what it set before its first `await` straight away (`self.loading =
+  True`), and the component renders again by itself when it finishes. Child
+  components get theirs the first time a render produces them.
+- **`on_after_render`**: anything that needs the component's elements to be
+  on the page, such as measuring them or handing one to JavaScript.
+- **`@effect`**: keeping something in step with state, such as saving,
+  syncing or subscribing. It works out which fields it depends on by itself
+  and can return a cleanup function (see [effects](#effects-reacting-to-state-changes)).
+- **`on_dispose`**: letting go of what you opened: timers, connections,
+  JavaScript listeners. Tasks started with `self.start_task()` and effect
+  cleanups have already been run by then, so it must not be `async`.
+
+**The order in one update.** An event arrives and its handler runs; the page
+renders again, and components appearing for the first time get `on_init`
+while vanished ones get `on_dispose`; the changes are applied to the page;
+effects run, then `on_after_render`, children before the root; if any of
+them changed state, it renders and applies again; finally `focus()` and
+`scroll_to()` requests are carried out.
+
+**Good to know:**
+
+- With [pages](#pages-and-navigation), every address is a fresh page
+  component: its `on_init` runs on each visit and `on_dispose` when you
+  leave.
+- [Hot reload](#hot-reload) keeps components alive, so `on_init` does not
+  run again; the effects of an edited component start over.
+- When the first screen is [rendered ahead of time](#the-first-screen-before-python-starts),
+  `on_init` and `on_after_render` also run on your machine during
+  `pyweft run` and `build`, up to the first `await`. Keep side effects, such
+  as sending analytics, after an `await` or in a handler.
+- A change that doesn't come from a handler, such as a timer or a JavaScript
+  callback, is outside this cycle: call `self.state_has_changed()`.
+
 ### Effects: reacting to state changes
 
 Some code should run *because* state changed, not because an event fired:
@@ -221,10 +291,9 @@ def sync_title(self):
   after 100 rounds instead of hanging the page. For a value that is purely
   derived from other state, a `@property` is still simpler.
 
-Effects run synchronously and only in components that are rendered. The
-older `on_after_render(self, first)` hook still exists for code that must
-run after every render; it now fires for child components too, not only the
-root.
+Effects run synchronously and only in components that are rendered. For code
+that must run after every render, whatever changed, use `on_after_render`
+(see [lifecycle](#lifecycle-when-your-code-runs)).
 
 ### Async handlers and background work
 
@@ -853,9 +922,11 @@ up `on_remove` and calls it. Consequences worth knowing:
 re-renders. Inside a `<For>`, the loop's `key` also keys the child instances,
 so their state follows the data when rows reorder.
 
-**Lifecycle:** `on_init(self)` runs once before the first render;
-`on_dispose(self)` runs when the component disappears (e.g. its `<If>` went
-false).
+**Lifecycle:** a child's `on_init` runs the first time a render produces it,
+and its `on_dispose` when a render no longer does (its `<If>` went false, its
+row left the list). A parent's `on_init` runs before its children's, since
+its render is what creates them. See
+[lifecycle](#lifecycle-when-your-code-runs) for all of them.
 
 **Overriding the file lookup.** A `components` dict in the code block wins
 over the file conventions, which is how you give a component a different tag
