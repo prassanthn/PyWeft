@@ -1,11 +1,14 @@
 <template>
   <div :class="'tabs tabs-' + variant">
-    <div class="list" role="tablist" :aria-label="label or None">
+    <div class="list" role="tablist" :aria-label="label or None"
+         @keydown.left.prevent="step(-1)" @keydown.right.prevent="step(1)"
+         @keydown.home.prevent="step_to(0)" @keydown.end.prevent="step_to(-1)">
       <For each="choice in choices" key="choice[2]" index="i">
-        <button type="button" role="tab" :id="_id + '-' + str(i)"
+        <button type="button" role="tab" :id="_id + '-' + str(i)" ref="tab-{{ i }}"
                 :class="'tab active' if choice[0] == current else 'tab'"
                 :aria-selected="'true' if choice[0] == current else 'false'"
                 :aria-controls="_id + '-panel' if choice[0] == current else None"
+                :tabindex="'0' if choice[0] == current else '-1'"
                 @click="select(choice[0])">{{ choice[1] }}</button>
       </For>
     </div>
@@ -23,7 +26,7 @@
 # </ui.Tabs>
 # The content between the tags is the panel; `tab` inside it is the chosen
 # tab's value, so it also works without @bind. options take the same forms
-# as Select's.
+# as Select's. Keyboard: Tab reaches the chosen tab, arrows move between tabs.
 import itertools
 
 label: str = ""           # names the tab list for screen readers
@@ -72,6 +75,18 @@ def current_index(self):
 def select(self, val):
     self._picked = val
     self.emit("update", val)
+
+# The tab row is one Tab stop (the chosen tab); the arrow keys move along it,
+# choosing as they go, and Home and End jump to the ends.
+def step(self, delta):
+    self.step_to((self.current_index + delta) % max(len(self.choices), 1))
+
+def step_to(self, index):
+    if not self.choices:
+        return
+    index %= len(self.choices)
+    self.select(self.choices[index][0])
+    self.focus(f"tab-{index}")
 </code>
 
 <style>

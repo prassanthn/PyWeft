@@ -2,8 +2,10 @@
   <div class="host">
     <If cond="value">
       <div class="backdrop" @click.self="dismiss" @keydown.esc="dismiss">
+        <!-- Tab past either end lands on a guard, which sends focus round. -->
+        <span class="guard" tabindex="0" data-focus-guard="" @focus="focus_last('box')"></span>
         <div class="dialog" role="dialog" aria-modal="true" :aria-label="title or None"
-             tabindex="-1" autofocus="" :style="f'max-width: {width}'">
+             tabindex="-1" ref="box" :style="f'max-width: {width}'">
           <header class="head">
             <h2 class="title">{{ title }}</h2>
             <If cond="dismissible">
@@ -13,6 +15,7 @@
           <div class="body"><Slot /></div>
           <If cond="has_slot('footer')"><footer class="foot"><Slot name="footer" /></footer></If>
         </div>
+        <span class="guard" tabindex="0" data-focus-guard="" @focus="focus_first('box')"></span>
       </div>
     </If>
   </div>
@@ -21,11 +24,28 @@
 <code>
 # <ui.Dialog title="Delete file?" @bind="confirming"> ... </ui.Dialog>
 # Open while the bound field is True. Esc, a click outside, or the X set it
-# back to False (unless dismissible="false") and emit "close".
+# back to False (unless dismissible="false") and emit "close". Focus moves
+# in when it opens, Tab stays inside, and focus goes back when it closes.
+from pyweft import effect
+
 value: bool = False
 title: str = ""
 width: str = "32rem"
 dismissible: bool = True
+
+_open = False
+
+@effect
+def follow_focus(self):
+    # Runs when value changes, however it changed: the bound field, Esc,
+    # the X or the app's own buttons.
+    if self.value and not self._open:
+        self._open = True
+        self.save_focus()
+        self.focus("box")
+    elif not self.value and self._open:
+        self._open = False
+        self.restore_focus()
 
 def close(self):
     self.emit("update", False)
@@ -60,6 +80,7 @@ def dismiss(self):
 }
 .close:hover { background: var(--ui-subtle, #f6f8fa); color: var(--ui-text, #1f2328); }
 .body { padding: 12px 20px 20px; }
+.guard { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; outline: none; }
 .foot {
   display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;
   padding: 12px 20px; border-top: 1px solid var(--ui-border, #d1d9e0);

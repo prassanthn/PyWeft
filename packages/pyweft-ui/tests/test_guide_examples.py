@@ -84,6 +84,9 @@ def test_signup_form_validates_then_submits(app_dir):
         form = next(n for n in walk(tree) if n.tag == "form")
         r.dispatch(form.events["submit.prevent"], {"type": "submit"})
         assert set(app.errors) == {"email", "password", "country"}
+        r.render()
+        (focus,) = r.take_commands()  # into the email field's input
+        assert focus["op"] == "focus" and "field" in node_at(r, focus["path"]).attrs["class"]
         errors = [text(n) for n in walk(r.render()) if "error" in n.attrs.get("class", "").split()]
         assert "Use at least 8 characters" in errors
 
@@ -162,6 +165,14 @@ def test_toast_recipe(app_dir, toasts):
         await r.idle()
 
     asyncio.run(main())
+
+
+def node_at(renderer, path):
+    nodes = renderer._tree
+    for index in path:
+        node = nodes[index]
+        nodes = node.children if isinstance(node, Element) else []
+    return node
 
 
 def find_text(nodes, tag):

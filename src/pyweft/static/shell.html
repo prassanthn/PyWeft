@@ -143,6 +143,10 @@ def pyweft_rerender():
     _tree = new_tree
     return json.dumps(ops)
 
+def pyweft_commands():
+    # focus() and friends, against the render that is now on the page.
+    return json.dumps(_renderer.take_commands())
+
 def pyweft_after_render():
     # Runs effects and on_after_render now that the patches are on the page.
     # null means settled; a list is a follow-up render to apply, after which
@@ -478,12 +482,15 @@ def pyweft_hot_reload():
       const initial = pyodide.globals.get("pyweft_initial");
       const dispatch = pyodide.globals.get("pyweft_dispatch");
       const afterRender = pyodide.globals.get("pyweft_after_render");
+      const takeCommands = pyodide.globals.get("pyweft_commands");
 
       // Python raises if effects never settle, so this loop terminates.
+      // Focus requests go last: what they name may appear in any pass.
       const settle = () => {
         for (let ops; (ops = JSON.parse(afterRender())) !== null; ) {
           PyWeftRuntime.applyOps(ops);
         }
+        PyWeftRuntime.runCommands(JSON.parse(takeCommands()));
       };
 
       PyWeftRuntime.init(document.getElementById("app"), (handlerId, event) => {

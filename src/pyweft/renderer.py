@@ -64,6 +64,7 @@ def _dispose(component: Any) -> None:
     for task in component.__dict__.pop("_pw_tasks", ()):
         task.cancel()
     component.__dict__.pop("_pw_start", None)
+    component.__dict__.pop("_pw_command", None)
     # Effect cleanups first: on_dispose is user code that may not call super().
     dispose_effects(component)
     component.on_dispose()
@@ -147,11 +148,56 @@ class Renderer:
         # to raise it to. Unset, it goes to the event loop's exception handler.
         self.on_error: Callable[[BaseException], Any] | None = None
         self._busy = 0
+        # ref="..." elements of the latest render, by (owning component, name),
+        # and the focus/scroll requests waiting for take_commands().
+        self._refs: dict[tuple[int, str], Element] = {}
+        self._tree: list[Node] = []
+        self._commands: list[tuple[Any, str, str | None]] = []
         self._watch(component)
 
     def _watch(self, component: Any) -> None:
         component.__dict__["_pw_invalidate"] = self._invalidated
         component.__dict__["_pw_start"] = partial(self._start, component)
+        component.__dict__["_pw_command"] = partial(self._command, component)
+
+    # -------------------------------------------------------------- commands
+
+    def _command(self, component: Any, op: str, ref: str | None) -> None:
+        self._commands.append((component, op, ref))
+
+    def take_commands(self) -> list[dict[str, Any]]:
+        """Requests such as ``focus("email")`` made since the last call, as
+        JSON-ready dicts against the latest render: ``{"op": "focus",
+        "path": [0, 2]}`` (paths as in patch ops), or ``{"op":
+        "restore_focus"}`` for ones without an element.
+
+        Hosts call this once the render's patches are applied and
+        ``after_render`` has settled, and carry them out in order: the
+        element a request names may only exist after that render. A
+        request whose ``ref`` isn't on the page is dropped, like an event
+        for a vanished handler."""
+        out: list[dict[str, Any]] = []
+        for component, op, ref in self._commands:
+            if ref is None:
+                out.append({"op": op})
+                continue
+            element = self._refs.get((id(component), ref))
+            path = self._path_to(element) if element is not None else None
+            if path is not None:
+                out.append({"op": op, "path": path})
+        self._commands = []
+        return out
+
+    def _path_to(self, target: Element) -> list[int] | None:
+        stack: list[tuple[list[Node], list[int]]] = [(self._tree, [])]
+        while stack:
+            nodes, prefix = stack.pop()
+            for index, node in enumerate(nodes):
+                if node is target:
+                    return prefix + [index]
+                if isinstance(node, Element) and node.children:
+                    stack.append((node.children, prefix + [index]))
+        return None
 
     def init_root(self) -> None:
         """Run the root component's ``on_init`` (as a task if it is async).
@@ -238,9 +284,10 @@ class Renderer:
 
     def render(self) -> list[Node]:
         self._busy += 1
-        previous_handlers = self.handlers
+        previous_handlers, previous_refs = self.handlers, self._refs
         try:
             self.handlers = {}
+            self._refs = {}
             self._seen = set()
             out: list[Node] = []
             try:
@@ -248,8 +295,9 @@ class Renderer:
             except BaseException:
                 # The page still shows the last good render; keep its handlers
                 # working (matters most when a hot reload's render fails).
-                self.handlers = previous_handlers
+                self.handlers, self._refs = previous_handlers, previous_refs
                 raise
+            self._tree = out
             for inst_id in [i for i in self.instances if i not in self._seen]:
                 _dispose(self.instances.pop(inst_id))
             self.component._dirty = False
@@ -477,9 +525,15 @@ class Renderer:
         # child's <Slot>s show (and what has_slot() reports).
         instance.__dict__["_pw_slots"] = slots
 
+        # ref="..." on a component tag names the component's root element in
+        # the *parent's* refs; focus() on it then moves into the component.
+        ref = passthrough.pop("ref", None)
+
         before = len(out)
         self._emit(cls.__template__, Scope(instance), path, out, key)
         roots = [node for node in out[before:] if isinstance(node, Element)]
+        if ref and roots:
+            self._refs[(id(scope.component), ref)] = roots[0]
         # The parent's scoped styles may target the child's root element(s),
         # so those carry the parent's marker as well as the child's own.
         parent_scope = getattr(type(scope.component), "__scope__", None)
@@ -605,12 +659,19 @@ class Renderer:
         if tnode.bind:
             self._bind(tnode, scope, attrs, events, prefix)
 
+        ref = attrs.pop("ref", None)
+
         children: list[Node] = []
         self._emit(tnode.children, scope, path, children)
 
-        return Element(
+        element = Element(
             tag=tnode.tag, attrs=attrs, events=events, children=children, key=key
         )
+        if ref:
+            # The component that wrote the template owns the name, so a ref
+            # in slot content belongs to the parent that passed it.
+            self._refs[(id(scope.component), ref)] = element
+        return element
 
     # -------------------------------------------------------------- handlers
 

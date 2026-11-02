@@ -279,5 +279,55 @@ const PyWeftRuntime = (() => {
     }
   }
 
-  return { init, mount, applyOps };
+  // Elements the keyboard can reach. Focus guards (a dialog's Tab-wrapping
+  // sentinels) are reachable too but never a target themselves.
+  const FOCUSABLE =
+    'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), ' +
+    'select:not([disabled]), textarea:not([disabled]), [contenteditable="true"], ' +
+    '[tabindex]:not([tabindex="-1"])';
+
+  const focusables = (el) =>
+    [...el.querySelectorAll(FOCUSABLE)].filter(
+      (e) => !e.hasAttribute("data-focus-guard") && e.getClientRects().length
+    );
+
+  const savedFocus = [];
+
+  // Requests from Python's focus(), scroll_to() ... (Renderer.take_commands),
+  // run once the render they refer to is on the page. Not patch ops: they
+  // change no node, so dommodel.py has nothing to mirror.
+  function runCommands(commands) {
+    for (const cmd of commands) {
+      const el = cmd.path ? nodeAt(cmd.path) : null;
+      switch (cmd.op) {
+        case "focus": {
+          // A component's root is often a wrapper: focus what's inside.
+          const target = el && (el.matches(FOCUSABLE) || el.hasAttribute("tabindex") ? el : focusables(el)[0]);
+          target?.focus();
+          break;
+        }
+        case "focus_first":
+          el && focusables(el)[0]?.focus();
+          break;
+        case "focus_last":
+          el && focusables(el).at(-1)?.focus();
+          break;
+        case "scroll_to":
+          el?.scrollIntoView({ block: "nearest" });
+          break;
+        case "save_focus":
+          savedFocus.push(document.activeElement);
+          break;
+        case "restore_focus": {
+          const target = savedFocus.pop();
+          if (target && target.isConnected) target.focus();
+          break;
+        }
+        default:
+          throw new Error(`unknown command ${cmd.op}`);
+      }
+    }
+  }
+
+  return { init, mount, applyOps, runCommands };
 })();

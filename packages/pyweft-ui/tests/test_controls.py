@@ -13,6 +13,7 @@ from pyweft import (
     load_component,
     to_dicts,
 )
+from pyweft.dommodel import _node_at
 from pyweft.vdom import Element
 
 
@@ -215,15 +216,29 @@ def test_dialog_opens_and_closes_through_bind(tmp_path):
         "open: bool = False\nclosed: list = []",
     )
     assert find(tree, cls("backdrop")) is None
+    r.after_render()
     r.dispatch(find(tree, tag("button")).events["click"], {})
     tree = cycle(r, tree)
+    r.after_render()
     dialog = find(tree, cls("dialog"))
-    assert dialog.attrs["role"] == "dialog" and "autofocus" in dialog.attrs
+    assert dialog.attrs["role"] == "dialog" and dialog.attrs["tabindex"] == "-1"
     assert text([find(tree, cls("title"))]) == "Sure?"
-    # Esc on the backdrop closes it through @bind.
+    # Opening remembers where focus was and moves it into the dialog.
+    save, focus = r.take_commands()
+    assert save == {"op": "save_focus"} and focus["op"] == "focus"
+    assert _node_at(to_dicts(tree), focus["path"])["attrs"]["class"] == "dialog"
+    # Tabbing off either end lands on a guard that sends focus round.
+    first_guard, last_guard = [n for n in _walk(tree) if "guard" in n.attrs.get("class", "")]
+    r.dispatch(last_guard.events["focus"], {})
+    r.dispatch(first_guard.events["focus"], {})
+    assert [c["op"] for c in r.take_commands()] == ["focus_first", "focus_last"]
+    # Esc on the backdrop closes it through @bind, and focus goes back.
     r.dispatch(find(tree, cls("backdrop")).events["keydown.esc"], {"key": "Escape"})
     assert a.open is False and a.closed == [1]
-    assert find(cycle(r, tree), cls("backdrop")) is None
+    tree = cycle(r, tree)
+    r.after_render()
+    assert find(tree, cls("backdrop")) is None
+    assert r.take_commands() == [{"op": "restore_focus"}]
 
 
 def test_dialog_not_dismissible(tmp_path):
@@ -277,6 +292,23 @@ def test_tabs_without_bind_use_the_tab_slot_prop(tmp_path):
     assert text([find(tree, cls("panel"))]) == "showing 1"  # the first, before any click
     r.dispatch([n for n in _walk(tree) if n.attrs.get("role") == "tab"][1].events["click"], {})
     assert text([find(cycle(r, tree), cls("panel"))]) == "showing 2"
+
+
+def test_tabs_arrow_keys_choose_and_focus(tmp_path):
+    _, a, r, tree = app(tmp_path, '<div><ui.Tabs options="a, b, c" @bind="t" /></div>', 't = "a"')
+    tabs = [n for n in _walk(tree) if n.attrs.get("role") == "tab"]
+    assert [t.attrs["tabindex"] for t in tabs] == ["0", "-1", "-1"]
+    tablist = find(tree, lambda n: n.attrs.get("role") == "tablist")
+    for spec, expected in [("keydown.left.prevent", "c"), ("keydown.right.prevent", "a"),
+                           ("keydown.end.prevent", "c"), ("keydown.home.prevent", "a"),
+                           ("keydown.right.prevent", "b")]:
+        r.dispatch(tablist.events[spec], {"key": spec})
+        tree = cycle(r, tree)  # as the host does after every event
+        assert a.t == expected, spec
+    (*_, last) = r.take_commands()
+    assert _node_at(to_dicts(tree), last["path"])["children"][0]["text"] == "b"
+    tabs = [n for n in _walk(tree) if n.attrs.get("role") == "tab"]
+    assert [t.attrs["tabindex"] for t in tabs] == ["-1", "0", "-1"]
 
 
 def test_tabs_alone_render_no_panel(tmp_path):

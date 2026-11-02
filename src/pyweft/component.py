@@ -100,6 +100,50 @@ class Component:
             )
         return start(awaitable)
 
+    # ---------------------------------------------------------------- focus
+    # Requests carried out by the host once the next render is on the page,
+    # so they can name an element that this very handler makes appear.
+
+    def focus(self, ref: str) -> None:
+        """Move keyboard focus to the element marked ``ref="..."`` in this
+        component's template. On a component tag, focus goes to the first
+        thing inside it that can take focus."""
+        self._pw_request("focus", ref)
+
+    def focus_first(self, ref: str) -> None:
+        """Focus the first focusable element inside ``ref``."""
+        self._pw_request("focus_first", ref)
+
+    def focus_last(self, ref: str) -> None:
+        """Focus the last focusable element inside ``ref``."""
+        self._pw_request("focus_last", ref)
+
+    def scroll_to(self, ref: str) -> None:
+        """Scroll the page so the element marked ``ref`` is in view."""
+        self._pw_request("scroll_to", ref)
+
+    def save_focus(self) -> None:
+        """Remember what has focus now, for ``restore_focus()``: a popup
+        saves it as it opens and gives it back as it closes."""
+        self._pw_request("save_focus")
+
+    def restore_focus(self) -> None:
+        """Focus what the matching ``save_focus()`` remembered, if it is
+        still on the page."""
+        self._pw_request("restore_focus")
+
+    def _pw_request(self, op: str, ref: str | None = None) -> None:
+        command = self.__dict__.get("_pw_command")
+        if command is None:
+            raise RuntimeError(
+                f"{type(self).__name__}.{op}() needs the component to be rendered "
+                "(call it from on_init or later), and not yet removed"
+            )
+        command(op, ref)
+        # Even when nothing else changed, the host must render and settle to
+        # reach the point where it carries requests out.
+        self.state_has_changed()
+
     # ---------------------------------------------------------------- state
 
     def state_has_changed(self) -> None:

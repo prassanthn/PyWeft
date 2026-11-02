@@ -253,12 +253,12 @@ when done.
     <ui.Card title="Create your account">
       <form novalidate="" @submit.prevent="submit">
         <ui.Column>
-          <ui.TextField label="Email" type="email" required="true" autocomplete="email"
+          <ui.TextField ref="email" label="Email" type="email" required="true" autocomplete="email"
                         @bind="email" :error="errors.get('email', '')" />
-          <ui.TextField label="Password" type="password" required="true"
+          <ui.TextField ref="password" label="Password" type="password" required="true"
                         hint="At least 8 characters"
                         @bind="password" :error="errors.get('password', '')" />
-          <ui.Select label="Country" placeholder="Choose your country"
+          <ui.Select ref="country" label="Country" placeholder="Choose your country"
                      options="India, Netherlands, United States"
                      @bind="country" :error="errors.get('country', '')" />
           <ui.Checkbox @bind="agreed">I agree to the terms</ui.Checkbox>
@@ -300,6 +300,7 @@ def check(self):
 async def submit(self):
     self.errors = self.check()
     if self.errors:
+        self.focus(next(iter(self.errors)))   # the first field to fix
         return
     self.saving = True
     await asyncio.sleep(1)      # send it to your server here
@@ -319,6 +320,9 @@ How it fits together:
 - **`errors` is a dict of field name to message.** Each field shows
   `errors.get('email', '')`, so a field with no problem shows nothing.
   Setting `self.errors = {}` clears them all.
+- **`ref="email"` and `self.focus(...)`** put the cursor in the first field
+  that needs fixing. The refs match the keys of `errors`, so the first key
+  names the field.
 - **`:loading="saving"`** shows a spinner on the button and makes it
   unclickable while the `async` handler waits, so nobody submits twice.
 
@@ -890,9 +894,12 @@ readers and mobile devices work the way people expect:
 - **Alerts are announced:** `warning` and `danger` alerts interrupt, `info`
   and `success` wait politely.
 - **Dialogs** are announced as dialogs, move focus into themselves when they
-  open (so Esc closes them straight away), and close with Esc.
+  open (so Esc closes them straight away), keep Tab and Shift+Tab inside
+  while open, close with Esc, and give focus back to whatever had it
+  before, such as the button that opened them.
 - **Tabs** are announced as tabs, with the chosen one marked, and their
-  content as the chosen tab's panel.
+  content as the chosen tab's panel. The tab row is one Tab stop: the arrow
+  keys move between tabs, and Home and End jump to the first and last.
 - **Tables** use real table headings, and tell screen readers which column
   is sorted and which way.
 - **Toasts** are read out politely when they appear (`danger` ones
@@ -908,9 +915,15 @@ What you should add yourself:
   `Select` in section 12, and a `label` on `Tabs`.
 - Don't put the only copy of something important in a toast: it goes away.
   Show errors that need fixing next to what needs fixing.
+- After a failed submit, move focus to the first field with a problem, so
+  keyboard and screen reader users land on it. Give the control a `ref` and
+  call `focus()` (see [moving focus](../../../docs/getting-started.md#moving-focus-and-scrolling-ref)):
 
-Not done yet:
+  ```xml
+  <ui.TextField ref="email" label="Email" @bind="email" :error="errors.get('email', '')" />
+  ```
 
-- Dialogs don't keep Tab inside themselves, and don't return focus to the
-  button that opened them when they close.
-- Each tab is its own Tab stop; the arrow keys don't move between tabs.
+  ```python
+  if "email" in self.errors:
+      self.focus("email")
+  ```
