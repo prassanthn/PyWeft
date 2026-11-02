@@ -38,6 +38,7 @@
 
   <script>
     const MODULES = __PYWEFT_MODULES__;
+    // The app's .weft files and its own .py modules, written into /app.
     const APP_FILES = __PYWEFT_APP_FILES__;
     const PACKAGES = __PYWEFT_PACKAGES__;
     // Component libraries installed where `pyweft run`/`build` ran, shipped
@@ -414,7 +415,9 @@ def pyweft_hot_reload():
         pyodide.FS.writeFile(`/pyweft-src/pyweft/${name}`, src);
       }
       await writeLibraries(pyodide, LIBRARIES);
-      pyodide.runPython(`import sys; sys.path[:0] = ["/pyweft-src", "/pyweft-libs"]`);
+      // /app too, so a component can `import helpers` from helpers.py next
+      // to app.weft. A changed .py reloads the page: imports are cached.
+      pyodide.runPython(`import sys; sys.path[:0] = ["/pyweft-src", "/pyweft-libs", "/app"]`);
 
       pyodide.FS.mkdirTree("/app");
       for (const name of APP_FILES) {

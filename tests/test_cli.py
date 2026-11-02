@@ -233,6 +233,105 @@ def test_new_scaffolds_head_file_with_nothing_active(tmp_path):
     assert "max-width" in (target / "styles.css").read_text(encoding="utf-8")
 
 
+# ------------------------------------------------------- the app's .py modules
+
+
+def add_modules(app):
+    files = {
+        "helpers.py": "GREETING = 'hi'\n",
+        "models/__init__.py": "",
+        "models/order.py": "class Order: pass\n",
+        "_private/secret.py": "TOKEN = 'x'\n",  # _ folder: never shipped
+        "dist/old.py": "",  # build output
+        "node_modules/x.py": "",
+        "assets/vendored.py": "",  # assets/ is served as-is, not imported
+        "build-site.py": "",  # not an identifier: cannot be imported
+        "setup.py": "",
+        "conftest.py": "",
+    }
+    for rel, text in files.items():
+        path = app / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    return app
+
+
+def test_app_python_files_follow_component_folder_rules(tmp_path):
+    from pyweft.cli import app_python_files
+
+    app = add_modules(make_app(tmp_path))
+    assert app_python_files(app) == ["helpers.py", "models/__init__.py", "models/order.py"]
+
+
+def test_render_shell_lists_modules_with_components(tmp_path):
+    html = render_shell(add_modules(make_app(tmp_path)))
+    assert (
+        '["app.weft", "widget.weft", "helpers.py", "models/__init__.py", "models/order.py"]'
+        in html
+    )
+    assert "secret.py" not in html
+
+
+def test_build_copies_modules(tmp_path):
+    app = add_modules(make_app(tmp_path))
+    out = tmp_path / "site"
+    cmd_build(app, out)
+    assert (out / "app" / "helpers.py").read_text(encoding="utf-8") == "GREETING = 'hi'\n"
+    assert (out / "app" / "models" / "order.py").is_file()
+    shipped = {p.relative_to(out / "app").as_posix() for p in (out / "app").rglob("*.py")}
+    assert shipped == {"helpers.py", "models/__init__.py", "models/order.py"}
+
+
+def test_dev_server_serves_modules_and_nothing_else(tmp_path):
+    import threading
+    import urllib.error
+    import urllib.request
+
+    from pyweft.cli import make_dev_server
+
+    app = add_modules(make_app(tmp_path))
+    server = make_dev_server(app, 0, poll_interval=0.05)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        body = urllib.request.urlopen(f"{base}/app/models/order.py", timeout=5).read()
+        assert body == (app / "models" / "order.py").read_bytes()
+        for bad in ["/app/_private/secret.py", "/app/dist/old.py", "/app/setup.py",
+                    "/app/build-site.py", "/app/../helpers.py"]:
+            with pytest.raises(urllib.error.HTTPError) as err:
+                urllib.request.urlopen(base + bad, timeout=5)
+            assert err.value.code == 404, bad
+    finally:
+        server.shutdown_dev()
+
+
+def test_snapshot_watches_modules(tmp_path):
+    from pyweft.cli import snapshot
+
+    snap = snapshot(add_modules(make_app(tmp_path)))
+    assert {"helpers.py", "models/order.py"} <= snap.keys()
+    assert "_private/secret.py" not in snap and "setup.py" not in snap
+
+
+@pytest.mark.parametrize(
+    "old, new",
+    [
+        ({"helpers.py": (1, 1)}, {"helpers.py": (2, 1)}),  # edited
+        ({}, {"models/order.py": (1, 1)}),  # added
+        ({"helpers.py": (1, 1)}, {}),  # removed
+    ],
+)
+def test_module_change_reloads_the_page(old, new):
+    # An imported module stays in sys.modules: hot-swapping the components
+    # would keep running the old code, so the page starts over.
+    from pyweft.cli import describe_change
+
+    base = {"app.weft": (1, 1)}
+    change = describe_change({**base, **old}, {**base, "app.weft": (2, 1), **new})
+    assert change["type"] == "reload"
+    assert change["reason"] == f"{next(iter(old or new))} changed"
+
+
 @pytest.mark.parametrize(
     "name, ctype",
     [("a.svg", "image/svg+xml"), ("b.WOFF2", "font/woff2"), ("c.png", "image/png"),
