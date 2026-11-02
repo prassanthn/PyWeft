@@ -19,6 +19,7 @@ from .expressions import ExpressionError
 from .parser import TemplateError, parse_template, split_source
 from .renderer import EffectLoopError, Renderer
 from .routing import Link, navigate, router
+from .store import Store
 from .styles import collect_styles, scope_css
 from .vdom import Element, Node, Text, to_dicts
 
@@ -38,6 +39,7 @@ __all__ = [
     "router",
     "Link",
     "navigate",
+    "Store",
     "collect_styles",
     "scope_css",
     "diff",

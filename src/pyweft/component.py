@@ -30,6 +30,7 @@ from .parser import (
     parse_template,
     split_source,
 )
+from .store import Store
 from .styles import scope_css
 
 
@@ -256,8 +257,8 @@ def component_named(cls: type, tag: str) -> type | None:
 
 
 # Not props even though they live on the class: imports, nested classes,
-# methods, computed values.
-_NOT_PROPS = (types.ModuleType, type, property, staticmethod, classmethod)
+# methods, computed values, and shared stores (imported, not passed in).
+_NOT_PROPS = (types.ModuleType, type, property, staticmethod, classmethod, Store)
 
 
 @functools.lru_cache(maxsize=1024)

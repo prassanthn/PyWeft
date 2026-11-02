@@ -27,6 +27,7 @@ from .effects import dispose_effects, run_effects
 from .events import Event
 from .expressions import ExpressionError, Scope, eval_expr, render_parts, run_handler
 from .parser import TElement, TemplateError, TFill, TFor, TIf, TSlot, TStatic
+from .store import _renderers as _store_renderers
 from .styles import marker
 from .vdom import Element, Node, Text
 
@@ -148,12 +149,14 @@ class Renderer:
         # to raise it to. Unset, it goes to the event loop's exception handler.
         self.on_error: Callable[[BaseException], Any] | None = None
         self._busy = 0
+        self.rendering = False  # inside render(): a Store change needs no new render
         # ref="..." elements of the latest render, by (owning component, name),
         # and the focus/scroll requests waiting for take_commands().
         self._refs: dict[tuple[int, str], Element] = {}
         self._tree: list[Node] = []
         self._commands: list[tuple[Any, str, str | None]] = []
         self._watch(component)
+        _store_renderers.add(self)  # a shared Store's changes reach this host
 
     def _watch(self, component: Any) -> None:
         component.__dict__["_pw_invalidate"] = self._invalidated
@@ -284,6 +287,7 @@ class Renderer:
 
     def render(self) -> list[Node]:
         self._busy += 1
+        self.rendering = True
         previous_handlers, previous_refs = self.handlers, self._refs
         try:
             self.handlers = {}
@@ -306,6 +310,7 @@ class Renderer:
             return out
         finally:
             self._busy -= 1
+            self.rendering = False
 
     def after_render(self) -> bool:
         """Call once the latest render's patches have been applied.

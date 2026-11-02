@@ -7,6 +7,7 @@
         <Link to="/orders">Orders</Link>
         <Link to="/help">Help</Link>
       </nav>
+      <span class="pins">Pinned: {{ pins.count }}</span>
     </header>
     <main><Pages /></main>
   </div>
@@ -14,8 +15,10 @@
 
 <code>
 # Each .weft file in pages/ is a screen: pages/orders.weft is #/orders.
-# orders_data.py holds the data the pages share.
+# orders_data.py holds the data the pages share; pins.py is a Store, state
+# that any page changes and the header shows.
 from pyweft import Link, router
+from pins import pins
 
 Pages = router("pages")
 </code>
@@ -26,4 +29,5 @@ nav { display: flex; gap: 1rem; }
 nav a { color: #555; text-decoration: none; padding: 0.25rem 0; border-bottom: 2px solid transparent; }
 nav a.active { color: #111; border-bottom-color: #4f46e5; }
 main { padding: 1rem 0; }
+.pins { margin-left: auto; color: #555; font-size: 0.9rem; }
 </style>

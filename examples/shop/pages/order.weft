@@ -6,6 +6,7 @@
     <Else>
       <h1>Order #{{ id }}</h1>
       <p>{{ order['customer'] }}: {{ order['items'] }} items, ${{ order['total'] }}</p>
+      <button @click="pins.toggle(id)">{{ 'Unpin' if id in pins.ids else 'Pin' }} this order</button>
     </Else>
   </section>
 </template>
@@ -15,6 +16,7 @@
 import asyncio
 from pyweft.routing import back
 import orders_data
+from pins import pins
 
 route = "/orders/{id}"
 id: int = 0

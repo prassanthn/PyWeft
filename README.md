@@ -132,6 +132,9 @@ To see every control live, clone this repository and run
 - **Composition:** components inside components, with props, events, slots
   for passing content, and `@bind` on your own components. Organise them in
   folders, or install them as packages.
+- **Shared state:** a `Store` holds what many components use, like a cart
+  or the signed-in user; change it from anywhere and every page showing it
+  updates.
 - **Pages:** a `pages/` folder becomes your app's screens, with links, Back
   and Forward, typed values from the address (`/orders/{id}`), and a
   not-found page.
@@ -203,7 +206,7 @@ place where PyWeft tracks which fields you read.
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev          # also installs packages/pyweft-ui, editable
-uv run pytest                # 859 tests, including pyweft-ui's
+uv run pytest                # 868 tests, including pyweft-ui's
 uv run python examples/demo.py              # render -> event -> diff -> apply, no browser
 uv run pyweft run examples/todo             # the todo app
 uv run pyweft run packages/pyweft-ui/gallery  # every control
@@ -233,7 +236,8 @@ Under the hood:
 ## Roadmap
 
 **Done:** the render core and differ; the browser target; components with
-props, events, slots and component libraries; pages and navigation; events
+props, events, slots and component libraries; pages and navigation; shared
+state with stores; events
 with modifiers and `@bind` for every form control; moving focus from
 Python; effects; async handlers and Web Worker background work; scoped
 styles and CSS framework support; the `pyweft` CLI with hot reload and
@@ -243,8 +247,7 @@ gallery.
 **Next:** more controls (menus, a date picker, form validation); publishing
 `pyweft` and `pyweft-ui` to PyPI; a desktop host using pywebview.
 
-**Later:** shared state across components, mobile packaging with Briefcase,
-developer tools.
+**Later:** mobile packaging with Briefcase, developer tools.
 
 ## License
 

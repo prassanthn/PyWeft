@@ -37,6 +37,7 @@ JavaScript to write. The same render core will later drive desktop apps
    [@bind on components](#bind-on-your-own-components),
    [attributes on a component tag](#attributes-on-a-component-tag),
    [components from packages](#components-from-packages),
+   [shared state (Store)](#sharing-state-between-components-store),
    [Dynamic](#choosing-a-component-while-the-app-runs-dynamic),
    [pages and navigation](#pages-and-navigation)
 5. [Starting a new project](#5-starting-a-new-project):
@@ -74,7 +75,7 @@ To hack on the framework itself, clone it and install in editable mode:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev      # or: pip install -e ".[dev]"
-uv run pytest            # 859 tests should pass
+uv run pytest            # 868 tests should pass
 ```
 
 To see it working immediately, run the bundled todo app from the clone:
@@ -166,10 +167,10 @@ and a method call `shorten(self.title, 40)`, without `self` being slipped in
 as the first argument. (An imported function whose first parameter is named
 `self` is taken to be a method you want to share, and becomes one.)
 
-State belongs to the instance that declared it. To share data between
-components, pass it down as props and send changes up with `emit` (section
-4). A cross-component store is on the roadmap; it will sit on top of this
-model, not replace it.
+State belongs to the instance that declared it. To share data between a
+parent and its children, pass it down as props and send changes up with
+`emit` (section 4). For state that many components use, such as a cart, the
+signed-in user or settings, use a [store](#sharing-state-between-components-store).
 
 ### Lifecycle: when your code runs
 
@@ -1097,6 +1098,82 @@ browser:
 A dependency counts as a component library when its package folder contains
 `.weft` files; everything else is an ordinary package.
 
+### Sharing state between components: Store
+
+Some state belongs to the whole app rather than to one component: a cart
+that the header counts and every page adds to, the signed-in user, settings.
+Put it in a store, a class in one of your app's `.py` modules:
+
+```python
+# cart.py, next to app.weft
+from pyweft import Store
+
+class Cart(Store):
+    items: list = []
+
+    @property
+    def count(self):
+        return len(self.items)
+
+    def add(self, product):
+        self.items.append(product)
+
+    def clear(self):
+        self.items = []
+
+cart = Cart()
+```
+
+Any component imports it and uses it like its own state:
+
+```xml
+<!-- header.weft -->
+<template>
+  <header>Cart ({{ cart.count }})</header>
+</template>
+
+<code>
+from cart import cart
+</code>
+```
+
+```xml
+<!-- pages/product.weft -->
+<template>
+  <button @click="cart.add(name)">Add {{ name }} to cart</button>
+</template>
+
+<code>
+from cart import cart
+name: str = "Teapot"
+</code>
+```
+
+- **Everything showing it updates.** Clicking the button changes the cart,
+  and the header's count follows, though neither component knows the other.
+- **Changes from anywhere work**: a timer, an async task, a JavaScript
+  callback. Setting a field (`cart.items = [...]`) or calling one of the
+  store's methods (`cart.add(...)`) re-renders the page; an `async` method
+  does it when it finishes. Inside a handler you don't notice the
+  difference, since the page renders after every handler anyway.
+- **Change it through its methods** when you change something in place.
+  `cart.items.append(x)` from a timer, outside the store, isn't seen; call
+  `cart.changed()` after it, or better, give the store a method.
+- **Computed values are `@property`s**, like `count`. Methods are for
+  changes.
+- **Fields work like a component's:** declare them with a default, and a
+  mutable default (`items: list = []`) is copied for each store you create.
+  `Cart(items=["mug"])` starts with values of your own.
+- **Effects see stores too:** an `@effect` that reads `self.cart` (or reads
+  it through a property) runs again when the cart changes.
+- **One store object, everywhere.** It lives in a module, so every
+  component that imports it gets the same object, and it keeps its contents
+  while you navigate between pages and through hot reloads of `.weft` files
+  (editing the `.py` file itself reloads the page).
+
+A store is the right place for state that outlives one component. For state
+that only a component and its children use, props and `emit` stay simpler.
+
 ### Choosing a component while the app runs: Dynamic
 
 When *which* component to show is decided by your state, write `<Dynamic>`
@@ -1857,6 +1934,7 @@ Working today:
   components; attributes passed through to a component's root element;
   components in subfolders as `<folder.Name>`, or imported from packages
   (`ComponentLibrary`), shipped to the browser from your environment;
+  `Store` for state many components share;
   `<Dynamic :is>` for a component chosen at runtime.
 - **Pages:** `router("pages")` turns a folder into screens, with `<Link>`,
   `navigate()`, Back/Forward, typed `{params}` and query values as fields.

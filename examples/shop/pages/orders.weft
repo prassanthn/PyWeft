@@ -11,7 +11,8 @@
     <ul>
       <For each="order in shown" key="order['id']">
         <li><Link :to="'/orders/' + str(order['id'])">#{{ order['id'] }}</Link>
-          {{ order['customer'] }} ({{ order['status'] }})</li>
+          {{ order['customer'] }} ({{ order['status'] }})
+          <If cond="order['id'] in pins.ids"><b>pinned</b></If></li>
       </For>
     </ul>
   </section>
@@ -21,6 +22,7 @@
 # Shown at #/orders; ?status=paid fills the `status` field.
 from pyweft import Link
 from orders_data import ORDERS
+from pins import pins
 
 status: str = "all"
 
