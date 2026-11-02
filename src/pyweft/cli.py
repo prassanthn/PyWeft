@@ -1,9 +1,10 @@
 """The ``pyweft`` command line: scaffold, serve, and build apps.
 
 A pyweft app is a directory of ``.weft`` files with ``app.weft`` as the root,
-any plain ``.py`` modules they import, plus an ordinary ``pyproject.toml``. Dependencies declared there (with ``uv
-add`` or by hand) are installed *in the browser* by micropip at page load, so
-the same file drives local tooling and the runtime. Only pure-Python wheels or
+any plain ``.py`` modules they import, and an ordinary ``pyproject.toml``.
+Dependencies declared there (with ``uv add`` or by hand) are installed *in
+the browser* by micropip at page load, so the same file drives local tooling
+and the runtime. Only pure-Python wheels or
 packages Pyodide ships prebuilt will work -- the browser can't compile C.
 """
 
