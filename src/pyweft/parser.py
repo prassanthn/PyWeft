@@ -409,6 +409,11 @@ def _convert_element(el: ET.Element) -> TElement:
         else:
             attrs[name] = parse_interpolation(value)
 
+    if el.tag == "Dynamic" and "is" not in expr_attrs:
+        raise TemplateError(
+            '<Dynamic> needs :is="..." naming the component class to render'
+        )
+
     return TElement(
         tag=el.tag,
         attrs=attrs,

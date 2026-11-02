@@ -188,7 +188,7 @@ def component_from_source(
     return type(name, (base,), namespace)
 
 
-_CONTROL_TAGS = {"If", "ElseIf", "Else", "For", "Slot", "Fill"}
+_CONTROL_TAGS = {"If", "ElseIf", "Else", "For", "Slot", "Fill", "Dynamic"}
 
 
 def is_component_tag(tag: str) -> bool:

@@ -14,6 +14,7 @@ a no-op rather than a crash.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import functools
 import inspect
 import sys
@@ -21,7 +22,7 @@ from functools import partial
 from typing import Any, Awaitable, Callable
 
 from .binding import KEEP, bind_kind, convert, declared_type, prop_value
-from .component import component_named, declared_props, is_component_tag
+from .component import Component, component_named, declared_props, is_component_tag
 from .effects import dispose_effects, run_effects
 from .events import Event
 from .expressions import ExpressionError, Scope, eval_expr, render_parts, run_handler
@@ -311,7 +312,9 @@ class Renderer:
                     f"k:{node_key}" if node_key is not None else f"i:{len(out)}"
                 )
                 comp_cls = self._resolve_component(scope, tnode.tag)
-                if comp_cls is not None:
+                if tnode.tag == "Dynamic":
+                    self._dynamic(tnode, scope, path + [segment], out, node_key)
+                elif comp_cls is not None:
                     self._component(
                         comp_cls, tnode, scope, path + [segment], out, node_key
                     )
@@ -379,6 +382,27 @@ class Renderer:
         # components they imported.
         return found if found is not None else component_named(owner, tag)
 
+    def _dynamic(
+        self, tnode: TElement, scope: Scope, path: list[str], out: list[Node], key: Any
+    ) -> None:
+        """``<Dynamic :is="cls" :props="mapping" />``: the component comes from
+        an expression, so what renders here can change between renders. A
+        different class disposes the old instance and creates a new one, as
+        for any child; ``None`` renders nothing. ``:props`` passes props by
+        name, for when which ones apply depends on the class."""
+        expr_attrs = dict(tnode.expr_attrs)
+        cls = eval_expr(expr_attrs.pop("is"), scope)
+        extra = eval_expr(expr_attrs.pop("props"), scope) if "props" in expr_attrs else None
+        if cls is None:
+            return
+        if not (isinstance(cls, type) and issubclass(cls, Component)):
+            raise TemplateError(
+                f'<Dynamic :is="{tnode.expr_attrs["is"]}">: expected a component '
+                f"class, got {cls!r}"
+            )
+        named = dataclasses.replace(tnode, tag=cls.__name__, expr_attrs=expr_attrs)
+        self._component(cls, named, scope, path, out, key, dict(extra or {}))
+
     def _component(
         self,
         cls: type,
@@ -387,6 +411,7 @@ class Renderer:
         path: list[str],
         out: list[Node],
         key: Any,
+        extra: dict[str, Any] | None = None,
     ) -> None:
         if tnode.bind_mods:
             raise TemplateError(
@@ -401,6 +426,12 @@ class Renderer:
         declared = declared_props(cls)
         props: dict[str, Any] = {}
         passthrough: dict[str, str] = {}
+        # A <Dynamic :props> mapping first, so attributes written out win.
+        for name, value in (extra or {}).items():
+            if name in declared:
+                props[name] = value
+            elif value is not None and value is not False:
+                passthrough[name] = "" if value is True else str(value)
         for name, parts in tnode.attrs.items():
             value = render_parts(parts, scope)
             if name in declared:
