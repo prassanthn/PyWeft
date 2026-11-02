@@ -125,10 +125,15 @@ To see every control live, clone this repository and run
     in sync.
   - **Events:** `@click="method"` handles an event, with modifiers like
     `@submit.prevent` and `@keydown.enter`.
+  - **Focus:** `ref="name"` marks an element; `self.focus("name")` and
+    `self.scroll_to("name")` move the keyboard focus or the page to it.
   - **Control flow:** `<If>`, `<ElseIf>`, `<Else>` and `<For>`.
 - **Composition:** components inside components, with props, events, slots
   for passing content, and `@bind` on your own components. Organise them in
   folders, or install them as packages.
+- **Pages:** a `pages/` folder becomes your app's screens, with links, Back
+  and Forward, typed values from the address (`/orders/{id}`), and a
+  not-found page.
 - **Effects:** `@effect` methods re-run when the state they read changes.
 - **Async:** `async def` handlers, plus `run_in_background()` to run heavy
   Python in a Web Worker so the page never freezes.
@@ -145,6 +150,7 @@ To see every control live, clone this repository and run
 |---|---|
 | Learn the basics: state, templates, events | [Getting started](docs/getting-started.md), sections 1–3 |
 | Split an app into components, use slots | [Composing components](docs/getting-started.md#4-composing-components) |
+| Build an app with several pages | [Pages and navigation](docs/getting-started.md#pages-and-navigation) |
 | Handle forms and keyboard input | [Binding form controls](docs/getting-started.md#binding-form-controls), [event modifiers](docs/getting-started.md#event-modifiers) |
 | Load data, run async code, do heavy work | [Async handlers](docs/getting-started.md#async-handlers-and-background-work), [`run_in_background`](docs/getting-started.md#heavy-work-run_in_background) |
 | Style with Tailwind or Bootstrap | [Using CSS frameworks](docs/getting-started.md#using-css-frameworks) |
@@ -152,8 +158,8 @@ To see every control live, clone this repository and run
 | Deploy your app | [Building for deployment](docs/getting-started.md#building-for-deployment) |
 | Test components without a browser | [Using the engine from plain Python](docs/getting-started.md#6-using-the-engine-from-plain-python) |
 
-`examples/todo/` is a small complete app; run it from a clone with
-`uv run pyweft run examples/todo`.
+`examples/todo/` is a small complete app, and `examples/shop/` one with
+pages; run them from a clone with `uv run pyweft run examples/todo`.
 
 ## Good to know
 
@@ -191,7 +197,7 @@ place where PyWeft tracks which fields you read.
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev          # also installs packages/pyweft-ui, editable
-uv run pytest                # 807 tests, including pyweft-ui's
+uv run pytest                # 843 tests, including pyweft-ui's
 uv run python examples/demo.py              # render -> event -> diff -> apply, no browser
 uv run pyweft run examples/todo             # the todo app
 uv run pyweft run packages/pyweft-ui/gallery  # every control
@@ -204,7 +210,7 @@ src/pyweft/           the framework (zero runtime dependencies)
   static/             the browser side: runtime.js, the page shell, the worker
 packages/pyweft-ui/   the control toolkit, released as its own package
 docs/                 the guide
-examples/             a headless demo and the todo app
+examples/             a headless demo, the todo app and the shop (pages)
 tests/                the framework's tests
 ```
 
@@ -221,13 +227,15 @@ Under the hood:
 ## Roadmap
 
 **Done:** the render core and differ; the browser target; components with
-props, events, slots and component libraries; events with modifiers and
-`@bind` for every form control; effects; async handlers and Web Worker
-background work; scoped styles and CSS framework support; the `pyweft` CLI
-with hot reload and static builds; `pyweft-ui` with 22 controls and a gallery.
+props, events, slots and component libraries; pages and navigation; events
+with modifiers and `@bind` for every form control; moving focus from
+Python; effects; async handlers and Web Worker background work; scoped
+styles and CSS framework support; the `pyweft` CLI with hot reload and
+static builds; `pyweft-ui` with 22 keyboard-accessible controls and a
+gallery.
 
-**Next:** more controls (menus, a date picker, form validation); publishing `pyweft` and `pyweft-ui` to PyPI; a desktop host
-using pywebview.
+**Next:** more controls (menus, a date picker, form validation); publishing
+`pyweft` and `pyweft-ui` to PyPI; a desktop host using pywebview.
 
 **Later:** shared state across components, mobile packaging with Briefcase,
 developer tools.

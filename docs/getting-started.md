@@ -29,12 +29,15 @@ JavaScript to write. The same render core will later drive desktop apps
 3. [Template syntax reference](#3-template-syntax-reference): bindings,
    inline handlers, [the event object](#the-event-object),
    [event modifiers](#event-modifiers),
-   [binding form controls](#binding-form-controls), component styles
+   [binding form controls](#binding-form-controls),
+   [focus and scrolling](#moving-focus-and-scrolling-ref), component styles
 4. [Composing components](#4-composing-components): props, events,
    components in folders, [slots](#passing-content-slots),
    [@bind on components](#bind-on-your-own-components),
    [attributes on a component tag](#attributes-on-a-component-tag),
-   [components from packages](#components-from-packages)
+   [components from packages](#components-from-packages),
+   [Dynamic](#choosing-a-component-while-the-app-runs-dynamic),
+   [pages and navigation](#pages-and-navigation)
 5. [Starting a new project](#5-starting-a-new-project):
    [hot reload](#hot-reload), [the loading screen](#the-loading-screen),
    [head.html and assets](#the-page-head-and-the-assets-folder),
@@ -69,7 +72,7 @@ To hack on the framework itself, clone it and install in editable mode:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev      # or: pip install -e ".[dev]"
-uv run pytest            # 807 tests should pass
+uv run pytest            # 843 tests should pass
 ```
 
 To see it working immediately, run the bundled todo app from the clone:
@@ -607,6 +610,53 @@ template instead of in your method:
   <input @bind="query" @input="search()" />
   ```
 
+### Moving focus and scrolling: ref
+
+Mark an element with `ref="name"`, then move keyboard focus to it or scroll
+to it from Python:
+
+```xml
+<template>
+  <form @submit.prevent="save">
+    <input ref="title" @bind="title" />
+    <If cond="error"><p ref="problem" class="error">{{ error }}</p></If>
+    <button>Save</button>
+  </form>
+</template>
+
+<code>
+title: str = ""
+error: str = ""
+
+def on_init(self):
+    self.focus("title")           # ready to type as soon as it shows
+
+def save(self):
+    if not self.title:
+        self.error = "Give it a title"
+        self.scroll_to("problem")  # the <p> appears in this same render
+        self.focus("title")
+</code>
+```
+
+- **Requests wait for the render**, so they can name an element that the
+  same handler makes appear, like `problem` above.
+- `ref` on a component tag (`<ui.TextField ref="email" />`) names the
+  component; `focus()` then goes to the first thing inside it that takes
+  focus, such as its input.
+- In a loop, make each name unique: `ref="row-{{ i }}"`.
+- A name that isn't on the page when the request is carried out is
+  ignored.
+
+| Method | Does |
+|---|---|
+| `focus(ref)` | focuses the element (or the first focusable thing inside it) |
+| `focus_first(ref)`, `focus_last(ref)` | focuses the first or last focusable element inside |
+| `scroll_to(ref)` | scrolls the page just enough to show the element |
+| `save_focus()`, `restore_focus()` | remembers what has focus, and later puts it back, for popups |
+
+`ref` is not written to the page as an attribute.
+
 ### Component styles
 
 A `<style>` block in a `.weft` file is **scoped to that component**: its
@@ -973,6 +1023,143 @@ browser:
 
 A dependency counts as a component library when its package folder contains
 `.weft` files; everything else is an ordinary package.
+
+### Choosing a component while the app runs: Dynamic
+
+When *which* component to show is decided by your state, write `<Dynamic>`
+and give it the class with `:is`:
+
+```xml
+<Dynamic :is="EDITORS[shape]" :value="settings" @update="save(event)" />
+```
+
+```python
+from pyweft import load_component
+EDITORS = {"circle": load_component("circle_editor.weft"),
+           "square": load_component("square_editor.weft")}
+shape: str = "circle"
+```
+
+- **Switching the class replaces the component:** the old one's
+  `on_dispose` runs, and the new one starts fresh with `on_init`.
+- **`:is="None"` shows nothing.**
+- **Attributes, events, `@bind` and slot content** work as on any component
+  tag. `:props="mapping"` passes props by name too, for when which ones
+  apply depends on the class; attributes written out win over it.
+- A `key="..."` on it makes a new key mean a new instance even when the
+  class stays the same.
+
+### Pages and navigation
+
+An app with several screens keeps them in a `pages/` folder, one `.weft` file
+per page, and shows the current one with a router:
+
+```
+myapp/
+  app.weft
+  pages/
+    index.weft        /
+    orders.weft       /orders
+    order.weft        /orders/7 (its route says so, below)
+    settings/
+      user_profile.weft   /settings/user-profile
+    not_found.weft    any address without a page
+```
+
+```xml
+<!-- app.weft -->
+<template>
+  <div>
+    <nav>
+      <Link to="/">Home</Link>
+      <Link to="/orders">Orders</Link>
+    </nav>
+    <main><Pages /></main>
+  </div>
+</template>
+
+<code>
+from pyweft import Link, router
+
+Pages = router("pages")
+</code>
+```
+
+`<Pages />` shows the page for the current address; everything around it
+(the nav here) stays put. The address is the part after `#` in the browser
+(`http://localhost:8642/#/orders`), so Back, Forward, bookmarks and reloading
+all work, and a built app needs no special server setup.
+
+**URLs come from file names.** `index.weft` is its folder's address, a
+folder adds a segment, and `_` in a name becomes `-`. Files and folders
+starting with `_` are not pages. Keep components that pages share somewhere
+else, such as next to `app.weft` or in a `components/` folder (used as
+`<components.OrderRow>`), since every file in `pages/` is a page.
+
+**Values from the address arrive as fields.** A page can set its own
+address with `route`, with `{name}` for a part that varies:
+
+```xml
+<!-- pages/order.weft -->
+<template>
+  <section>
+    <h1>Order #{{ id }}</h1>
+    <If cond="order is None"><p>Loading…</p></If>
+    <Else><p>{{ order['customer'] }}</p></Else>
+  </section>
+</template>
+
+<code>
+route = "/orders/{id}"
+id: int = 0
+order = None
+
+async def on_init(self):
+    self.order = await fetch_order(self.id)
+</code>
+```
+
+`id` is converted to the type the page declares, so `/orders/7` gives the
+`int` 7 and `/orders/abc` is not this page at all (it shows `not_found`).
+Query parameters fill fields too: `/orders?status=paid` sets the orders
+page's `status: str = "all"` field to `"paid"`. When two routes could match,
+the fixed one wins: `pages/orders/new.weft` takes `/orders/new` before
+`/orders/{id}` sees it.
+
+**Every address is a fresh page.** Going from `/orders/7` to `/orders/8`, or
+from `?status=paid` to `?status=pending`, creates a new page component, so
+`on_init` loads its data again and fields not in the address start at their
+defaults.
+
+**Links:** `<Link to="/orders">` is a link (`<a href="#/orders">`) that gets
+`class="active"` and `aria-current="page"` while its page, or one below it,
+is showing; add `exact="true"` to match only that address. Ctrl- and
+Cmd-clicks open a new tab as usual. A plain `<a href="#/orders">` works too,
+just without the active marking.
+
+**From code:**
+
+```python
+from pyweft import navigate
+from pyweft.routing import back, location
+
+navigate("/orders/7")                            # go there
+navigate("/orders", query={"status": "paid"})    # /orders?status=paid
+navigate("/login", replace=True)                 # Back won't return here
+back()                                           # the Back button
+location().path, location().query                # "/orders", {"status": "paid"}
+```
+
+Calling `navigate()` in a page's `on_init` redirects: the new page replaces
+it before anything is shown. Use `replace=True` there so Back doesn't land on
+the redirect again.
+
+**The page for unknown addresses** is `pages/not_found.weft`; declare
+`path: str = ""` in it to show the address that was asked for. Without the
+file, a plain "There is no page at …" message is shown.
+
+`examples/shop/` is a small app using all of this:
+`uv run pyweft run examples/shop`.
 
 ---
 
@@ -1519,12 +1706,16 @@ Working today:
   `@bind` for every form control, event handlers (methods, expressions or
   inline statements) with modifiers (`@submit.prevent`, `@keydown.enter`)
   and a detailed event object (keys, modifier keys, mouse, form fields),
-  `<If>`/`<For>` with keyed lists, `@property` computed values.
+  `<If>`/`<For>` with keyed lists, `@property` computed values, `ref=` with
+  `focus()` and `scroll_to()`.
 - **Composition:** child components with props, events (`emit`) and
   lifecycle hooks; slots (named, with fallbacks and slot props); `@bind` on
   components; attributes passed through to a component's root element;
   components in subfolders as `<folder.Name>`, or imported from packages
-  (`ComponentLibrary`), shipped to the browser from your environment.
+  (`ComponentLibrary`), shipped to the browser from your environment;
+  `<Dynamic :is>` for a component chosen at runtime.
+- **Pages:** `router("pages")` turns a folder into screens, with `<Link>`,
+  `navigate()`, Back/Forward, typed `{params}` and query values as fields.
 - **Reacting to change:** `@effect` methods with automatic dependency
   tracking and cleanup; `state_has_changed()` for changes from timers and
   callbacks.
