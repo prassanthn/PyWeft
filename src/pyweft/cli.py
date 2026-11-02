@@ -1,7 +1,7 @@
 """The ``pyweft`` command line: scaffold, serve, and build apps.
 
 A pyweft app is a directory of ``.weft`` files with ``app.weft`` as the root,
-plus an ordinary ``pyproject.toml``. Dependencies declared there (with ``uv
+any plain ``.py`` modules they import, plus an ordinary ``pyproject.toml``. Dependencies declared there (with ``uv
 add`` or by hand) are installed *in the browser* by micropip at page load, so
 the same file drives local tooling and the runtime. Only pure-Python wheels or
 packages Pyodide ships prebuilt will work -- the browser can't compile C.
@@ -98,6 +98,26 @@ def app_pyweft_files(app_dir: Path) -> list[str]:
 
 def app_css_files(app_dir: Path) -> list[str]:
     return _app_files(app_dir, ".css")
+
+
+# Python files an app folder may hold that are tooling, not app modules.
+_NOT_MODULES = {"setup.py", "conftest.py", "noxfile.py"}
+
+
+def app_python_files(app_dir: Path) -> list[str]:
+    """The app's own modules (``orders_data.py``, ``models/__init__.py``),
+    shipped to ``/app`` so components can import them. A name that is not
+    an identifier (``build-site.py``) cannot be imported, so it stays home."""
+    return [
+        rel
+        for rel in _app_files(app_dir, ".py")
+        if Path(rel).stem.isidentifier() and Path(rel).name not in _NOT_MODULES
+    ]
+
+
+def app_shipped_files(app_dir: Path) -> list[str]:
+    """Everything the shell writes into ``/app``: components, then modules."""
+    return app_pyweft_files(app_dir) + app_python_files(app_dir)
 
 
 def app_assets(app_dir: Path) -> list[str]:
@@ -338,7 +358,7 @@ def render_shell(app_dir: Path, dev: bool = False, since: int = 0) -> str:
     html = (
         html.replace("__PYWEFT_TITLE__", app_dir.resolve().name)
         .replace("__PYWEFT_MODULES__", json.dumps(pyweft_modules()))
-        .replace("__PYWEFT_APP_FILES__", json.dumps(app_pyweft_files(app_dir)))
+        .replace("__PYWEFT_APP_FILES__", json.dumps(app_shipped_files(app_dir)))
         .replace("__PYWEFT_PACKAGES__", json.dumps(browser_packages(app_dir)))
         .replace(
             "__PYWEFT_LIBRARIES__",
@@ -442,7 +462,7 @@ def cmd_new(target: Path) -> None:
 
 
 def cmd_build(app_dir: Path, out: Path) -> None:
-    files = app_pyweft_files(app_dir)  # validates app.weft exists first
+    files = app_shipped_files(app_dir)  # validates app.weft exists first
     html = render_shell(app_dir)
     if out.exists():
         shutil.rmtree(out)
@@ -487,10 +507,12 @@ _STALE_MESSAGE = (
 
 def snapshot(app_dir: Path) -> dict[str, tuple[int, int]]:
     """(mtime, size) of everything a change notification is sent for: the
-    app's .weft/.css files, its startup files and assets, and the framework
-    itself (so editing PyWeft while running an app reloads the page too)."""
+    app's .weft/.css/.py files, its startup files and assets, and the
+    framework itself (so editing PyWeft while running an app reloads the
+    page too)."""
     entries: dict[str, Path] = {}
-    for rel in _app_files(app_dir, ".weft") + _app_files(app_dir, ".css"):
+    shipped = _app_files(app_dir, ".weft") + _app_files(app_dir, ".css")
+    for rel in shipped + app_python_files(app_dir):
         entries[rel] = app_dir / rel
     for name in _STARTUP_FILES:
         entries[name] = app_dir / name
@@ -515,8 +537,9 @@ def snapshot(app_dir: Path) -> dict[str, tuple[int, int]]:
 def describe_change(old: dict, new: dict) -> dict | None:
     """The message for the browser, or None if nothing changed.
 
-    ``reload`` when a startup, asset or framework file changed (an image or
-    font may be referenced from anywhere, so nothing short of a reload is
+    ``reload`` when a startup, asset, framework or app ``.py`` file changed
+    (an image or font may be referenced from anywhere, and an imported
+    module stays cached in ``sys.modules``, so nothing short of a reload is
     sure to show it); otherwise ``update`` listing changed/added and removed
     .weft and .css files, which the page applies without losing state.
     """
@@ -524,7 +547,11 @@ def describe_change(old: dict, new: dict) -> dict | None:
     if not touched:
         return None
     for key in touched:
-        if key.startswith((_FRAMEWORK, _ASSET, _LIB)) or key in _STARTUP_FILES:
+        if (
+            key.startswith((_FRAMEWORK, _ASSET, _LIB))
+            or key in _STARTUP_FILES
+            or key.endswith(".py")
+        ):
             name = key[len(_FRAMEWORK) :] if key.startswith(_FRAMEWORK) else key
             return {"type": "reload", "reason": f"{name} changed"}
 
@@ -636,7 +663,7 @@ def make_dev_server(
                 # Only paths the app actually ships, so a crafted URL cannot
                 # reach anything else on disk.
                 rel = route[len("/app/") :]
-                if rel in app_pyweft_files(app_dir) or rel in app_css_files(app_dir):
+                if rel in app_shipped_files(app_dir) or rel in app_css_files(app_dir):
                     ctype = "text/css" if rel.endswith(".css") else "text/plain"
                     return self._file(app_dir / rel, ctype)
             if route.startswith("/lib/"):

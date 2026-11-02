@@ -349,7 +349,8 @@ The worker is a separate copy of Python, which sets the rules:
 - **Arguments and the result must be picklable**: numbers, strings, lists,
   dicts, tuples, sets, dates, and objects from installed packages (NumPy
   arrays, for example). Instances of classes defined in a `.weft` file are
-  not. Everything is copied in and out, so a list the function changes in
+  not; define the class in one of your app's `.py` modules instead (section
+  5). Everything is copied in and out, so a list the function changes in
   the worker is not changed on the page.
 - **Exceptions come back**: `ValueError` in the worker raises `ValueError`
   at the `await`, and the error overlay shows both lines, the `await` and the
@@ -1193,6 +1194,24 @@ build` pick up `.weft` and `.css` files in subfolders too. They skip folders
 a tag cannot name (`.venv`, anything starting with `_`), `node_modules`,
 `assets/` (served as-is, see below), and build output such as `dist/`.
 
+Plain Python modules work the same way. Put shared data or helper functions
+in a `.py` file next to `app.weft` (or in a package folder with an
+`__init__.py`) and import it from any component's `<code>` block:
+
+```
+myapp/
+  app.weft
+  orders_data.py    # ORDERS = [...], def total(order): ...
+  pages/
+    orders.weft     # <code> import orders_data </code>
+```
+
+The app folder is on the import path in the browser, and in the
+`run_in_background` worker too. `.py` files follow the same folder rules as
+components, so keep scripts that must not reach the browser (a deploy script
+with a token in it, say) in a `_`-prefixed folder or outside the app folder:
+everything else **is shipped to visitors**.
+
 ### Hot reload
 
 While `pyweft run` is serving, every save shows up in the open page within
@@ -1203,6 +1222,7 @@ you'd typed, toggles you'd set. What happens depends on what you saved:
 |---|---|---|
 | a `.weft` file: template, `<code>` or `<style>` | recompiles it and patches only what changed | kept |
 | a global `.css` file | swaps the stylesheet, in the same place | kept |
+| a `.py` module of your app | reloads (Python keeps imported modules cached) | reset |
 | `pyproject.toml`, `head.html` or `loading.html` | reloads (they only apply at startup) | reset |
 | anything in `assets/` | reloads (an image may be used anywhere) | reset |
 
@@ -1579,7 +1599,7 @@ dist/
   runtime.js        applies DOM patches, sends events back to Python
   worker.js         the Web Worker for run_in_background (started on first use)
   pyweft-src/*.py   the framework, served to the browser
-  app/              your .weft components and .css files, copied as-is
+  app/              your .weft components, .py modules and .css files, as-is
   assets/           your assets/ folder, copied as-is
 ```
 
