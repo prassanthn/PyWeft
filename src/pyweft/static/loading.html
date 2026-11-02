@@ -6,10 +6,19 @@
   Edit freely; this is plain HTML and CSS.
   - Any element with a data-pyweft-status attribute receives progress
     messages ("Installing packages...", and the error if startup fails).
-  - While loading, the wrapper element is #pyweft-loading. It gets the
-    pyweft-failed class if startup fails.
+  - While loading, the wrapper element is #pyweft-loading. Its
+    data-pyweft-step attribute says what is happening: python (downloading
+    and starting Python), packages (installing your dependencies; skipped
+    when there are none), app (loading your components), then ready. The
+    --pyweft-progress variable goes 0 to 1 with them, for a progress bar:
+    width: calc(var(--pyweft-progress, 0) * 100%).
+  - It gets the pyweft-failed class if startup fails.
   - Delete this file to go back to PyWeft's built-in loading screen, or leave
     it empty to show no loading screen at all.
+
+  This one weaves a little cloth: each step finishes two rows, and the
+  shuttle runs along the row in progress. Set --pyweft-loader-color on
+  #pyweft-loading to colour the threads.
 -->
 <style>
   .pyweft-loader {
@@ -24,19 +33,36 @@
     color: CanvasText;
     font-family: system-ui, sans-serif;
   }
-  .pyweft-loader__threads {
-    display: grid;
-    gap: 8px;
-    width: 4.5rem;
+  .pyweft-weave {
+    width: 5.5rem;
+    height: auto;
+    overflow: visible;
+    color: var(--pyweft-loader-color, currentColor);
   }
-  .pyweft-loader__threads span {
-    height: 5px;
-    border-radius: 3px;
-    background: currentColor;
-    animation: pyweft-weave 1.4s ease-in-out infinite;
+  .pyweft-weave line, .pyweft-weave path { fill: none; stroke: currentColor; stroke-linecap: round; }
+  .pyweft-weave__warp line { stroke-width: 2; opacity: 0.3; }
+  .pyweft-weave__row { stroke-width: 4; opacity: 0; transition: opacity 0.35s ease; }
+  .pyweft-weave__shuttle {
+    stroke-width: 5;
+    opacity: 0;
+    transition: opacity 0.2s;
+    animation: pyweft-shuttle 0.9s ease-in-out infinite alternate;
   }
-  .pyweft-loader__threads span:nth-child(2) { animation-delay: -0.45s; }
-  .pyweft-loader__threads span:nth-child(3) { animation-delay: -0.9s; }
+  /* The row in progress is faint with the shuttle running along it; the rows
+     below it are finished. Before the first step is announced, it's Python. */
+  .pyweft-weave__row--1 { opacity: 0.3; }
+  .pyweft-weave__shuttle--1 { opacity: 1; }
+  [data-pyweft-step="packages"] .pyweft-weave__row--3,
+  [data-pyweft-step="app"] .pyweft-weave__row--5 { opacity: 0.3; }
+  [data-pyweft-step="packages"] :is(.pyweft-weave__row--1, .pyweft-weave__row--2),
+  [data-pyweft-step="app"] :is(.pyweft-weave__row--1, .pyweft-weave__row--2,
+                               .pyweft-weave__row--3, .pyweft-weave__row--4),
+  [data-pyweft-step="ready"] .pyweft-weave__row { opacity: 1; }
+  [data-pyweft-step]:not([data-pyweft-step="python"]) .pyweft-weave__shuttle--1 { opacity: 0; }
+  [data-pyweft-step="packages"] .pyweft-weave__shuttle--3,
+  [data-pyweft-step="app"] .pyweft-weave__shuttle--5 { opacity: 1; }
+  @keyframes pyweft-shuttle { to { transform: translateX(64px); } }
+
   .pyweft-loader__status {
     margin: 0 1.5rem;
     max-width: 36rem;
@@ -44,19 +70,33 @@
     font-size: 0.9rem;
     opacity: 0.65;
   }
-  @keyframes pyweft-weave {
-    0%, 100% { transform: translateX(-28%) scaleX(0.45); opacity: 0.35; }
-    50% { transform: translateX(28%) scaleX(0.45); opacity: 1; }
-  }
   @media (prefers-reduced-motion: reduce) {
-    .pyweft-loader__threads span { animation: none; opacity: 0.5; }
+    .pyweft-weave__shuttle { animation: none; visibility: hidden; }
+    .pyweft-weave__row { transition: none; }
   }
-  .pyweft-failed .pyweft-loader__threads span { animation: none; background: #c0392b; }
+  .pyweft-failed .pyweft-weave { color: #c0392b; }
+  .pyweft-failed .pyweft-weave__shuttle { visibility: hidden; }
   .pyweft-failed .pyweft-loader__status { color: #c0392b; opacity: 1; }
 </style>
 <div class="pyweft-loader">
-  <div class="pyweft-loader__threads" aria-hidden="true">
-    <span></span><span></span><span></span>
-  </div>
+  <svg class="pyweft-weave" viewBox="0 0 84 64" aria-hidden="true">
+    <g class="pyweft-weave__warp">
+      <line x1="12" y1="4" x2="12" y2="60" />
+      <line x1="24" y1="4" x2="24" y2="60" />
+      <line x1="36" y1="4" x2="36" y2="60" />
+      <line x1="48" y1="4" x2="48" y2="60" />
+      <line x1="60" y1="4" x2="60" y2="60" />
+      <line x1="72" y1="4" x2="72" y2="60" />
+    </g>
+    <path class="pyweft-weave__row pyweft-weave__row--1" d="M5 52H8.8 M15.2 52H32.8 M39.2 52H56.8 M63.2 52H79" />
+    <path class="pyweft-weave__row pyweft-weave__row--2" d="M5 44H20.8 M27.2 44H44.8 M51.2 44H68.8 M75.2 44H79" />
+    <path class="pyweft-weave__row pyweft-weave__row--3" d="M5 36H8.8 M15.2 36H32.8 M39.2 36H56.8 M63.2 36H79" />
+    <path class="pyweft-weave__row pyweft-weave__row--4" d="M5 28H20.8 M27.2 28H44.8 M51.2 28H68.8 M75.2 28H79" />
+    <path class="pyweft-weave__row pyweft-weave__row--5" d="M5 20H8.8 M15.2 20H32.8 M39.2 20H56.8 M63.2 20H79" />
+    <path class="pyweft-weave__row pyweft-weave__row--6" d="M5 12H20.8 M27.2 12H44.8 M51.2 12H68.8 M75.2 12H79" />
+    <line class="pyweft-weave__shuttle pyweft-weave__shuttle--1" x1="5" y1="52" x2="15" y2="52" />
+    <line class="pyweft-weave__shuttle pyweft-weave__shuttle--3" x1="5" y1="36" x2="15" y2="36" />
+    <line class="pyweft-weave__shuttle pyweft-weave__shuttle--5" x1="5" y1="20" x2="15" y2="20" />
+  </svg>
   <p class="pyweft-loader__status" data-pyweft-status>Starting…</p>
 </div>

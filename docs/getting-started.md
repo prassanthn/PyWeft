@@ -1275,9 +1275,11 @@ of it.
 Starting Python in the browser takes a few seconds on the first visit (the
 runtime is downloaded, then cached), so the page shows a loading screen until
 your app has rendered, then fades it out. `pyweft new` gives you the default
-one as `loading.html`: three threads weaving back and forth, with a line of
-progress text underneath. It follows the system's light or dark colors and
-calms down for visitors who prefer reduced motion.
+one as `loading.html`: a small piece of cloth being woven, two rows for each
+startup step, with a line of progress text underneath. It follows the
+system's light or dark colors (set `--pyweft-loader-color` on
+`#pyweft-loading` to tint it) and stays still for visitors who prefer
+reduced motion.
 
 The file is plain HTML and CSS, inserted into the page before anything else
 loads, so change it however you like. Replace the animation, add your logo,
@@ -1298,6 +1300,20 @@ set your brand colors:
 - **Progress messages** ("Loading Python…", "Installing humanize…") go into
   every element with a `data-pyweft-status` attribute. Leave it out if you
   don't want them.
+- **Progress you can style:** the wrapper `#pyweft-loading` gets
+  `data-pyweft-step="python"`, then `"packages"` (only when the app has
+  dependencies), `"app"` and finally `"ready"` as it fades out, and the CSS
+  variable `--pyweft-progress` goes from 0 to 1 with them. A progress bar
+  needs no JavaScript:
+
+  ```css
+  .bar { height: 3px; background: #1e3a5f;
+         width: calc(var(--pyweft-progress, 0) * 100%); transition: width .3s; }
+  #pyweft-loading[data-pyweft-step="packages"] .hint { display: block; }
+  ```
+
+  Downloading Python is most of a first visit, so the bar moves by step, not
+  by bytes.
 - **If startup fails**, the error appears in that same element, and the
   wrapper (`#pyweft-loading`) gets the class `pyweft-failed`, so you can style
   the failure state: `.pyweft-failed .splash { background: #7a1f1f; }`. The

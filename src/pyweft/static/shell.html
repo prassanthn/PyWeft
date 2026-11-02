@@ -187,6 +187,19 @@ def pyweft_hot_reload():
       }
     };
 
+    // Which startup step is running, for loading screens that show progress
+    // with CSS alone: #pyweft-loading[data-pyweft-step="packages"], or
+    // var(--pyweft-progress), 0 to 1. Downloading Python is most of a first
+    // visit, so progress is by step, not by bytes.
+    const STEPS = ["python", "packages", "app", "ready"];
+    const setStep = (step) => {
+      // On the root, so the pre-rendered page's progress bar sees it too.
+      const progress = STEPS.indexOf(step) / (STEPS.length - 1);
+      document.documentElement.style.setProperty("--pyweft-progress", progress);
+      const el = document.getElementById("pyweft-loading");
+      if (el) el.dataset.pyweftStep = step;
+    };
+
     function hideLoading() {
       const el = document.getElementById("pyweft-loading");
       if (!el) return;
@@ -424,17 +437,20 @@ def pyweft_hot_reload():
     }
 
     async function main() {
+      setStep("python");
       setStatus("Loading Python…");
       const pyodide = await loadPyodide();
       window.pyodide = pyodide; // console/devtools access to the live interpreter
 
       if (PACKAGES.length) {
+        setStep("packages");
         setStatus(`Installing ${PACKAGES.join(", ")}…`);
         await pyodide.loadPackage("micropip");
         const micropip = pyodide.pyimport("micropip");
         await micropip.install(pyodide.toPy(PACKAGES));
       }
 
+      setStep("app");
       setStatus("Loading app…");
       pyodide.FS.mkdirTree("/pyweft-src/pyweft");
       for (const name of MODULES) {
@@ -509,6 +525,7 @@ def pyweft_hot_reload():
       PyWeftRuntime.mount(JSON.parse(initial()));
       mounted = true;
       settle();
+      setStep("ready"); // lets a loading screen finish its picture as it fades
       hideLoading();
 
       // Back, forward, a typed address or a plain <a href="#/...">. Python

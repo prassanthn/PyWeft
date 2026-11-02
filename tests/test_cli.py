@@ -93,7 +93,7 @@ def test_new_refuses_nonempty_dir(tmp_path):
 def test_default_loading_screen_without_file(tmp_path):
     html = render_shell(make_app(tmp_path))
     assert "__PYWEFT_LOADING__" not in html
-    assert "pyweft-loader__threads" in html
+    assert "pyweft-weave" in html
     assert "data-pyweft-status" in html
 
 
@@ -104,7 +104,7 @@ def test_custom_loading_screen_replaces_default(tmp_path):
     )
     html = render_shell(app)
     assert '<div class="mine">' in html
-    assert "pyweft-loader__threads" not in html
+    assert "pyweft-weave" not in html
 
 
 def test_empty_loading_file_means_no_loading_screen(tmp_path):
