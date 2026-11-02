@@ -40,6 +40,7 @@ JavaScript to write. The same render core will later drive desktop apps
    [pages and navigation](#pages-and-navigation)
 5. [Starting a new project](#5-starting-a-new-project):
    [hot reload](#hot-reload), [the loading screen](#the-loading-screen),
+   [the first screen before Python starts](#the-first-screen-before-python-starts),
    [head.html and assets](#the-page-head-and-the-assets-folder),
    [CSS frameworks (Tailwind, Bootstrap)](#using-css-frameworks),
    [ready-made controls (pyweft-ui)](#ready-made-controls-pyweft-ui),
@@ -72,7 +73,7 @@ To hack on the framework itself, clone it and install in editable mode:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev      # or: pip install -e ".[dev]"
-uv run pytest            # 843 tests should pass
+uv run pytest            # 859 tests should pass
 ```
 
 To see it working immediately, run the bundled todo app from the clone:
@@ -1328,6 +1329,42 @@ With `pyweft run`, saving `loading.html` reloads the page so you see it
 again; `pyweft build` writes the screen
 into `index.html`, so it appears before any other file has downloaded.
 
+### The first screen, before Python starts
+
+Most visitors never see the loading screen: `pyweft run` and `pyweft build`
+render your app's first screen on your machine and put it in the page. The
+real page appears at once, slightly dimmed and not yet clickable, with a thin
+progress bar along the top. When Python has started in the browser it takes
+over that same page, which brightens and starts responding. Nothing moves or
+blinks, because the page Python renders is the same one.
+
+What the first screen shows is what your app renders before anything
+arrives: initial field values, synchronous `on_init` code, effects, and an
+async `on_init` up to its first `await` (a "Loading orders…" message, say).
+Your own `.py` modules and installed component libraries work as they do in
+the browser.
+
+The loading screen is used instead when:
+
+- **the app can't be rendered on your machine**: code that only works in a
+  browser (`import js`, `pyodide`), or a package that isn't installed
+  locally. `pyweft run` and `build` print why, and the page still works;
+- **the page is opened at another address** than the one rendered (a link
+  to `#/orders/7` in an app with pages), so the wrong page never flashes up;
+- **you turn it off** with `--no-prerender` on `run` or `build`, for example
+  to keep a custom splash screen.
+
+Two things to know:
+
+- **Your app's code runs on your machine** as part of `run` and `build`, up
+  to its first `await`, in a separate process. Keep code with side effects
+  (sending analytics, say) behind an `await` or in a handler.
+- **Clicks and typing before Python is ready don't count**: the page is
+  inert until then, which is why it is dimmed.
+
+The bar's color is your system's highlight color; set `--pyweft-bar-color`
+on `:root` in your CSS to change it.
+
 ### The page head and the assets folder
 
 **`head.html`** is added to the page's `<head>`, so anything that belongs
@@ -1763,8 +1800,9 @@ Working today:
   CDN stylesheets and scripts, an `assets/` folder, so CSS frameworks such as
   Tailwind and Bootstrap work.
 - **Tooling:** `pyweft new` / `run` / `build`; hot reload that keeps state,
-  with an error overlay; a customizable loading screen; PyPI dependencies
-  from `pyproject.toml`, installed in the browser.
+  with an error overlay; the first screen rendered ahead of time, so pages
+  appear at once; a customizable loading screen that shows real progress;
+  PyPI dependencies from `pyproject.toml`, installed in the browser.
 - **Controls:** `pyweft-ui`, 22 ready-made, themeable controls (see
   "Ready-made controls" in section 5), with a live gallery.
 

@@ -12,6 +12,18 @@
     /* Fades the loading screen out once the app has rendered. */
     #pyweft-loading { transition: opacity 0.25s ease; }
     #pyweft-loading.pyweft-done { opacity: 0; pointer-events: none; }
+    /* A page rendered ahead of time (pyweft run/build) shows at once, dimmed
+       and not yet clickable, with a thin progress bar instead of the loading
+       screen; it brightens when Python takes over. */
+    #app { transition: opacity 0.3s ease; }
+    #app[data-pyweft-prerendered] { opacity: 0.6; cursor: progress; }
+    #pyweft-loading:has(~ #app[data-pyweft-prerendered]) { display: none; }
+    #pyweft-bar {
+      display: none; position: fixed; top: 0; left: 0; z-index: 2147483646; height: 3px;
+      width: calc((0.1 + 0.9 * var(--pyweft-progress, 0)) * 100%);
+      background: var(--pyweft-bar-color, Highlight); transition: width 0.4s ease;
+    }
+    #app[data-pyweft-prerendered] ~ #pyweft-bar { display: block; }
     /* Development only (pyweft run): errors from a hot reload or a handler. */
     #pyweft-dev-error, #pyweft-dev-stale {
       position: fixed; left: 1rem; right: 1rem; bottom: 1rem; z-index: 2147483647;
@@ -27,6 +39,7 @@
   </style>
   __PYWEFT_HEAD__
   __PYWEFT_CSS__
+  <style id="pyweft-component-styles">__PYWEFT_PRERENDER_CSS__</style>
   <!-- defer: without it nothing paints, loading screen included, until the
        Pyodide loader has downloaded from the CDN. -->
   <script defer src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
@@ -34,7 +47,26 @@
 </head>
 <body>
   <div id="pyweft-loading" role="status" aria-live="polite">__PYWEFT_LOADING__</div>
-  <div id="app"></div>
+  <div id="app"__PYWEFT_APP_ATTRS__>__PYWEFT_PRERENDER__</div>
+  <div id="pyweft-bar"></div>
+  <script>
+    // Rendered ahead of time at one address but opened at another (a link to
+    // #/orders/7): show the loading screen, not the wrong page, until Python
+    // has started. Runs before anything paints.
+    (() => {
+      const app = document.getElementById("app");
+      const at = app.dataset.pyweftPrerendered;
+      let here = "/";
+      try {
+        if (location.hash.startsWith("#/")) here = decodeURI(location.hash.slice(1));
+      } catch {}
+      if (at && here !== at) {
+        app.replaceChildren();
+        app.removeAttribute("data-pyweft-prerendered");
+        app.removeAttribute("inert");
+      }
+    })();
+  </script>
 
   <script>
     const MODULES = __PYWEFT_MODULES__;
@@ -198,6 +230,13 @@ def pyweft_hot_reload():
       document.documentElement.style.setProperty("--pyweft-progress", progress);
       const el = document.getElementById("pyweft-loading");
       if (el) el.dataset.pyweftStep = step;
+    };
+
+    // Python has rendered: the pre-rendered page it replaced becomes live.
+    const wakeApp = () => {
+      const app = document.getElementById("app");
+      app.removeAttribute("data-pyweft-prerendered");
+      app.removeAttribute("inert");
     };
 
     function hideLoading() {
@@ -522,10 +561,13 @@ def pyweft_hot_reload():
           throw err; // full traceback in the console
         }
       });
+      // init() empties #app and mount() builds the same page again in the same
+      // task, so a pre-rendered page never visibly blinks.
       PyWeftRuntime.mount(JSON.parse(initial()));
       mounted = true;
       settle();
       setStep("ready"); // lets a loading screen finish its picture as it fades
+      wakeApp();
       hideLoading();
 
       // Back, forward, a typed address or a plain <a href="#/...">. Python
@@ -584,6 +626,8 @@ def pyweft_hot_reload():
     // Deferred scripts (Pyodide, runtime.js) have run by DOMContentLoaded.
     document.addEventListener("DOMContentLoaded", () => {
       main().catch((err) => {
+        // A pre-rendered page hides the loading screen; the error needs it.
+        document.getElementById("app").removeAttribute("data-pyweft-prerendered");
         document.getElementById("pyweft-loading")?.classList.add("pyweft-failed");
         setStatus(`Failed to start: ${lastLine(err)}`); // full traceback: console
         // In development, the next save gets a fresh start.

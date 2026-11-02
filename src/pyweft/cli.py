@@ -4,8 +4,8 @@ A pyweft app is a directory of ``.weft`` files with ``app.weft`` as the root,
 any plain ``.py`` modules they import, and an ordinary ``pyproject.toml``.
 Dependencies declared there (with ``uv add`` or by hand) are installed *in
 the browser* by micropip at page load, so the same file drives local tooling
-and the runtime. Only pure-Python wheels or
-packages Pyodide ships prebuilt will work -- the browser can't compile C.
+and the runtime. Only pure-Python wheels or packages Pyodide ships prebuilt
+will work -- the browser can't compile C.
 """
 
 from __future__ import annotations
@@ -16,10 +16,12 @@ import mimetypes
 import re
 import shutil
 import socket
+import subprocess
 import sys
 import threading
 import uuid
 from dataclasses import dataclass
+from html import escape
 from html.parser import HTMLParser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -286,7 +288,7 @@ def browser_packages(app_dir: Path) -> list[str]:
     return list(dict.fromkeys(packages))
 
 
-_HOST_ONLY = {"cli.py", "__main__.py"}  # never shipped to the browser
+_HOST_ONLY = {"cli.py", "__main__.py", "prerender.py"}  # never shipped to the browser
 
 
 def pyweft_modules() -> list[str]:
@@ -343,11 +345,71 @@ def linked_app_css(head: str) -> set[str]:
     return found
 
 
-def render_shell(app_dir: Path, dev: bool = False, since: int = 0) -> str:
+_PRERENDER_TIMEOUT = 20  # seconds; past this the app gets its loading screen
+_prerendered: dict[str, tuple[frozenset, dict | None]] = {}
+_prerender_lock = threading.Lock()
+
+
+def prerender_app(app_dir: Path) -> dict | None:
+    """The app's first screen rendered on this machine (see prerender.py),
+    or None when it can't be, such as code that only works in a browser.
+    Runs in a separate process, once per state of the app's files: the dev
+    server asks on every page load."""
+    from .prerender import MARK
+
+    key = frozenset(snapshot(app_dir).items())
+    with _prerender_lock:
+        cached = _prerendered.get(str(app_dir))
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        try:
+            proc = subprocess.run(
+                [sys.executable, "-m", "pyweft.prerender", str(app_dir.resolve())],
+                cwd=app_dir,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=_PRERENDER_TIMEOUT,
+            )
+            line = next(
+                (l for l in reversed(proc.stdout.splitlines()) if l.startswith(MARK)), None
+            )
+            if line is not None:
+                result = json.loads(line[len(MARK) :])
+            else:
+                lines = proc.stderr.strip().splitlines() or ["it stopped without a result"]
+                result = {"error": lines[-1]}
+        except subprocess.TimeoutExpired:
+            result = {"error": f"it took longer than {_PRERENDER_TIMEOUT} s"}
+        if "error" in result:
+            # Said once per state of the files, not on every page load.
+            reason = "\n  ".join(result["error"].splitlines())
+            print(
+                "pyweft: no pre-rendered page, the loading screen shows instead, "
+                f"because rendering the app here failed:\n  {reason}",
+                file=sys.stderr,
+            )
+            result = None
+        _prerendered[str(app_dir)] = (key, result)
+        return result
+
+
+def render_shell(
+    app_dir: Path, dev: bool = False, since: int = 0, prerender: bool = False
+) -> str:
     """``dev`` turns on hot reload: only ``pyweft run`` pages get it, never
     the static output of ``pyweft build``. ``since`` is how many changes the
     dev server had published when it rendered the page; the page asks for
-    the ones after it, so a save made while it was starting is not lost."""
+    the ones after it, so a save made while it was starting is not lost.
+    ``prerender`` puts the app's first screen in the page (prerender_app)."""
+    pre = prerender_app(app_dir) if prerender else None
+    if pre is None:
+        app_attrs = ""
+    else:
+        # Not clickable until Python has taken over; the address it was
+        # rendered at, so a page opened elsewhere can drop it (shell.html).
+        app_attrs = f' data-pyweft-prerendered="{escape(pre["location"])}" inert'
     head = head_extras(app_dir)
     linked = linked_app_css(head)
     css = "\n  ".join(
@@ -368,8 +430,11 @@ def render_shell(app_dir: Path, dev: bool = False, since: int = 0) -> str:
         .replace("__PYWEFT_DEV__", "true" if dev else "false")
         .replace("__PYWEFT_SINCE__", str(since))
         .replace("__PYWEFT_CSS__", css)
+        .replace("__PYWEFT_APP_ATTRS__", app_attrs)
     )
-    leftover = re.search(r"__PYWEFT_(?!HEAD__|LOADING__)[A-Z_]+?__", html)
+    leftover = re.search(
+        r"__PYWEFT_(?!HEAD__|LOADING__|PRERENDER__|PRERENDER_CSS__)[A-Z_]+?__", html
+    )
     if leftover:
         # Only possible when shell.html is newer than this process's code:
         # PyWeft was updated while `pyweft run` kept running.
@@ -379,9 +444,19 @@ def render_shell(app_dir: Path, dev: bool = False, since: int = 0) -> str:
             "Restart `pyweft run`."
         )
     # The user's files go in last and in one pass, so text in them is never
-    # taken for a placeholder (not even one in the other file).
-    user = {"__PYWEFT_HEAD__": head, "__PYWEFT_LOADING__": loading_screen(app_dir)}
-    return re.sub("__PYWEFT_(?:HEAD|LOADING)__", lambda m: user[m.group(0)], html)
+    # taken for a placeholder (not even one in the other file). The
+    # pre-rendered page counts: it is the app's own text.
+    user = {
+        "__PYWEFT_HEAD__": head,
+        "__PYWEFT_LOADING__": loading_screen(app_dir),
+        "__PYWEFT_PRERENDER__": pre["html"] if pre else "",
+        "__PYWEFT_PRERENDER_CSS__": pre["css"] if pre else "",
+    }
+    return re.sub(
+        "__PYWEFT_(?:HEAD|LOADING|PRERENDER_CSS|PRERENDER)__",
+        lambda m: user[m.group(0)],
+        html,
+    )
 
 
 # ------------------------------------------------------------------ commands
@@ -462,9 +537,9 @@ def cmd_new(target: Path) -> None:
     print(f"  add browser-usable packages with:  uv add <pkg>  (inside {target}/)")
 
 
-def cmd_build(app_dir: Path, out: Path) -> None:
+def cmd_build(app_dir: Path, out: Path, prerender: bool = True) -> None:
     files = app_shipped_files(app_dir)  # validates app.weft exists first
-    html = render_shell(app_dir)
+    html = render_shell(app_dir, prerender=prerender)
     if out.exists():
         shutil.rmtree(out)
     (out / "pyweft-src").mkdir(parents=True)
@@ -626,11 +701,12 @@ class _DevServer(ThreadingHTTPServer):
 
 
 def make_dev_server(
-    app_dir: Path, port: int, poll_interval: float = 0.3
+    app_dir: Path, port: int, poll_interval: float = 0.3, prerender: bool = False
 ) -> ThreadingHTTPServer:
     """The ``pyweft run`` server, not yet serving: the app plus a change
     feed at ``/__pyweft/events`` that hot reload listens to. Call
-    ``serve_forever()``, and ``shutdown_dev()`` to stop it and its watcher."""
+    ``serve_forever()``, and ``shutdown_dev()`` to stop it and its watcher.
+    ``prerender`` puts the app's first screen in the page, as build does."""
     app_pyweft_files(app_dir)  # fail fast with a clear message
     feed = ChangeFeed()
     stop = threading.Event()
@@ -647,7 +723,7 @@ def make_dev_server(
                 with feed.cond:
                     since = len(feed.events)
                 try:
-                    page = render_shell(app_dir, dev=True, since=since)
+                    page = render_shell(app_dir, dev=True, since=since, prerender=prerender)
                 except CliError as exc:
                     print(f"error: {exc}", file=sys.stderr)
                     self.send_error(500, explain=str(exc))
@@ -758,9 +834,9 @@ def make_dev_server(
     return server
 
 
-def cmd_run(app_dir: Path, port: int) -> None:
+def cmd_run(app_dir: Path, port: int, prerender: bool = True) -> None:
     try:
-        server = make_dev_server(app_dir, port)
+        server = make_dev_server(app_dir, port, prerender=prerender)
     except OSError as exc:
         raise CliError(
             f"cannot listen on port {port} ({exc.strerror or exc}). Is another "
@@ -791,14 +867,23 @@ def main(argv: list[str] | None = None) -> int:
     p_build.add_argument("app_dir", type=Path)
     p_build.add_argument("--out", type=Path, default=None)
 
+    no_prerender = (
+        "show the loading screen instead of the app's first screen rendered "
+        "ahead of time (which runs the app's code here, up to its first await)"
+    )
+    for p in (p_run, p_build):
+        p.add_argument("--no-prerender", action="store_true", help=no_prerender)
+
     args = parser.parse_args(argv)
     try:
         if args.command == "new":
             cmd_new(args.path)
         elif args.command == "run":
-            cmd_run(args.app_dir, args.port)
+            cmd_run(args.app_dir, args.port, prerender=not args.no_prerender)
         else:
-            cmd_build(args.app_dir, args.out or args.app_dir / "dist")
+            cmd_build(
+                args.app_dir, args.out or args.app_dir / "dist", prerender=not args.no_prerender
+            )
     except CliError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

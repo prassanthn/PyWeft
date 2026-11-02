@@ -40,8 +40,9 @@ uv run pyweft new myapp
 uv run pyweft run myapp
 ```
 
-Open <http://127.0.0.1:8642/>. The first load takes a few seconds while the
-browser downloads Python (it is cached after that).
+Open <http://127.0.0.1:8642/>. Your page shows straight away, dimmed, while
+the browser downloads Python in the background (a few seconds the first
+time, cached after that); then it comes alive.
 
 With pip instead:
 
@@ -143,6 +144,8 @@ To see every control live, clone this repository and run
   `pyproject.toml`, works in the browser.
 - **A fast dev loop:** hot reload that keeps your app's state, and readable
   errors that point to your `.weft` file and line.
+- **Fast first load:** your app's first screen is rendered ahead of time and
+  shows at once, while Python starts in the background.
 
 ## Learn more
 
@@ -197,7 +200,7 @@ place where PyWeft tracks which fields you read.
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev          # also installs packages/pyweft-ui, editable
-uv run pytest                # 843 tests, including pyweft-ui's
+uv run pytest                # 859 tests, including pyweft-ui's
 uv run python examples/demo.py              # render -> event -> diff -> apply, no browser
 uv run pyweft run examples/todo             # the todo app
 uv run pyweft run packages/pyweft-ui/gallery  # every control
