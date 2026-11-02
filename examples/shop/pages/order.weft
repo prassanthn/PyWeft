@@ -1,0 +1,32 @@
+<template>
+  <section>
+    <button @click="back()">← Back</button>
+    <If cond="order is None"><p>Loading order {{ id }}…</p></If>
+    <ElseIf cond="order == {}"><p>There is no order {{ id }}.</p></ElseIf>
+    <Else>
+      <h1>Order #{{ id }}</h1>
+      <p>{{ order['customer'] }}: {{ order['items'] }} items, ${{ order['total'] }}</p>
+    </Else>
+  </section>
+</template>
+
+<code>
+# route sets this page's URL; {id} arrives as the int declared below.
+import asyncio
+from pyweft.routing import back
+
+route = "/orders/{id}"
+id: int = 0
+order = None
+
+DETAILS = {
+    1041: {"customer": "Ada Lovelace", "items": 3, "total": 1250.0},
+    1042: {"customer": "Grace Hopper", "items": 1, "total": 89.9},
+    1043: {"customer": "Alan Turing", "items": 2, "total": 410.0},
+    1044: {"customer": "Katherine Johnson", "items": 1, "total": 72.5},
+}
+
+async def on_init(self):
+    await asyncio.sleep(0.4)        # a real app fetches from its server here
+    self.order = self.DETAILS.get(self.id, {})
+</code>

@@ -52,6 +52,29 @@
 import json
 import js
 from pyweft import Renderer, collect_styles, diff, load_component, to_dicts
+from pyweft import routing as _routing
+
+class _HashHost:
+    # The app's location is the part after the #, so a built app needs no
+    # server rules. A # that doesn't start with / is an in-page anchor.
+    def current(self):
+        place = js.location.hash
+        return place[1:] if place.startswith("#/") else "/"
+
+    def push(self, url):
+        js.location.hash = url
+
+    def replace(self, url):
+        js.history.replaceState(None, "", "#" + url)
+
+    def back(self):
+        js.history.back()  # arrives back here through hashchange
+
+_routing.set_host(_HashHost())
+
+def pyweft_location(place):
+    if place.startswith("#/"):
+        _routing.location_changed(place[1:])
 
 _component_cls = load_component("/app/app.weft")
 _component = _component_cls()
@@ -477,6 +500,15 @@ def pyweft_hot_reload():
       mounted = true;
       settle();
       hideLoading();
+
+      // Back, forward, a typed address or a plain <a href="#/...">. Python
+      // re-renders through pyweftScheduleRender if the page changed.
+      const locationChanged = pyodide.globals.get("pyweft_location");
+      window.addEventListener("hashchange", () => {
+        if (!location.hash.startsWith("#/")) return; // an in-page anchor
+        locationChanged(location.hash);
+        window.scrollTo(0, 0); // a new page starts at its top
+      });
 
       console.info(
         `PyWeft: Python ${pyodide.runPython("import sys; sys.version.split()[0]")} running in WebAssembly`

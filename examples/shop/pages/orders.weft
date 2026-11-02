@@ -1,0 +1,43 @@
+<template>
+  <section>
+    <h1>Orders</h1>
+    <p class="filters">
+      Show:
+      <For each="choice in ['all', 'paid', 'pending', 'refunded']" key="choice">
+        <Link :to="'/orders' if choice == 'all' else '/orders?status=' + choice"
+              :class="'on' if choice == status else None">{{ choice }}</Link>
+      </For>
+    </p>
+    <ul>
+      <For each="order in shown" key="order['id']">
+        <li><Link :to="'/orders/' + str(order['id'])">#{{ order['id'] }}</Link>
+          {{ order['customer'] }} ({{ order['status'] }})</li>
+      </For>
+    </ul>
+  </section>
+</template>
+
+<code>
+# Shown at #/orders; ?status=paid fills the `status` field.
+from pyweft import Link
+
+status: str = "all"
+
+ORDERS = [
+    {"id": 1041, "customer": "Ada Lovelace", "status": "paid"},
+    {"id": 1042, "customer": "Grace Hopper", "status": "pending"},
+    {"id": 1043, "customer": "Alan Turing", "status": "paid"},
+    {"id": 1044, "customer": "Katherine Johnson", "status": "refunded"},
+]
+
+@property
+def shown(self):
+    if self.status == "all":
+        return self.ORDERS
+    return [o for o in self.ORDERS if o["status"] == self.status]
+</code>
+
+<style>
+.filters { display: flex; gap: 0.75rem; align-items: center; }
+.on { font-weight: 700; text-decoration: none; color: #111; }
+</style>

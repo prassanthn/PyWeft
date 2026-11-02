@@ -18,6 +18,7 @@ from .events import Event
 from .expressions import ExpressionError
 from .parser import TemplateError, parse_template, split_source
 from .renderer import EffectLoopError, Renderer
+from .routing import Link, navigate, router
 from .styles import collect_styles, scope_css
 from .vdom import Element, Node, Text, to_dicts
 
@@ -34,6 +35,9 @@ __all__ = [
     "EffectLoopError",
     "run_in_background",
     "BackgroundError",
+    "router",
+    "Link",
+    "navigate",
     "collect_styles",
     "scope_css",
     "diff",

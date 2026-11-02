@@ -1,0 +1,6 @@
+<template>
+  <section>
+    <h1>Help</h1>
+    <p>Orders are shipped within two days. Questions? Write to the shop.</p>
+  </section>
+</template>

@@ -1,0 +1,13 @@
+<template>
+  <section>
+    <h1>Welcome</h1>
+    <p>This app has a page per file in <code>pages/</code>. Try the links above, the
+      browser's Back button, or an address that doesn't exist, such as
+      <a href="#/nowhere">#/nowhere</a>.</p>
+    <button @click="navigate('/orders', query={'status': 'pending'})">See pending orders</button>
+  </section>
+</template>
+
+<code>
+from pyweft import navigate
+</code>

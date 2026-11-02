@@ -1,0 +1,12 @@
+<template>
+  <section>
+    <h1>Page not found</h1>
+    <p>Nothing lives at <code>{{ path }}</code>. <Link to="/">Go home</Link>.</p>
+  </section>
+</template>
+
+<code>
+from pyweft import Link
+
+path: str = ""
+</code>
