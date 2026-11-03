@@ -250,6 +250,9 @@ uv run pyweft run packages/pyweft-ui/gallery  # every control
 
 With pip: `pip install -e ".[dev]"` and `pip install -e packages/pyweft-ui`.
 
+Releases go to PyPI by pushing a version tag; [RELEASING.md](RELEASING.md)
+has the steps, and [CHANGELOG.md](CHANGELOG.md) what each release changed.
+
 ```
 src/pyweft/           the framework (zero runtime dependencies)
   static/             the browser side: runtime.js, the page shell, the worker

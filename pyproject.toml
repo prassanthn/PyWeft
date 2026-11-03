@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyweft"
-version = "0.0.1"
+dynamic = ["version"]  # from __version__ in src/pyweft/__init__.py
 description = "A UI framework for Python: XML templates, Python code-behind, one render core for web, desktop and mobile."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -41,8 +41,19 @@ Issues = "https://github.com/prassanthn/PyWeft/issues"
 [project.scripts]
 pyweft = "pyweft.cli:main"
 
+[tool.hatch.version]
+path = "src/pyweft/__init__.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyweft"]
+
+# The source archive: the package, its tests and docs, and nothing else
+# lying around the repository (example apps, local test apps, the toolkit,
+# which is released on its own).
+[tool.hatch.build.targets.sdist]
+# (A leading / anchors a pattern here; without it, "tests" would match
+# packages/pyweft-ui/tests too.)
+include = ["/src/pyweft", "/tests", "/docs", "/README.md", "/LICENSE", "/CHANGELOG.md"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "packages/pyweft-ui/src"]

@@ -16,7 +16,7 @@ from pyweft import ComponentLibrary
 
 from .toasts import Toast, clear_toasts, toast
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 
 ui = ComponentLibrary(Path(__file__).parent, prefix="ui")
 

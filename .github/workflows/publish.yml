@@ -1,0 +1,106 @@
+# Publishes a release to PyPI when a version tag is pushed:
+#
+#   v0.2.0             ->  pyweft 0.2.0
+#   pyweft-ui-v0.2.0   ->  pyweft-ui 0.2.0
+#
+# The tag must match __version__ in that package, or nothing is published.
+# "Run workflow" on the Actions tab publishes to TestPyPI instead, as a
+# practice run. No passwords or tokens: PyPI trusts this workflow file
+# ("trusted publishing"), set up once on pypi.org. See RELEASING.md.
+
+name: Publish
+
+on:
+  push:
+    tags: ["v*", "pyweft-ui-v*"]
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package to publish to TestPyPI
+        type: choice
+        options: [pyweft, pyweft-ui]
+        default: pyweft
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # The suite is developed and run on Windows; it gates every release.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --extra dev
+      - run: uv run pytest -q
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      package: ${{ steps.which.outputs.package }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - id: which
+        name: Find the package, and check the tag matches its version
+        env:
+          CHOSEN: ${{ inputs.package }}
+        run: |
+          want=""
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            pkg="$CHOSEN"
+          else
+            case "$GITHUB_REF_NAME" in
+              pyweft-ui-v*) pkg=pyweft-ui; want="${GITHUB_REF_NAME#pyweft-ui-v}" ;;
+              v*)           pkg=pyweft;    want="${GITHUB_REF_NAME#v}" ;;
+            esac
+          fi
+          case "$pkg" in
+            pyweft)    file=src/pyweft/__init__.py ;;
+            pyweft-ui) file=packages/pyweft-ui/src/pyweft_ui/__init__.py ;;
+          esac
+          have=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' "$file")
+          if [ -n "$want" ] && [ "$want" != "$have" ]; then
+            echo "::error::the tag $GITHUB_REF_NAME says $want, but $file says $have"
+            exit 1
+          fi
+          echo "Publishing $pkg $have"
+          echo "package=$pkg" >> "$GITHUB_OUTPUT"
+      - run: uv build --package "${{ steps.which.outputs.package }}" --out-dir dist
+      - run: uvx twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  pypi:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # proves to PyPI that this workflow is the publisher
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  testpypi:
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true  # a version already there is not an error here
