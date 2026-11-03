@@ -8,6 +8,11 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+## 0.2.1
+
+- The PyPI page installs from PyPI, and its links to the guide and the
+  toolkit work there.
+
 ## 0.2.0
 
 The first release. (It starts at 0.2.0 because an earlier, unrelated

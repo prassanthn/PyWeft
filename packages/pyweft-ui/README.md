@@ -42,7 +42,7 @@ async def submit(self):
 </code>
 ```
 
-**New to the toolkit? Read the [guide](docs/guide.md)**: page layout, forms
+**New to the toolkit? Read the [guide](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/docs/guide.md)**: page layout, forms
 with validation, dialogs, themes and building your own components, with
 complete examples. This README is the compact reference.
 

@@ -101,7 +101,7 @@ height = 800
 
 ## Ready-made controls (no HTML or CSS needed)
 
-[`pyweft-ui`](packages/pyweft-ui/README.md) gives you styled, accessible
+[`pyweft-ui`](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/README.md) gives you styled, accessible
 controls as components: buttons, text fields, selects, checkboxes, switches,
 cards, tabs, sortable tables, dialogs, alerts, toasts, layout and light/dark
 themes.
@@ -188,20 +188,20 @@ To see every control live, clone this repository and run
 
 | You want to | Read |
 |---|---|
-| Learn the basics: state, templates, events | [Getting started](docs/getting-started.md), sections 1–3 |
-| Run code when a component appears, updates or goes away | [Lifecycle](docs/getting-started.md#lifecycle-when-your-code-runs) |
-| Split an app into components, use slots | [Composing components](docs/getting-started.md#4-composing-components) |
-| Build an app with several pages | [Pages and navigation](docs/getting-started.md#pages-and-navigation) |
-| Handle forms and keyboard input | [Binding form controls](docs/getting-started.md#binding-form-controls), [event modifiers](docs/getting-started.md#event-modifiers) |
-| Load data, run async code, do heavy work | [Async handlers](docs/getting-started.md#async-handlers-and-background-work), [`run_in_background`](docs/getting-started.md#heavy-work-run_in_background) |
-| Style with Tailwind or Bootstrap | [Using CSS frameworks](docs/getting-started.md#using-css-frameworks) |
-| Build screens with the ready-made controls | [pyweft-ui guide](packages/pyweft-ui/docs/guide.md), then the [reference](packages/pyweft-ui/README.md) |
-| Deploy your app | [Building for deployment](docs/getting-started.md#building-for-deployment) |
-| Run it as a desktop app | [A desktop app](docs/getting-started.md#a-desktop-app-pyweft-run---desktop) |
-| Hand out a desktop app (`.exe`, `.app`) | [Handing out a desktop app](docs/getting-started.md#handing-out-a-desktop-app-pyweft-build---desktop) |
-| Open and save files, ask for confirmation | [Files and dialogs](docs/getting-started.md#files-and-dialogs) |
-| Name the app, give it an icon | [The app's title and icon](docs/getting-started.md#the-apps-title-and-icon) |
-| Test components without a browser | [Using the engine from plain Python](docs/getting-started.md#6-using-the-engine-from-plain-python) |
+| Learn the basics: state, templates, events | [Getting started](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md), sections 1–3 |
+| Run code when a component appears, updates or goes away | [Lifecycle](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#lifecycle-when-your-code-runs) |
+| Split an app into components, use slots | [Composing components](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#4-composing-components) |
+| Build an app with several pages | [Pages and navigation](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#pages-and-navigation) |
+| Handle forms and keyboard input | [Binding form controls](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#binding-form-controls), [event modifiers](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#event-modifiers) |
+| Load data, run async code, do heavy work | [Async handlers](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#async-handlers-and-background-work), [`run_in_background`](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#heavy-work-run_in_background) |
+| Style with Tailwind or Bootstrap | [Using CSS frameworks](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#using-css-frameworks) |
+| Build screens with the ready-made controls | [pyweft-ui guide](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/docs/guide.md), then the [reference](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/README.md) |
+| Deploy your app | [Building for deployment](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#building-for-deployment) |
+| Run it as a desktop app | [A desktop app](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#a-desktop-app-pyweft-run---desktop) |
+| Hand out a desktop app (`.exe`, `.app`) | [Handing out a desktop app](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#handing-out-a-desktop-app-pyweft-build---desktop) |
+| Open and save files, ask for confirmation | [Files and dialogs](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#files-and-dialogs) |
+| Name the app, give it an icon | [The app's title and icon](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#the-apps-title-and-icon) |
+| Test components without a browser | [Using the engine from plain Python](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#6-using-the-engine-from-plain-python) |
 
 `examples/todo/` is a small complete app, and `examples/shop/` one with
 pages; run them from a clone with `uv run pyweft run examples/todo`.
@@ -250,8 +250,8 @@ uv run pyweft run packages/pyweft-ui/gallery  # every control
 
 With pip: `pip install -e ".[dev]"` and `pip install -e packages/pyweft-ui`.
 
-Releases go to PyPI by pushing a version tag; [RELEASING.md](RELEASING.md)
-has the steps, and [CHANGELOG.md](CHANGELOG.md) what each release changed.
+Releases go to PyPI by pushing a version tag; [RELEASING.md](https://github.com/prassanthn/PyWeft/blob/main/RELEASING.md)
+has the steps, and [CHANGELOG.md](https://github.com/prassanthn/PyWeft/blob/main/CHANGELOG.md) what each release changed.
 
 ```
 src/pyweft/           the framework (zero runtime dependencies)
@@ -292,4 +292,4 @@ signing for desktop apps.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/prassanthn/PyWeft/blob/main/LICENSE).

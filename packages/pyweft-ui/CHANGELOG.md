@@ -8,6 +8,10 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+## 0.1.1
+
+- The PyPI page installs from PyPI, and its link to the guide works there.
+
 ## 0.1.0
 
 The first release, for `pyweft` 0.2.
