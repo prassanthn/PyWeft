@@ -27,7 +27,7 @@ is plain Python fields, and the page updates itself after every event.
 
 > **Status:** a working proof of concept. Web apps and desktop apps (run
 > locally or built into a program to hand out) work today. APIs may still
-> change. Not on PyPI yet, so you install from GitHub (below).
+> change.
 
 ## Quick start
 
@@ -35,7 +35,7 @@ You need Python 3.10 or newer. With [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv init myproject && cd myproject
-uv add git+https://github.com/prassanthn/PyWeft.git
+uv add pyweft
 uv run pyweft new myapp
 uv run pyweft run myapp
 ```
@@ -47,7 +47,7 @@ time, cached after that); then it comes alive.
 With pip instead:
 
 ```bash
-pip install git+https://github.com/prassanthn/PyWeft.git
+pip install pyweft
 pyweft new myapp
 pyweft run myapp
 ```
@@ -107,7 +107,7 @@ cards, tabs, sortable tables, dialogs, alerts, toasts, layout and light/dark
 themes.
 
 ```bash
-uv add "pyweft-ui @ git+https://github.com/prassanthn/PyWeft.git#subdirectory=packages/pyweft-ui"
+uv add pyweft-ui
 ```
 
 Add `"pyweft-ui"` to the `dependencies` list in `myapp/pyproject.toml`, then
@@ -282,9 +282,9 @@ handlers and Web Worker background work; file and confirmation dialogs on
 both targets; the app's title and icon, and window settings; scoped styles
 and CSS framework support; the `pyweft` CLI with hot reload, static builds
 and pre-rendered first screens; `pyweft-ui` with 22 keyboard-accessible
-controls and a gallery.
+controls and a gallery; both released on PyPI.
 
-**Next:** publishing `pyweft` and `pyweft-ui` to PyPI; more controls (menus,
+**Next:** more controls (menus,
 a date picker, form validation); installers (`.msi`, `.dmg`) and code
 signing for desktop apps.
 

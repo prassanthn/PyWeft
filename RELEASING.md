@@ -79,10 +79,9 @@ Done once, by the owner of the PyPI accounts:
    your click on the Actions tab before it uploads.
 
 The first tag pushed for each package creates the project on PyPI, owned by
-the account that added the pending publisher.
+the account that added the pending publisher. (Done: `pyweft` 0.2.0 and
+`pyweft-ui` 0.1.0 were the first releases.)
 
-## After the first release
-
-Change the install instructions in `README.md`,
-`docs/getting-started.md` and `packages/pyweft-ui/README.md` from the
-GitHub URLs to `uv add pyweft` and `uv add pyweft-ui`.
+PyPI never accepts a file name twice, even after it is deleted, and that
+holds across owners: an unrelated, deleted project called `pyweft` used
+0.1.0 to 0.1.3, which is why `pyweft` started at 0.2.0.

@@ -62,18 +62,17 @@ later mobile: only the transport differs.
 
 ## 1. Install
 
-PyWeft is not on PyPI yet, so install it straight from GitHub. With uv:
+With uv:
 
 ```bash
 uv init myproject && cd myproject
-uv add git+https://github.com/prassanthn/PyWeft.git
+uv add pyweft
 uv run pyweft new myapp
 uv run pyweft run myapp
 ```
 
-With pip, the equivalent is
-`pip install git+https://github.com/prassanthn/PyWeft.git`, then `pyweft new`
-and `pyweft run` directly.
+With pip, the equivalent is `pip install pyweft`, then `pyweft new` and
+`pyweft run` directly.
 
 To hack on the framework itself, clone it and install in editable mode:
 
@@ -1729,15 +1728,13 @@ reference; and the gallery shows every control live:
 uv run pyweft run packages/pyweft-ui/gallery
 ```
 
-It is not on PyPI yet. Install it from GitHub into the same environment as
-PyWeft:
+Install it into the same environment as PyWeft:
 
 ```bash
-uv add "pyweft-ui @ git+https://github.com/prassanthn/PyWeft.git#subdirectory=packages/pyweft-ui"
+uv add pyweft-ui
 ```
 
-(with pip: `pip install "git+https://github.com/prassanthn/PyWeft.git#subdirectory=packages/pyweft-ui"`),
-then add `"pyweft-ui"` to the `dependencies` in your app's own
+(with pip: `pip install pyweft-ui`), then add `"pyweft-ui"` to the `dependencies` in your app's own
 `pyproject.toml`. PyWeft ships it to the browser for you (see "Components
 from packages"). Inside a clone of this repository, `uv sync` already
 installs it.

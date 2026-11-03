@@ -48,17 +48,17 @@ complete examples. This README is the compact reference.
 
 ## Install
 
-It isn't on PyPI yet, so install it from GitHub, into the same environment
-as PyWeft itself (see PyWeft's [quick start](../../README.md#quick-start)):
+Install it into the same environment as PyWeft itself (see PyWeft's
+[quick start](https://github.com/prassanthn/PyWeft#quick-start)):
 
 ```bash
-uv add "pyweft-ui @ git+https://github.com/prassanthn/PyWeft.git#subdirectory=packages/pyweft-ui"
+uv add pyweft-ui
 ```
 
 With pip:
 
 ```bash
-pip install "git+https://github.com/prassanthn/PyWeft.git#subdirectory=packages/pyweft-ui"
+pip install pyweft-ui
 ```
 
 Then add `"pyweft-ui"` to the `dependencies` list in your app's own
