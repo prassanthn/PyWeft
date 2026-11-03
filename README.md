@@ -10,7 +10,7 @@ running on your machine. No JavaScript to write, no build step.
 **[Website](https://prassanthn.github.io/PyWeft/)**: a step-by-step
 [tutorial](https://prassanthn.github.io/PyWeft/tutorial/), the
 [guide](https://prassanthn.github.io/PyWeft/guide/), and the
-[controls](https://prassanthn.github.io/PyWeft/controls/gallery/) and
+[controls](https://prassanthn.github.io/PyWeft/live/gallery/) and
 [examples](https://prassanthn.github.io/PyWeft/examples/) running live.
 
 ```xml
