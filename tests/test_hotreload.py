@@ -472,10 +472,12 @@ def test_changed_server_code_tells_pages_to_restart_instead_of_reloading(tmp_pat
 
     write(tmp_path, "app.weft", COUNTER)
     edited = threading.Event()
+    polls = []
     real_snapshot = cli.snapshot
 
     def snapshot(app_dir):
         snap = real_snapshot(app_dir)
+        polls.append(1)
         if edited.is_set():  # as if cli.py were saved while the server runs
             snap["pyweft:cli.py"] = (0, 0)
         return snap
@@ -489,6 +491,11 @@ def test_changed_server_code_tells_pages_to_restart_instead_of_reloading(tmp_pat
         stream = urllib.request.urlopen(base, timeout=5)
         (hello,) = read_events(stream, 1)
         assert hello["stale"] is False
+        # The edit must land after the watcher's first snapshot, or it is
+        # the baseline and nothing ever looks changed (seen under load).
+        deadline = time.monotonic() + 5
+        while len(polls) < 2 and time.monotonic() < deadline:
+            time.sleep(0.01)
         edited.set()
         (event,) = read_events(stream, 1)
         assert event["type"] == "stale" and "Restart `pyweft run`" in event["reason"]
