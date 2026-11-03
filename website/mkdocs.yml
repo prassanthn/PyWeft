@@ -49,6 +49,9 @@ theme:
 extra_css:
   - assets/extra.css
 
+extra_javascript:
+  - assets/live-links.js
+
 markdown_extensions:
   - admonition
   - attr_list
@@ -76,6 +79,9 @@ validation:
   absolute_links: warn
   unrecognized_links: warn
   anchors: warn
+  nav:
+    # The live gallery is in the menu, but it's a built app, not a page
+    not_found: info
 
 nav:
   - Home: index.md
@@ -91,7 +97,7 @@ nav:
   - Controls:
       - controls/index.md
       - Guide: controls/guide.md
-      - Live gallery: controls/gallery.md
+      - Live gallery: live/gallery/
   - Examples: examples.md
   - Changelog:
       - changelog/index.md

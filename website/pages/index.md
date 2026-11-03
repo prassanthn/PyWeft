@@ -15,7 +15,7 @@ a native window with Python on your machine. No JavaScript to write, no build
 step.
 
 [Start the tutorial](tutorial.md){ .md-button .md-button--primary }
-[See the controls, live](controls/gallery.md){ .md-button }
+<a class="md-button" href="live/gallery/" target="_blank">See the controls, live</a>
 
 </div>
 
@@ -98,7 +98,7 @@ then `pyweft new myapp` and `pyweft run myapp`.
     `pyweft-ui`: buttons, form fields, tabs, sortable tables, dialogs,
     toasts, layout and light and dark themes. No HTML or CSS needed.
 
-    [:octicons-arrow-right-24: Try them live](controls/gallery.md)
+    <a href="live/gallery/" target="_blank">:octicons-arrow-right-24: Try them live</a>
 
 -   :material-sitemap-outline:{ .lg .middle } **Pages and shared state**
 

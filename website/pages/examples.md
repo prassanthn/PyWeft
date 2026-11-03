@@ -33,8 +33,9 @@ shared Python module for the data, and exporting to a CSV file.
 
 ## Controls gallery
 
-Every control in `pyweft-ui`, with light and dark themes. It has a page of
-its own: [the live gallery](controls/gallery.md).
+Every control in `pyweft-ui`, with light and dark themes. It needs the
+whole window, so it opens in a new tab:
+<a href="../live/gallery/" target="_blank">the live gallery</a>.
 
 ## Run them yourself
 

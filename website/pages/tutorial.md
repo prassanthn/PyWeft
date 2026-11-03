@@ -467,7 +467,8 @@ uv run pyweft build todo --desktop
   in the background: [async handlers and background
   work](guide/first-component.md#async-handlers-and-background-work).
 - **Use ready-made controls** instead of plain inputs and buttons:
-  [pyweft-ui](controls/index.md), and the [live gallery](controls/gallery.md).
+  [pyweft-ui](controls/index.md), and the
+  <a href="../live/gallery/" target="_blank">live gallery</a>.
 - **Add more screens** with a `pages/` folder: [pages and
   navigation](guide/components.md#pages-and-navigation).
 - **Test it without a browser**: [testing](guide/testing.md).
