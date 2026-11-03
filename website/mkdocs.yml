@@ -1,0 +1,98 @@
+# The PyWeft website. Don't run mkdocs on this directly: website/build.py
+# assembles _build/docs from the repository's docs first, then builds.
+site_name: PyWeft
+site_description: Build web and desktop apps in Python. Components are .weft files, an XML template plus a Python code block.
+site_url: https://prassanthn.github.io/PyWeft/
+repo_url: https://github.com/prassanthn/PyWeft
+repo_name: prassanthn/PyWeft
+edit_uri: ""
+copyright: MIT licensed &middot; &copy; 2026 Prassanth Nicholas
+docs_dir: _build/docs
+site_dir: _build/site
+
+theme:
+  name: material
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Use the system setting
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+
+extra_css:
+  - assets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      # GitHub's anchors, so links written for the repository keep working
+      slugify: !!python/object/apply:pymdownx.slugs.slugify {kwds: {case: lower}}
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.keys
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+# build.py runs mkdocs with --strict, so a broken link or anchor fails the build
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+nav:
+  - Home: index.md
+  - Tutorial: tutorial.md
+  - Guide:
+      - guide/index.md
+      - Your first component: guide/first-component.md
+      - Templates: guide/templates.md
+      - Composing components: guide/components.md
+      - Apps, building and desktop: guide/projects.md
+      - Testing without a browser: guide/testing.md
+      - What's coming: guide/roadmap.md
+  - Controls:
+      - controls/index.md
+      - Guide: controls/guide.md
+      - Live gallery: controls/gallery.md
+  - Examples: examples.md
+  - Changelog:
+      - changelog/index.md
+      - pyweft-ui: changelog/pyweft-ui.md

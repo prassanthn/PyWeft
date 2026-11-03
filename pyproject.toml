@@ -35,7 +35,7 @@ package = ["pywebview>=5", "pyinstaller>=6"]
 
 [project.urls]
 Homepage = "https://github.com/prassanthn/PyWeft"
-Documentation = "https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md"
+Documentation = "https://prassanthn.github.io/PyWeft/"
 Issues = "https://github.com/prassanthn/PyWeft/issues"
 
 [project.scripts]
@@ -70,3 +70,5 @@ pyweft-ui = { workspace = true }
 
 [dependency-groups]
 dev = ["pyweft-ui"]
+# The website (website/build.py): uv sync --group website
+website = ["mkdocs-material>=9.8,<10; python_version >= '3.11'"]

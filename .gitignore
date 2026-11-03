@@ -8,3 +8,4 @@ dist-desktop/
 .venv/
 CLAUDE.md
 PROMPTS.md
+website/_build/

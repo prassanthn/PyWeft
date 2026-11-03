@@ -1,0 +1,48 @@
+# Builds the website (website/build.py: the docs, the tutorial, and the
+# live gallery and examples) and publishes it to GitHub Pages on every push
+# to main: https://prassanthn.github.io/PyWeft/
+
+name: Website
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time; a newer push waits rather than cancelling one
+# that is halfway published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      # mkdocs-material needs 3.11+; the default dev group brings pyweft-ui
+      # for the gallery
+      - run: uv sync --group website --python 3.13
+      - run: uv run python website/build.py
+        env:
+          NO_MKDOCS_2_WARNING: "1"
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: website/_build/site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
