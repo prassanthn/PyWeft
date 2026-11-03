@@ -9,7 +9,7 @@ and no password or token is stored anywhere.
 
 1. **Choose the new version.** Below 1.0: a new feature, or anything that
    changes how existing apps behave, raises the middle number
-   (`0.1.0` → `0.2.0`); bug fixes only raise the last (`0.1.0` → `0.1.1`).
+   (`0.2.0` → `0.3.0`); bug fixes only raise the last (`0.2.0` → `0.2.1`).
 2. **Set it** in the package's `__init__.py`, the one place it lives:
    - `pyweft`: `src/pyweft/__init__.py`
    - `pyweft-ui`: `packages/pyweft-ui/src/pyweft_ui/__init__.py`
@@ -18,12 +18,12 @@ and no password or token is stored anywhere.
    version and start a fresh, empty **Unreleased** above it.
 4. **Releasing `pyweft-ui` for a new `pyweft`?** Release `pyweft` first,
    then raise the range in `packages/pyweft-ui/pyproject.toml`
-   (`pyweft>=0.2,<0.3`).
+   (`pyweft>=0.3,<0.4`).
 5. **Commit and push to `main`**, then tag that commit and push the tag:
 
    ```bash
-   git tag v0.2.0                 # pyweft
-   git push origin v0.2.0
+   git tag v0.3.0                 # pyweft
+   git push origin v0.3.0
 
    git tag pyweft-ui-v0.2.0       # pyweft-ui
    git push origin pyweft-ui-v0.2.0
@@ -31,7 +31,7 @@ and no password or token is stored anywhere.
 
 6. **Watch it** on the repository's Actions tab. If the tests fail, or the
    tag doesn't match the version in `__init__.py`, nothing is published:
-   fix it, delete the tag (`git push origin :v0.2.0`, `git tag -d v0.2.0`)
+   fix it, delete the tag (`git push origin :v0.3.0`, `git tag -d v0.3.0`)
    and tag again.
 
 A minute or two later the release is on PyPI, and `uv add -U pyweft`
@@ -52,7 +52,7 @@ uv pip install --index-url https://test.pypi.org/simple/ \
 ```
 
 TestPyPI also keeps every version forever, so a second practice run of the
-same version is skipped; raise the version (`0.1.0` → `0.1.1.dev1`) to
+same version is skipped; raise the version (`0.2.0` → `0.2.1.dev1`) to
 practise again.
 
 ## One-time setup

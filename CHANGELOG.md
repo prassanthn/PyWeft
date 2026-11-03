@@ -8,10 +8,11 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
-## 0.1.1
+## 0.2.0
 
-The first release. (It is 0.1.1 because PyPI keeps `pyweft-0.1.0` reserved
-from an earlier, deleted project of the same name.)
+The first release. (It starts at 0.2.0 because an earlier, unrelated
+project named `pyweft` used 0.1.0 to 0.1.3 and deleted them, and PyPI never
+lets a deleted file name be used again.)
 
 - **Components** in `.weft` files: an XML template, a Python code block and
   a scoped `<style>` block. `{{ }}`, `:attr`, `@event` handlers with

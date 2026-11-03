@@ -10,7 +10,7 @@ releasing moves them under the new version (see
 
 ## 0.1.0
 
-The first release, for `pyweft` 0.1.
+The first release, for `pyweft` 0.2.
 
 - **22 controls**: `Theme`, `AppShell`, `Row`, `Column`, `Grid`, `Card`,
   `Button`, `Icon`, `TextField`, `TextArea`, `NumberField`, `Select`,

@@ -24,7 +24,7 @@ from .store import Store
 from .styles import collect_styles, scope_css
 from .vdom import Element, Node, Text, to_dicts
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 __all__ = [
     "Component",
