@@ -148,6 +148,27 @@ class _WorkerHost:
 from pyweft import background as _background
 _background.set_host(_WorkerHost())
 
+class _BrowserDialogs:
+    # pyweft.dialogs through window.pyweftDialogs (below, in the page).
+    async def open(self, types, multiple):
+        accept = ",".join("." + ext for ext in types)
+        files = await js.pyweftDialogs.open(accept, multiple)
+        return [(f.name, f.data.to_bytes(), None) for f in files]
+
+    async def save(self, name, data, types):
+        from pyodide.ffi import to_js
+        from pyweft.dialogs import mime_type
+        # Blob copies the bytes at once, so the view into Python's memory
+        # that to_js gives is never kept.
+        js.pyweftDialogs.save(name, to_js(data), mime_type(name))
+        return True
+
+    async def confirm(self, message, title):
+        return bool(js.pyweftDialogs.confirm(f"{title}\\n\\n{message}" if title else message))
+
+from pyweft import dialogs as _dialogs
+_dialogs.set_host(_BrowserDialogs())
+
 _renderer.init_root()  # an async on_init keeps running as a task
 _tree = _renderer.render()
 
@@ -526,6 +547,37 @@ def pyweft_hot_reload():
       };
 
       window.pyweftWorker = pyweftWorker; // the `js` module sees globals only
+
+      // pyweft.dialogs in the browser. A file picker may only open during a
+      // user's click: the handler runs inside the click (an async one until
+      // its first await), so input.click() below still counts as the user's.
+      window.pyweftDialogs = {
+        open(accept, multiple) {
+          return new Promise((resolve) => {
+            const input = document.createElement("input");
+            Object.assign(input, { type: "file", accept, multiple });
+            input.style.display = "none";
+            const done = (files) => { input.remove(); resolve(files); };
+            input.addEventListener("change", async () => {
+              done(await Promise.all([...input.files].map(async (file) =>
+                ({ name: file.name, data: new Uint8Array(await file.arrayBuffer()) }))));
+            });
+            input.addEventListener("cancel", () => done([]));
+            document.body.appendChild(input);
+            input.click();
+          });
+        },
+        save(name, data, type) {
+          // A download: the browser decides where it goes, and may ask.
+          const url = URL.createObjectURL(new Blob([data], { type }));
+          const link = Object.assign(document.createElement("a"), { href: url, download: name });
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 10000);
+        },
+        confirm: (message) => window.confirm(message),
+      };
 
       window.pyweftTaskError = (summary, traceback) => {
         if (DEV) showDevError(summary, RUNTIME_ERROR);

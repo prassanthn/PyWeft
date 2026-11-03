@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import unquote
 
-from . import routing
+from . import dialogs, routing
 from .component import load_component
 from .differ import diff
 from .hotreload import format_error, hot_swap
@@ -149,6 +149,58 @@ class _Location:
         self.app.js("history.back()")  # comes back through hashchange
 
 
+class _Dialogs:
+    """pyweft.dialogs in a window: the system's own dialogs. They wait for
+    the user, so they run off the loop thread and the app keeps going."""
+
+    def __init__(self, app: DesktopApp):
+        self.app = app
+
+    @staticmethod
+    def _file_types(types: list[str]) -> tuple[str, ...]:
+        if not types:
+            return ()
+        patterns = ";".join(f"*.{ext}" for ext in types)
+        return (f"{', '.join(types).upper()} files ({patterns})", "All files (*.*)")
+
+    async def open(self, types: list[str], multiple: bool) -> list[tuple]:
+        import webview
+
+        paths = await asyncio.to_thread(
+            self.app.window.create_file_dialog,
+            webview.FileDialog.OPEN,
+            allow_multiple=multiple,
+            file_types=self._file_types(types),
+        )
+
+        def read() -> list[tuple]:
+            return [(Path(p).name, Path(p).read_bytes(), str(p)) for p in paths or ()]
+
+        return await asyncio.to_thread(read)
+
+    async def save(self, name: str, data: bytes, types: list[str]) -> bool:
+        import webview
+
+        chosen = await asyncio.to_thread(
+            self.app.window.create_file_dialog,
+            webview.FileDialog.SAVE,
+            save_filename=name,
+            file_types=self._file_types(types),
+        )
+        if not chosen:
+            return False
+        path = chosen if isinstance(chosen, str) else chosen[0]
+        await asyncio.to_thread(Path(path).write_bytes, data)
+        return True
+
+    async def confirm(self, message: str, title: str) -> bool:
+        return bool(
+            await asyncio.to_thread(
+                self.app.window.create_confirmation_dialog, title or "Confirm", message
+            )
+        )
+
+
 class _Api:
     """What the page can call (window.pywebview.api.*). pywebview exposes
     every public method, so this holds nothing else."""
@@ -228,6 +280,7 @@ class DesktopApp:
     def _load(self) -> None:
         sys.path.insert(0, str(self.app_dir))  # the app's own modules
         routing.set_host(_Location(self))
+        dialogs.set_host(_Dialogs(self))
         self.cls = load_component(self.app_dir / "app.weft")
         self.renderer = Renderer(self.cls())
         # Already on the loop thread whenever app code changes state, except

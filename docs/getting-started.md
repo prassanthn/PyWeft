@@ -50,6 +50,7 @@ later mobile: only the transport differs.
    [ready-made controls (pyweft-ui)](#ready-made-controls-pyweft-ui),
    [PyPI packages](#using-pypi-packages),
    [calling JavaScript](#calling-javascript),
+   [files and dialogs](#files-and-dialogs),
    [building for deployment](#building-for-deployment),
    [a desktop app](#a-desktop-app-pyweft-run---desktop)
 6. [Using the engine from plain Python](#6-using-the-engine-from-plain-python):
@@ -78,7 +79,7 @@ To hack on the framework itself, clone it and install in editable mode:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev      # or: pip install -e ".[dev]"
-uv run pytest            # 900 tests should pass
+uv run pytest            # 909 tests should pass
 ```
 
 To see it working immediately, run the bundled todo app from the clone:
@@ -1823,6 +1824,53 @@ State changed from a JavaScript callback happens outside a handler, so call
 A transport-independent way to call JavaScript, a `call` patch op that works
 identically in the browser, on desktop and in tests, is on the roadmap.
 
+### Files and dialogs
+
+`pyweft.dialogs` opens and saves files and asks yes-or-no questions, the
+same way in the browser and in a [desktop app](#a-desktop-app-pyweft-run---desktop).
+The calls are `async`, so use them in `async` handlers:
+
+```python
+import csv, io
+from pyweft import dialogs
+
+async def import_orders(self):
+    file = await dialogs.open_file(types=["csv"])
+    if file:                                    # None when cancelled
+        self.orders = list(csv.DictReader(io.StringIO(file.text)))
+
+async def export(self):
+    await dialogs.save_file(self.as_csv(), name="orders.csv")
+
+async def clear(self):
+    if await dialogs.confirm("Delete all orders?", title="Orders"):
+        self.orders = []
+```
+
+| Call | Returns | In the browser | In a desktop app |
+|---|---|---|---|
+| `open_file(types=["csv"])` | a `PickedFile`, or `None` if cancelled | the browser's file picker | the system's Open dialog |
+| `open_files(types=[...])` | a list of `PickedFile`s (empty if cancelled) | the same, choosing several | the same, choosing several |
+| `save_file(data, name="x.csv")` | `True` once saved, `False` if cancelled | a download | the system's Save As dialog |
+| `confirm(message, title="")` | `True` for OK | the browser's confirm box | a system dialog |
+
+- **A `PickedFile`** has `name`, `data` (the bytes) and `text` (the bytes
+  as UTF-8). In a desktop app it also has `path`; in the browser that is
+  `None`, because a web page is never shown your file system.
+- **`types`** are extensions: `"csv"`, `".csv"` or `"*.csv"`. `save_file`
+  takes text (saved as UTF-8) or bytes, and in the browser always returns
+  `True`, since a download can't be cancelled from the page.
+- **In the browser, open a file from a click.** Browsers only show a file
+  picker in answer to the user, so call `open_file` in a click handler
+  before any other `await`, not from a timer.
+- **In a desktop app, your code can also use files directly**, since it
+  runs in ordinary Python: `Path.home() / "Documents" / "orders.csv"`.
+  Use absolute paths (a relative one starts from where you ran
+  `pyweft run`), and keep files your app writes out of its own folder,
+  where `pyweft run` would take them for edits.
+- **In tests**, `dialogs.set_host()` installs a stand-in that answers
+  instead of the user; without one, the calls raise an error saying so.
+
 ### Building for deployment
 
 ```bash
@@ -1908,6 +1956,9 @@ run in ordinary Python, and each event and update crosses between the two.
   can use the machine (files, sockets, databases, any installed package,
   including ones with C extensions that can't run in a browser); and
   `run_in_background` runs functions on real threads.
+- **System dialogs:** [`pyweft.dialogs`](#files-and-dialogs) shows the
+  system's own Open, Save As and confirmation dialogs here, and the
+  browser's equivalents on the web, with the same code.
 - **What works the same:** templates, handlers, `@bind`, async handlers,
   effects, focus, pages and Back/Forward, stores, `pyweft-ui`, scoped styles,
   your `.css` files, `head.html` and `assets/`.
@@ -2060,7 +2111,14 @@ Working today:
   CDN stylesheets and scripts, an `assets/` folder, so CSS frameworks such as
   Tailwind and Bootstrap work.
 - **Desktop:** `pyweft run --desktop` opens the same app in a native window,
-  with Python running on your machine and hot reload included.
+  with Python running on your machine and hot reload included; the window's
+  size and the like come from `[tool.pyweft.desktop]`.
+- **Files and dialogs:** `pyweft.dialogs` opens and saves files and asks for
+  confirmation with one API: the browser's picker and downloads on the web,
+  the system's dialogs on the desktop.
+- **Title and icon:** `[tool.pyweft]` names the app and gives it an icon for
+  the browser tab and the window; `set_title()` changes the title as the
+  app runs.
 - **Tooling:** `pyweft new` / `run` / `build`; hot reload that keeps state,
   with an error overlay; the first screen rendered ahead of time, so pages
   appear at once; a customizable loading screen that shows real progress;
