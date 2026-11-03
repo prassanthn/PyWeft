@@ -52,7 +52,8 @@ later mobile: only the transport differs.
    [calling JavaScript](#calling-javascript),
    [files and dialogs](#files-and-dialogs),
    [building for deployment](#building-for-deployment),
-   [a desktop app](#a-desktop-app-pyweft-run---desktop)
+   [a desktop app](#a-desktop-app-pyweft-run---desktop),
+   [handing it out](#handing-out-a-desktop-app-pyweft-build---desktop)
 6. [Using the engine from plain Python](#6-using-the-engine-from-plain-python):
    headless tests, including async ones
 7. [What's here and what's coming](#7-whats-here-and-whats-coming)
@@ -79,7 +80,7 @@ To hack on the framework itself, clone it and install in editable mode:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev      # or: pip install -e ".[dev]"
-uv run pytest            # 909 tests should pass
+uv run pytest            # 920 tests should pass
 ```
 
 To see it working immediately, run the bundled todo app from the clone:
@@ -1932,9 +1933,8 @@ works:
   rebuild after every change you want deployed.
 - Subpath hosting works without configuration: every reference in
   `index.html` is relative, so the app runs at `/` or `/myapp/` alike.
-- Packaging a desktop app as an installer or executable (Briefcase) is on
-  the roadmap; today the static site is the only form you can hand out. To
-  run an app as a desktop app yourself, see below.
+- The same app can also be handed out as a desktop program, with
+  [`pyweft build --desktop`](#handing-out-a-desktop-app-pyweft-build---desktop).
 
 ### A desktop app: `pyweft run --desktop`
 
@@ -2006,8 +2006,46 @@ maximized = false
   `title` in `pyproject.toml` renames the open window. The other window
   settings apply the next time it opens.
 
-Close the window to stop. Running an app as a desktop app for other people,
-packaged as an installer, is the next step on the roadmap.
+Close the window to stop.
+
+### Handing out a desktop app: `pyweft build --desktop`
+
+To give your app to people who don't have Python, build it into one
+program they can run:
+
+```bash
+uv add --dev "pyweft[package]"    # once: installs PyInstaller, only where you build
+uv run pyweft build myapp --desktop
+```
+
+With pip: `pip install "pyweft[package]"`, then `pyweft build myapp --desktop`.
+
+This writes `myapp/dist-desktop/Acme Orders.exe` on Windows, an `Acme
+Orders.app` on macOS, or a program on Linux, named after your
+[title](#the-apps-title-and-icon) and carrying your icon. It contains
+Python, PyWeft, your app and everything it uses, so the people you give it
+to just run it: nothing to install.
+
+- **Build on each system you ship for.** PyInstaller builds for the system
+  it runs on: build the `.exe` on Windows, the `.app` on a Mac.
+- **What goes in:** your `.weft`, `.css` and `.py` files, `assets/`,
+  `head.html` and `pyproject.toml` (for the window settings); every module
+  your code blocks and modules import, which PyWeft finds by reading them;
+  and your component libraries, such as `pyweft-ui`, whole. Anything else in
+  the app folder stays out.
+- **The icon** must be an `.ico` for Windows and an `.icns` for macOS;
+  with another format, the program keeps the default icon and the build
+  says so.
+- **It runs like `pyweft run --desktop`**, without hot reload or a terminal.
+  If it can't start, it opens a window saying why.
+- **Size and speed:** a small app is around 15 MB, and the program unpacks
+  itself each time it starts, so it opens in a second or two.
+- **Imports PyWeft can't see**, such as `importlib.import_module(name)` with
+  a name worked out at run time, aren't bundled. Import such modules
+  plainly somewhere in your code so they're found.
+- A building tool won't sign the program: Windows and macOS may warn the
+  first time it runs, as they do for any unsigned download. Signing with a
+  certificate, and installers (`.msi`, `.dmg`), are on the roadmap.
 
 ---
 
@@ -2112,7 +2150,9 @@ Working today:
   Tailwind and Bootstrap work.
 - **Desktop:** `pyweft run --desktop` opens the same app in a native window,
   with Python running on your machine and hot reload included; the window's
-  size and the like come from `[tool.pyweft.desktop]`.
+  size and the like come from `[tool.pyweft.desktop]`. `pyweft build
+  --desktop` makes it a single program to hand out (an `.exe`, `.app` or
+  Linux program) with nothing to install.
 - **Files and dialogs:** `pyweft.dialogs` opens and saves files and asks for
   confirmation with one API: the browser's picker and downloads on the web,
   the system's dialogs on the desktop.
@@ -2126,6 +2166,7 @@ Working today:
 - **Controls:** `pyweft-ui`, 22 ready-made, themeable controls (see
   "Ready-made controls" in section 5), with a live gallery.
 
-Coming next: more controls (menus, a date picker, form validation), and
-packaging desktop apps as installers you can hand out.
+Coming next: more controls (menus, a date picker, form validation),
+publishing to PyPI, and installers (`.msi`, `.dmg`) and code signing for
+desktop apps.
 

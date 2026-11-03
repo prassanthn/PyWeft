@@ -29,6 +29,9 @@ dev = ["pytest>=7"]
 # `pyweft run --desktop`: the app in a native window. Optional, so the core
 # stays dependency-free and web-only apps never install it.
 desktop = ["pywebview>=5"]
+# `pyweft build --desktop`: a standalone app to hand out. Needed only where
+# the app is built, never by the people who run it.
+package = ["pywebview>=5", "pyinstaller>=6"]
 
 [project.urls]
 Homepage = "https://github.com/prassanthn/PyWeft"

@@ -99,7 +99,8 @@ def app_settings(app_dir: Path) -> dict:
 ASSETS_DIR = "assets"
 # assets/ is served as-is (images, fonts, vendored CSS/JS), so a .css file in
 # it must not be linked automatically and a .weft file there is not a component.
-_SKIP_DIRS = {"dist", "node_modules", ASSETS_DIR}
+# dist-desktop holds `pyweft build --desktop` output.
+_SKIP_DIRS = {"dist", "dist-desktop", "node_modules", ASSETS_DIR}
 
 
 def _app_files(app_dir: Path, suffix: str) -> list[str]:
@@ -373,7 +374,7 @@ def browser_packages(app_dir: Path) -> list[str]:
 
 
 # Never shipped to the browser: they run where `pyweft` runs.
-_HOST_ONLY = {"cli.py", "__main__.py", "prerender.py", "desktop.py"}
+_HOST_ONLY = {"cli.py", "__main__.py", "prerender.py", "desktop.py", "packaging.py"}
 
 
 def pyweft_modules() -> list[str]:
@@ -970,6 +971,12 @@ def main(argv: list[str] | None = None) -> int:
         help="open the app in a native window, with Python running on this "
         'machine (needs pywebview: uv add "pyweft[desktop]")',
     )
+    p_build.add_argument(
+        "--desktop",
+        action="store_true",
+        help="build a desktop app to hand out (an .exe, .app or program) into "
+        'dist-desktop/ (needs PyInstaller: uv add --dev "pyweft[package]")',
+    )
 
     args = parser.parse_args(argv)
     try:
@@ -981,6 +988,10 @@ def main(argv: list[str] | None = None) -> int:
             run_desktop(args.app_dir)
         elif args.command == "run":
             cmd_run(args.app_dir, args.port, prerender=not args.no_prerender)
+        elif args.desktop:
+            from .packaging import build_desktop
+
+            build_desktop(args.app_dir, args.out or args.app_dir / "dist-desktop")
         else:
             cmd_build(
                 args.app_dir, args.out or args.app_dir / "dist", prerender=not args.no_prerender

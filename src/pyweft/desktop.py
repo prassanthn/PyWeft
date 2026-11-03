@@ -539,7 +539,9 @@ def watch(app: DesktopApp, stop: threading.Event, interval: float = 0.3) -> None
             app.js("location.reload()")  # head.html, assets: the page remounts
 
 
-def run_desktop(app_dir: Path) -> None:
+def run_desktop(app_dir: Path, dev: bool = True) -> None:
+    """The app in a window until it closes. ``dev`` (``pyweft run``) adds
+    hot reload and terminal messages; a packaged app runs without them."""
     from .cli import CliError, app_identity, app_pyweft_files
 
     app_pyweft_files(app_dir)  # fails fast without an app.weft
@@ -564,9 +566,10 @@ def run_desktop(app_dir: Path) -> None:
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     app.window = webview.create_window(identity.title, url, js_api=app.api, **options)
     stop = threading.Event()
-    threading.Thread(target=watch, args=(app, stop), daemon=True).start()
-    print(f"pyweft: {app_dir} in a desktop window (close it to stop)")
-    print("  hot reload is on: saved .weft and .css files appear in the window")
+    if dev:
+        threading.Thread(target=watch, args=(app, stop), daemon=True).start()
+        print(f"pyweft: {app_dir} in a desktop window (close it to stop)")
+        print("  hot reload is on: saved .weft and .css files appear in the window")
     icon = window_icon(app_dir, identity.icon)
     try:
         webview.start(**({"icon": icon} if icon else {}))  # until the window closes
@@ -574,3 +577,30 @@ def run_desktop(app_dir: Path) -> None:
         stop.set()
         server.shutdown()
         app.stop()
+
+
+_STARTUP_ERROR = """<!DOCTYPE html><html><head><meta charset="utf-8"><title>{title}</title>
+<style>body {{ font: 15px/1.5 system-ui, sans-serif; margin: 2rem; color: #1f2328; }}
+pre {{ background: #f6f8fa; padding: 1rem; border-radius: 8px; white-space: pre-wrap; }}</style>
+</head><body><h1>{title} couldn't start</h1><pre>{error}</pre></body></html>"""
+
+
+def run_packaged(app_dir: Path) -> None:
+    """Entry point of an app built with ``pyweft build --desktop``. There's
+    no terminal to print to, so a failure to start shows in a window."""
+    try:
+        run_desktop(app_dir, dev=False)
+    except Exception as exc:  # noqa: BLE001 - shown to the user instead
+        import webview
+
+        from .cli import CliError, app_identity
+
+        detail = str(exc) if isinstance(exc, CliError) else traceback.format_exc()
+        try:
+            title = escape(app_identity(app_dir).title)
+        except Exception:  # noqa: BLE001 - the settings may be what failed
+            title = "The app"
+        webview.create_window(
+            "Couldn't start", html=_STARTUP_ERROR.format(title=title, error=escape(detail))
+        )
+        webview.start()

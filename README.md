@@ -25,9 +25,9 @@ count: int = 0
 Type in the box and the heading follows; click and the count goes up. State
 is plain Python fields, and the page updates itself after every event.
 
-> **Status:** a working proof of concept. Web and desktop apps run today;
-> packaging desktop apps as installers is planned. APIs may still change.
-> Not on PyPI yet, so you install from GitHub (below).
+> **Status:** a working proof of concept. Web apps and desktop apps (run
+> locally or built into a program to hand out) work today. APIs may still
+> change. Not on PyPI yet, so you install from GitHub (below).
 
 ## Quick start
 
@@ -76,6 +76,14 @@ your machine:
 ```bash
 uv add "pyweft[desktop]"
 uv run pyweft run myapp --desktop
+```
+
+To hand it to people without Python, build it into one program (an `.exe`
+on Windows, a `.app` on macOS) in `myapp/dist-desktop/`:
+
+```bash
+uv add --dev "pyweft[package]"
+uv run pyweft build myapp --desktop
 ```
 
 Name the app and give it an icon in `myapp/pyproject.toml`, for the browser
@@ -190,6 +198,7 @@ To see every control live, clone this repository and run
 | Build screens with the ready-made controls | [pyweft-ui guide](packages/pyweft-ui/docs/guide.md), then the [reference](packages/pyweft-ui/README.md) |
 | Deploy your app | [Building for deployment](docs/getting-started.md#building-for-deployment) |
 | Run it as a desktop app | [A desktop app](docs/getting-started.md#a-desktop-app-pyweft-run---desktop) |
+| Hand out a desktop app (`.exe`, `.app`) | [Handing out a desktop app](docs/getting-started.md#handing-out-a-desktop-app-pyweft-build---desktop) |
 | Open and save files, ask for confirmation | [Files and dialogs](docs/getting-started.md#files-and-dialogs) |
 | Name the app, give it an icon | [The app's title and icon](docs/getting-started.md#the-apps-title-and-icon) |
 | Test components without a browser | [Using the engine from plain Python](docs/getting-started.md#6-using-the-engine-from-plain-python) |
@@ -233,7 +242,7 @@ place where PyWeft tracks which fields you read.
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev          # also installs packages/pyweft-ui, editable
-uv run pytest                # 909 tests, including pyweft-ui's
+uv run pytest                # 920 tests, including pyweft-ui's
 uv run python examples/demo.py              # render -> event -> diff -> apply, no browser
 uv run pyweft run examples/todo             # the todo app
 uv run pyweft run packages/pyweft-ui/gallery  # every control
@@ -263,7 +272,7 @@ Under the hood:
 ## Roadmap
 
 **Done:** the render core and differ; the browser target; the desktop target
-(pywebview); components with props, events, slots and component libraries;
+(pywebview), and standalone desktop programs (PyInstaller); components with props, events, slots and component libraries;
 pages and navigation; shared state with stores; events with modifiers and
 `@bind` for every form control; moving focus from Python; effects; async
 handlers and Web Worker background work; file and confirmation dialogs on
@@ -272,8 +281,9 @@ and CSS framework support; the `pyweft` CLI with hot reload, static builds
 and pre-rendered first screens; `pyweft-ui` with 22 keyboard-accessible
 controls and a gallery.
 
-**Next:** more controls (menus, a date picker, form validation); publishing
-`pyweft` and `pyweft-ui` to PyPI; packaging desktop apps as installers.
+**Next:** publishing `pyweft` and `pyweft-ui` to PyPI; more controls (menus,
+a date picker, form validation); installers (`.msi`, `.dmg`) and code
+signing for desktop apps.
 
 **Later:** mobile packaging with Briefcase, developer tools.
 
