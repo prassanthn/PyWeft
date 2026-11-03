@@ -17,7 +17,7 @@ from .effects import effect
 from .events import Event
 from .expressions import ExpressionError
 from .parser import TemplateError, parse_template, split_source
-from .renderer import EffectLoopError, Renderer
+from .renderer import EffectLoopError, Renderer, set_title
 from .routing import Link, navigate, router
 from .store import Store
 from .styles import collect_styles, scope_css
@@ -40,6 +40,7 @@ __all__ = [
     "Link",
     "navigate",
     "Store",
+    "set_title",
     "collect_styles",
     "scope_css",
     "diff",

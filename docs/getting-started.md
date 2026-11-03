@@ -44,6 +44,7 @@ later mobile: only the transport differs.
 5. [Starting a new project](#5-starting-a-new-project):
    [hot reload](#hot-reload), [the loading screen](#the-loading-screen),
    [the first screen before Python starts](#the-first-screen-before-python-starts),
+   [title and icon](#the-apps-title-and-icon),
    [head.html and assets](#the-page-head-and-the-assets-folder),
    [CSS frameworks (Tailwind, Bootstrap)](#using-css-frameworks),
    [ready-made controls (pyweft-ui)](#ready-made-controls-pyweft-ui),
@@ -77,7 +78,7 @@ To hack on the framework itself, clone it and install in editable mode:
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev      # or: pip install -e ".[dev]"
-uv run pytest            # 875 tests should pass
+uv run pytest            # 900 tests should pass
 ```
 
 To see it working immediately, run the bundled todo app from the clone:
@@ -1307,6 +1308,10 @@ Calling `navigate()` in a page's `on_init` redirects: the new page replaces
 it before anything is shown. Use `replace=True` there so Back doesn't land on
 the redirect again.
 
+**Page titles:** call `set_title(f"Order #{self.id} - Acme")` in a page's
+`on_init` to name the browser tab or window after it (see
+[the app's title and icon](#the-apps-title-and-icon)).
+
 **The page for unknown addresses** is `pages/not_found.weft`; declare
 `path: str = ""` in it to show the address that was asked for. Without the
 file, a plain "There is no page at …" message is shown.
@@ -1515,6 +1520,39 @@ Two things to know:
 
 The bar's color is your system's highlight color; set `--pyweft-bar-color`
 on `:root` in your CSS to change it.
+
+### The app's title and icon
+
+Name your app in its `pyproject.toml` (`pyweft new` starts you off):
+
+```toml
+[tool.pyweft]
+title = "Acme Orders"
+icon = "assets/icon.ico"
+```
+
+- **`title`** is the browser tab's title, and the desktop window's. Without
+  it, the app folder's name is used.
+- **`icon`** is the browser tab's icon (favicon) and the desktop window's.
+  It must be a file in your app's `assets/` folder: `.ico` (needed for a
+  Windows window icon), `.png` or `.svg`.
+
+A mistake, such as a misspelled setting or an icon that isn't there, stops
+`pyweft run` and `build` with a message naming it.
+
+**Changing the title while the app runs:** call `set_title()` from a
+handler, an `on_init` or a task:
+
+```python
+from pyweft import set_title
+
+def on_init(self):
+    set_title(f"Order #{self.id} - Acme")
+```
+
+It updates the browser tab, or the window in a desktop app. A title stays
+until the next `set_title()`, so with [pages](#pages-and-navigation), give
+each page its own in its `on_init`.
 
 ### The page head and the assets folder
 
@@ -1886,6 +1924,36 @@ run in ordinary Python, and each event and update crosses between the two.
   browser. If you start threads of your own, hand results back with
   `run_in_background` or asyncio rather than changing component state from
   another thread.
+
+**The window** takes its title and icon from
+[`[tool.pyweft]`](#the-apps-title-and-icon), and the rest from
+`[tool.pyweft.desktop]` in your app's `pyproject.toml`:
+
+```toml
+[tool.pyweft.desktop]
+width = 1200
+height = 800
+min_size = [800, 600]
+maximized = false
+```
+
+| Setting | Meaning | Default |
+|---|---|---|
+| `width`, `height` | the window's size in pixels when it opens | 1100, 800 |
+| `min_size` | the smallest it can be resized to, `[width, height]` | none |
+| `resizable` | whether the user can resize it | `true` |
+| `maximized`, `fullscreen` | open maximized, or full screen | `false` |
+| `on_top` | stay above other windows | `false` |
+| `frameless` | no title bar or border (your page draws everything) | `false` |
+| `background_color` | shown before the page paints, like `"#0d1117"` | the system's |
+
+- **The icon** shows on the window and in the taskbar on Windows (it must
+  be an `.ico`; other formats keep the default icon, and the terminal says
+  so) and on Linux. On macOS the Dock icon comes from a packaged app, so it
+  waits for packaging.
+- **`set_title()`** renames the window while the app runs, and saving a new
+  `title` in `pyproject.toml` renames the open window. The other window
+  settings apply the next time it opens.
 
 Close the window to stop. Running an app as a desktop app for other people,
 packaged as an installer, is the next step on the roadmap.

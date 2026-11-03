@@ -44,6 +44,10 @@ class FakeWindow:
         self.dom = []
         self.scripts = []
         self.done = 0
+        self.title = None
+
+    def set_title(self, title):
+        self.title = title
 
     def evaluate_js(self, script):
         self.scripts.append(script)
@@ -133,6 +137,14 @@ def test_focus_requests_follow_the_render(desktop):
     flush(app, lambda: any("commands" in s for s in window.scripts))
     (cmd,) = [s for s in window.scripts if s.startswith("pyweftDesktop.commands(")]
     assert json.loads(cmd[len("pyweftDesktop.commands(") : -1]) == [{"op": "focus", "path": [0, 4]}]
+
+
+def test_set_title_names_the_window_and_the_page(desktop):
+    app, window, _ = desktop({"app.weft": APP})
+    app.call(lambda: __import__("pyweft").set_title("Order #7 - Acme"))
+    flush(app, lambda: window.title is not None)
+    assert window.title == "Order #7 - Acme"
+    assert any(s.startswith("pyweftDesktop.commands(") and "Order #7" in s for s in window.scripts)
 
 
 def test_pages_navigate_both_ways(desktop):

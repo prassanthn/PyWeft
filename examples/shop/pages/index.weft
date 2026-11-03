@@ -9,5 +9,8 @@
 </template>
 
 <code>
-from pyweft import navigate
+from pyweft import navigate, set_title
+
+def on_init(self):
+    set_title("Shop")   # each page names itself; a title stays until the next
 </code>

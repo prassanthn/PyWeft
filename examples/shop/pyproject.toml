@@ -2,3 +2,14 @@
 name = "shop"
 version = "0.1.0"
 dependencies = []
+
+# The app's name and icon: the browser tab and favicon, and the desktop window.
+[tool.pyweft]
+title = "Shop"
+icon = "assets/icon.ico"
+
+# The window, for `pyweft run examples/shop --desktop`.
+[tool.pyweft.desktop]
+width = 960
+height = 720
+min_size = [480, 400]

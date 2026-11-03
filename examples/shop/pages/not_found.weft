@@ -6,7 +6,10 @@
 </template>
 
 <code>
-from pyweft import Link
+from pyweft import Link, set_title
 
 path: str = ""
+
+def on_init(self):
+    set_title("Not found - Shop")
 </code>

@@ -4,3 +4,10 @@
     <p>Orders are shipped within two days. Questions? Write to the shop.</p>
   </section>
 </template>
+
+<code>
+from pyweft import set_title
+
+def on_init(self):
+    set_title("Help - Shop")
+</code>

@@ -323,6 +323,9 @@ const PyWeftRuntime = (() => {
         case "save_focus":
           savedFocus.push(document.activeElement);
           break;
+        case "set_title":
+          document.title = cmd.text;
+          break;
         case "restore_focus": {
           const target = savedFocus.pop();
           if (target && target.isConnected) target.focus();

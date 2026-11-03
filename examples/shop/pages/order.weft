@@ -14,6 +14,7 @@
 <code>
 # route sets this page's URL; {id} arrives as the int declared below.
 import asyncio
+from pyweft import set_title
 from pyweft.routing import back
 import orders_data
 from pins import pins
@@ -23,6 +24,7 @@ id: int = 0
 order = None
 
 async def on_init(self):
+    set_title(f"Order #{self.id} - Shop")   # the tab, or the window
     await asyncio.sleep(0.4)        # a real app fetches from its server here
     self.order = orders_data.find(self.id) or {}
 </code>

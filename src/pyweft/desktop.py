@@ -22,9 +22,11 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import json
+import re
 import sys
 import threading
 import traceback
+from html import escape
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
@@ -258,6 +260,10 @@ class DesktopApp:
         while self.renderer.after_render():
             self._push(self._render())
         commands = self.renderer.take_commands()
+        for command in commands:
+            # The page's <title> is set too, but the window keeps its own.
+            if command["op"] == "set_title" and hasattr(self.window, "set_title"):
+                self.window.set_title(command["text"])
         if commands:
             self.js(f"pyweftDesktop.commands({json.dumps(commands)})")
 
@@ -308,11 +314,86 @@ class DesktopApp:
         print(f"pyweft: hot-reloaded {', '.join(names) or 'app'}")
 
 
+# --------------------------------------------------------------- settings
+
+# [tool.pyweft.desktop] in the app's pyproject.toml: setting -> (kind, default).
+_WINDOW_SETTINGS: dict[str, tuple[str, Any]] = {
+    "width": ("pixels", 1100),
+    "height": ("pixels", 800),
+    "min_size": ("pair", None),
+    "resizable": ("bool", True),
+    "maximized": ("bool", False),
+    "fullscreen": ("bool", False),
+    "on_top": ("bool", False),
+    "frameless": ("bool", False),
+    "background_color": ("color", None),
+}
+_KINDS = {
+    "pixels": "a whole number of pixels, like 1200",
+    "pair": "two whole numbers, like [800, 600]",
+    "bool": "true or false",
+    "color": 'a colour like "#1e293b"',
+}
+
+
+def _fits(kind: str, value: Any) -> bool:
+    def pixels(v: Any) -> bool:
+        return isinstance(v, int) and not isinstance(v, bool) and v > 0
+
+    if kind == "pixels":
+        return pixels(value)
+    if kind == "pair":
+        return isinstance(value, list) and len(value) == 2 and all(pixels(v) for v in value)
+    if kind == "bool":
+        return isinstance(value, bool)
+    return isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value) is not None
+
+
+def window_options(app_dir: Path) -> dict[str, Any]:
+    """``webview.create_window`` arguments from ``[tool.pyweft.desktop]``;
+    anything the app leaves out keeps its default. A setting that doesn't
+    exist or doesn't fit is a CliError naming it."""
+    from .cli import CliError, app_settings
+
+    settings = app_settings(app_dir).get("desktop", {})
+    unknown = sorted(set(settings) - set(_WINDOW_SETTINGS))
+    if unknown:
+        raise CliError(
+            f"pyproject.toml [tool.pyweft.desktop] has no setting {unknown[0]!r}; "
+            f"the settings are {', '.join(_WINDOW_SETTINGS)}"
+        )
+    options: dict[str, Any] = {}
+    for name, (kind, default) in _WINDOW_SETTINGS.items():
+        value = settings.get(name, default)
+        if value is None:
+            continue
+        if not _fits(kind, value):
+            raise CliError(
+                f"pyproject.toml [tool.pyweft.desktop] {name} must be {_KINDS[kind]}, "
+                f"not {value!r}"
+            )
+        options[name] = tuple(value) if kind == "pair" else value
+    return options
+
+
+def window_icon(app_dir: Path, icon: str | None) -> str | None:
+    """The icon file for pywebview, where the platform can use it: an .ico
+    on Windows, any image on Linux. macOS takes the Dock icon from a packaged
+    app, so there it waits for packaging."""
+    if icon is None or sys.platform == "darwin":
+        return None
+    if sys.platform == "win32" and not icon.lower().endswith(".ico"):
+        print(f"pyweft: {icon} isn't an .ico file, which a Windows window icon needs; "
+              "the window keeps the default icon")
+        return None
+    return str((Path(app_dir) / icon).resolve())
+
+
 # ---------------------------------------------------------------- serving
 
 
 def page(app_dir: Path) -> str:
-    from .cli import app_css_files, head_extras, linked_app_css
+    from .cli import app_css_files, app_identity, head_extras, linked_app_css
 
     head = head_extras(app_dir)
     linked = linked_app_css(head)
@@ -321,8 +402,10 @@ def page(app_dir: Path) -> str:
         for name in app_css_files(app_dir)
         if name not in linked
     )
-    html = _PAGE.replace("__TITLE__", app_dir.resolve().name).replace("__CSS__", css)
-    return html.replace("__HEAD__", head)  # last: the app's own text
+    html = _PAGE.replace("__CSS__", css)
+    # Last, in one pass: the app's own text is never taken for a placeholder.
+    user = {"__TITLE__": escape(app_identity(app_dir).title), "__HEAD__": head}
+    return re.sub("__(?:TITLE|HEAD)__", lambda m: user[m.group(0)], html)
 
 
 def make_server(app_dir: Path) -> ThreadingHTTPServer:
@@ -359,6 +442,21 @@ def make_server(app_dir: Path) -> ThreadingHTTPServer:
     return ThreadingHTTPServer(("127.0.0.1", 0), Handler)
 
 
+def _retitle(app: DesktopApp) -> None:
+    # The title can follow an edit; size and the other window settings are
+    # fixed when the window opens.
+    from .cli import CliError, app_identity
+
+    try:
+        title = app_identity(app.app_dir).title
+    except CliError as exc:
+        print(f"pyweft: {exc}", file=sys.stderr)
+        return
+    if app.window is not None:
+        app.window.set_title(title)
+    print("pyweft: window settings other than the title apply after a restart")
+
+
 def watch(app: DesktopApp, stop: threading.Event, interval: float = 0.3) -> None:
     """Hot reload for the window, from the same file snapshot as the
     browser's dev server."""
@@ -377,6 +475,8 @@ def watch(app: DesktopApp, stop: threading.Event, interval: float = 0.3) -> None
             names = ", ".join(sorted(k.removeprefix("pyweft:") for k in changed))
             print(f"pyweft: {names} changed; restart `pyweft run --desktop` to use it")
             continue
+        if "pyproject.toml" in changed:
+            _retitle(app)
         weft = [k for k in changed if k.endswith(".weft")]
         if weft:
             app.post(app.hot_reload)
@@ -386,10 +486,12 @@ def watch(app: DesktopApp, stop: threading.Event, interval: float = 0.3) -> None
             app.js("location.reload()")  # head.html, assets: the page remounts
 
 
-def run_desktop(app_dir: Path, width: int = 1100, height: int = 800) -> None:
-    from .cli import CliError, app_pyweft_files
+def run_desktop(app_dir: Path) -> None:
+    from .cli import CliError, app_identity, app_pyweft_files
 
     app_pyweft_files(app_dir)  # fails fast without an app.weft
+    identity = app_identity(app_dir)  # and on a mistake in the settings
+    options = window_options(app_dir)
     try:
         import webview
     except ImportError:
@@ -407,15 +509,14 @@ def run_desktop(app_dir: Path, width: int = 1100, height: int = 800) -> None:
     server = make_server(app_dir)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     url = f"http://127.0.0.1:{server.server_address[1]}/"
-    app.window = webview.create_window(
-        Path(app_dir).resolve().name, url, js_api=app.api, width=width, height=height
-    )
+    app.window = webview.create_window(identity.title, url, js_api=app.api, **options)
     stop = threading.Event()
     threading.Thread(target=watch, args=(app, stop), daemon=True).start()
     print(f"pyweft: {app_dir} in a desktop window (close it to stop)")
     print("  hot reload is on: saved .weft and .css files appear in the window")
+    icon = window_icon(app_dir, identity.icon)
     try:
-        webview.start()  # until the window closes
+        webview.start(**({"icon": icon} if icon else {}))  # until the window closes
     finally:
         stop.set()
         server.shutdown()

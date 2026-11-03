@@ -56,6 +56,46 @@ def app_dependencies(app_dir: Path) -> list[str]:
     return re.findall(r"[\"']([^\"']+)[\"']", match.group(1)) if match else []
 
 
+def _flat_table(text: str, name: str) -> dict:
+    """3.10 fallback for reading one TOML table of simple values (strings,
+    numbers, booleans, lists of those), which is all PyWeft's settings use."""
+    import ast
+
+    match = re.search(rf"^\[{re.escape(name)}\]\s*$(.*?)(?=^\[|\Z)", text, re.S | re.M)
+    table: dict = {}
+    for line in (match.group(1) if match else "").splitlines():
+        line = line.split(" #", 1)[0].strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        value = re.sub(r"\btrue\b", "True", re.sub(r"\bfalse\b", "False", value.strip()))
+        try:
+            table[key.strip()] = ast.literal_eval(value)
+        except (ValueError, SyntaxError):
+            raise CliError(f"pyproject.toml [{name}]: can't read {line!r}") from None
+    return table
+
+
+def app_settings(app_dir: Path) -> dict:
+    """The app's ``[tool.pyweft]`` table from its pyproject.toml, with any
+    ``[tool.pyweft.desktop]`` under ``"desktop"``; empty without one."""
+    pyproject = app_dir / "pyproject.toml"
+    if not pyproject.exists():
+        return {}
+    text = pyproject.read_text(encoding="utf-8")
+    if tomllib is not None:
+        try:
+            data = tomllib.loads(text)
+        except tomllib.TOMLDecodeError as exc:
+            raise CliError(f"{pyproject}: {exc}") from None
+        return dict(data.get("tool", {}).get("pyweft", {}))
+    settings = _flat_table(text, "tool.pyweft")
+    desktop = _flat_table(text, "tool.pyweft.desktop")
+    if desktop:
+        settings["desktop"] = desktop
+    return settings
+
+
 ASSETS_DIR = "assets"
 # assets/ is served as-is (images, fonts, vendored CSS/JS), so a .css file in
 # it must not be linked automatically and a .weft file there is not a component.
@@ -147,6 +187,50 @@ def _asset_path(app_dir: Path, rel: str) -> Path | None:
     if path == root or not path.is_relative_to(root) or not path.is_file():
         return None
     return path
+
+
+_APP_SETTINGS = ("title", "icon", "desktop")
+_ICON_TYPES = (".ico", ".png", ".svg")
+
+
+@dataclass
+class AppIdentity:
+    title: str
+    icon: str | None  # path below the app folder, always under assets/
+
+
+def app_identity(app_dir: Path) -> AppIdentity:
+    """The app's name and icon, from ``[tool.pyweft]``: the browser tab and
+    favicon, and the desktop window. The folder name when there's no title."""
+    settings = app_settings(app_dir)
+    unknown = sorted(set(settings) - set(_APP_SETTINGS))
+    if unknown:
+        raise CliError(
+            f"pyproject.toml [tool.pyweft] has no setting {unknown[0]!r}; "
+            f"the settings are {', '.join(_APP_SETTINGS)}"
+        )
+    title = settings.get("title", app_dir.resolve().name)
+    if not isinstance(title, str) or not title.strip():
+        raise CliError('pyproject.toml [tool.pyweft] title must be text, like title = "My App"')
+    icon = settings.get("icon")
+    if icon is not None:
+        if not isinstance(icon, str):
+            raise CliError(
+                'pyproject.toml [tool.pyweft] icon must be a path, like icon = "assets/icon.ico"'
+            )
+        icon = icon.replace("\\", "/").removeprefix("./")
+        inside = icon.startswith(ASSETS_DIR + "/")
+        if not inside or _asset_path(app_dir, icon[len(ASSETS_DIR) + 1 :]) is None:
+            raise CliError(
+                f"pyproject.toml [tool.pyweft] icon {icon!r} must be a file in the "
+                f"app's {ASSETS_DIR}/ folder, so the browser can show it too"
+            )
+        if not icon.lower().endswith(_ICON_TYPES):
+            raise CliError(
+                f"pyproject.toml [tool.pyweft] icon {icon!r} must be one of "
+                f"{', '.join(_ICON_TYPES)} (.ico for a Windows window icon)"
+            )
+    return AppIdentity(title=title.strip(), icon=icon)
 
 
 # mimetypes reads the Windows registry, which can be wrong or missing these.
@@ -411,6 +495,8 @@ def render_shell(
         # Not clickable until Python has taken over; the address it was
         # rendered at, so a page opened elsewhere can drop it (shell.html).
         app_attrs = f' data-pyweft-prerendered="{escape(pre["location"])}" inert'
+    identity = app_identity(app_dir)
+    icon = f'<link rel="icon" href="{escape(identity.icon)}" />' if identity.icon else ""
     head = head_extras(app_dir)
     linked = linked_app_css(head)
     css = "\n  ".join(
@@ -420,7 +506,7 @@ def render_shell(
     )
     html = (_STATIC / "shell.html").read_text(encoding="utf-8")
     html = (
-        html.replace("__PYWEFT_TITLE__", app_dir.resolve().name)
+        html.replace("__PYWEFT_ICON__", icon)
         .replace("__PYWEFT_MODULES__", json.dumps(pyweft_modules()))
         .replace("__PYWEFT_APP_FILES__", json.dumps(app_shipped_files(app_dir)))
         .replace("__PYWEFT_PACKAGES__", json.dumps(browser_packages(app_dir)))
@@ -434,7 +520,7 @@ def render_shell(
         .replace("__PYWEFT_APP_ATTRS__", app_attrs)
     )
     leftover = re.search(
-        r"__PYWEFT_(?!HEAD__|LOADING__|PRERENDER__|PRERENDER_CSS__)[A-Z_]+?__", html
+        r"__PYWEFT_(?!TITLE__|HEAD__|LOADING__|PRERENDER__|PRERENDER_CSS__)[A-Z_]+?__", html
     )
     if leftover:
         # Only possible when shell.html is newer than this process's code:
@@ -448,13 +534,14 @@ def render_shell(
     # taken for a placeholder (not even one in the other file). The
     # pre-rendered page counts: it is the app's own text.
     user = {
+        "__PYWEFT_TITLE__": escape(identity.title),
         "__PYWEFT_HEAD__": head,
         "__PYWEFT_LOADING__": loading_screen(app_dir),
         "__PYWEFT_PRERENDER__": pre["html"] if pre else "",
         "__PYWEFT_PRERENDER_CSS__": pre["css"] if pre else "",
     }
     return re.sub(
-        "__PYWEFT_(?:HEAD|LOADING|PRERENDER_CSS|PRERENDER)__",
+        "__PYWEFT_(?:TITLE|HEAD|LOADING|PRERENDER_CSS|PRERENDER)__",
         lambda m: user[m.group(0)],
         html,
     )
@@ -526,7 +613,10 @@ def cmd_new(target: Path) -> None:
         raise CliError(f"{target} already exists and is not empty")
     target.mkdir(parents=True, exist_ok=True)
     (target / "pyproject.toml").write_text(
-        f'[project]\nname = "{target.name}"\nversion = "0.1.0"\ndependencies = []\n',
+        f'[project]\nname = "{target.name}"\nversion = "0.1.0"\ndependencies = []\n\n'
+        "# The app's name, and an icon from assets/ (the browser tab, favicon\n"
+        "# and desktop window). [tool.pyweft.desktop] sets the window's size.\n"
+        f'[tool.pyweft]\ntitle = "{target.name}"\n# icon = "assets/icon.ico"\n',
         encoding="utf-8",
     )
     (target / "app.weft").write_text(_SCAFFOLD_APP, encoding="utf-8")

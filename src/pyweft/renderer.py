@@ -27,7 +27,7 @@ from .effects import dispose_effects, run_effects
 from .events import Event
 from .expressions import ExpressionError, Scope, eval_expr, render_parts, run_handler
 from .parser import TElement, TemplateError, TFill, TFor, TIf, TSlot, TStatic
-from .store import _renderers as _store_renderers
+from .store import _renderers as _live_renderers
 from .styles import marker
 from .vdom import Element, Node, Text
 
@@ -112,6 +112,19 @@ def _merge_attrs(attrs: dict[str, str], extra: dict[str, str]) -> None:
             attrs[name] = value
 
 
+def set_title(text: str) -> None:
+    """Set the title of the browser tab, or of the window in a desktop app:
+    ``set_title(f"Order #{self.id} - Acme")`` in a page's ``on_init``. It
+    applies once the render in progress is on the page, and stays until the
+    next call, so each page that wants its own title sets it."""
+    for renderer in list(_live_renderers):
+        renderer.set_title(str(text))
+        if not renderer.rendering:
+            # Outside a handler nothing else would render and settle, which
+            # is when hosts carry requests out.
+            renderer.component.state_has_changed()
+
+
 def _takes_arg(fn: Callable) -> bool:
     """Does this callable want the event object passed in?"""
     try:
@@ -156,7 +169,7 @@ class Renderer:
         self._tree: list[Node] = []
         self._commands: list[tuple[Any, str, str | None]] = []
         self._watch(component)
-        _store_renderers.add(self)  # a shared Store's changes reach this host
+        _live_renderers.add(self)  # a Store's changes and set_title() reach this host
 
     def _watch(self, component: Any) -> None:
         component.__dict__["_pw_invalidate"] = self._invalidated
@@ -167,6 +180,10 @@ class Renderer:
 
     def _command(self, component: Any, op: str, ref: str | None) -> None:
         self._commands.append((component, op, ref))
+
+    def set_title(self, text: str) -> None:
+        """See the module-level set_title()."""
+        self._commands.append((None, "set_title", text))
 
     def take_commands(self) -> list[dict[str, Any]]:
         """Requests such as ``focus("email")`` made since the last call, as
@@ -181,6 +198,9 @@ class Renderer:
         for a vanished handler."""
         out: list[dict[str, Any]] = []
         for component, op, ref in self._commands:
+            if op == "set_title":
+                out.append({"op": op, "text": ref})
+                continue
             if ref is None:
                 out.append({"op": op})
                 continue

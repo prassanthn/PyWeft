@@ -78,6 +78,19 @@ uv add "pyweft[desktop]"
 uv run pyweft run myapp --desktop
 ```
 
+Name the app and give it an icon in `myapp/pyproject.toml`, for the browser
+tab and the window alike, and size the window there too:
+
+```toml
+[tool.pyweft]
+title = "Acme Orders"
+icon = "assets/icon.ico"
+
+[tool.pyweft.desktop]
+width = 1200
+height = 800
+```
+
 ## Ready-made controls (no HTML or CSS needed)
 
 [`pyweft-ui`](packages/pyweft-ui/README.md) gives you styled, accessible
@@ -215,7 +228,7 @@ place where PyWeft tracks which fields you read.
 ```bash
 git clone https://github.com/prassanthn/PyWeft.git && cd PyWeft
 uv sync --extra dev          # also installs packages/pyweft-ui, editable
-uv run pytest                # 875 tests, including pyweft-ui's
+uv run pytest                # 900 tests, including pyweft-ui's
 uv run python examples/demo.py              # render -> event -> diff -> apply, no browser
 uv run pyweft run examples/todo             # the todo app
 uv run pyweft run packages/pyweft-ui/gallery  # every control

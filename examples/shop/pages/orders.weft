@@ -20,11 +20,14 @@
 
 <code>
 # Shown at #/orders; ?status=paid fills the `status` field.
-from pyweft import Link
+from pyweft import Link, set_title
 from orders_data import ORDERS
 from pins import pins
 
 status: str = "all"
+
+def on_init(self):
+    set_title("Orders - Shop")
 
 @property
 def shown(self):
