@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.3  # publishes no major-version tag
       # mkdocs-material needs 3.11+; the default dev group brings pyweft-ui
       # for the gallery
       - run: uv sync --group website --python 3.13
