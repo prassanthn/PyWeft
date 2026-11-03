@@ -1696,6 +1696,21 @@ page:
 `@apply` works in `_tailwind/input.css`, but not in a component's `<style>`
 block, which Tailwind never reads.
 
+**Classes that depend on state.** A `:class` sets the whole attribute, so
+an element with both `class` and `:class` gets only the `:class` one. Put
+the fixed classes in the expression too:
+
+```xml
+<button @click="show = name"
+        :class="'rounded-lg px-3 py-1.5 ' + ('bg-slate-900 text-white' if name == show else 'text-slate-500')">
+  {{ name }}
+</button>
+```
+
+The todo and shop examples (`examples/todo`, `examples/shop`) are styled
+with Tailwind's CLI exactly as above: see each one's `_tailwind/input.css`
+for the setup and the command that rebuilds its `tailwind.css`.
+
 ### Ready-made controls: pyweft-ui
 
 If you'd rather not write HTML and CSS at all, `pyweft-ui` gives you styled,

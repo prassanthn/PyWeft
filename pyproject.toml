@@ -71,4 +71,10 @@ pyweft-ui = { workspace = true }
 [dependency-groups]
 dev = ["pyweft-ui"]
 # The website (website/build.py): uv sync --group website
-website = ["mkdocs-material>=9.8,<10; python_version >= '3.11'"]
+# and the examples' Tailwind stylesheets (examples/*/_tailwind/input.css)
+website = [
+    "mkdocs-material>=9.8,<10; python_version >= '3.11'",
+    "pytailwindcss>=0.4; python_version >= '3.11'",
+    # the todo example's own dependency, so its first screen can be pre-rendered
+    "humanize",
+]

@@ -1,0 +1,24 @@
+<template>
+  <span :class="'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ring-1 ring-inset ' + tone">
+    <span :class="'size-1.5 rounded-full ' + dot" aria-hidden="true"></span>
+    {{ status }}
+  </span>
+</template>
+
+<code>
+# <components.StatusBadge :status="order['status']" /> from any page. The
+# classes are written out in full: Tailwind finds classes by reading this
+# file, not by running it.
+status: str = ""
+
+@property
+def tone(self):
+    return {
+        "paid": "bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-400/20",
+        "pending": "bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/20",
+    }.get(self.status, "bg-slate-100 text-slate-600 ring-slate-500/20 dark:bg-slate-400/10 dark:text-slate-300 dark:ring-slate-400/20")
+
+@property
+def dot(self):
+    return {"paid": "bg-emerald-500", "pending": "bg-amber-500"}.get(self.status, "bg-slate-400")
+</code>

@@ -1,22 +1,86 @@
 <template>
-  <section>
-    <button @click="back()">← Back</button>
-    <If cond="order is None"><p>Loading order {{ id }}…</p></If>
-    <ElseIf cond="order == {}"><p>There is no order {{ id }}.</p></ElseIf>
+  <div class="mx-auto max-w-3xl space-y-6">
+    <button type="button" @click="back()"
+            class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
+      <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M12.8 4.2a.75.75 0 0 1 0 1.06L8.06 10l4.74 4.74a.75.75 0 1 1-1.06 1.06l-5.27-5.27a.75.75 0 0 1 0-1.06l5.27-5.27a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
+      </svg>
+      Back
+    </button>
+
+    <If cond="order is None">
+      <div class="animate-pulse rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-900/5 dark:bg-slate-900 dark:ring-white/10" aria-label="Loading order">
+        <div class="h-7 w-48 rounded-lg bg-slate-200 dark:bg-white/10"></div>
+        <div class="mt-3 h-4 w-32 rounded bg-slate-200 dark:bg-white/10"></div>
+        <div class="mt-8 grid gap-6 sm:grid-cols-3">
+          <div class="h-16 rounded-xl bg-slate-100 dark:bg-white/5"></div>
+          <div class="h-16 rounded-xl bg-slate-100 dark:bg-white/5"></div>
+          <div class="h-16 rounded-xl bg-slate-100 dark:bg-white/5"></div>
+        </div>
+      </div>
+    </If>
+    <ElseIf cond="order == {}">
+      <div class="rounded-2xl bg-white p-10 text-center shadow-sm ring-1 ring-slate-900/5 dark:bg-slate-900 dark:ring-white/10">
+        <p class="text-lg font-semibold text-slate-900 dark:text-white">There is no order #{{ id }}</p>
+        <p class="mt-1 text-slate-500 dark:text-slate-400">It may have been removed.</p>
+        <Link to="/orders" class="mt-6 inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">All orders</Link>
+      </div>
+    </ElseIf>
     <Else>
-      <h1>Order #{{ id }}</h1>
-      <p>{{ order['customer'] }}: {{ order['items'] }} items, ${{ order['total'] }}</p>
-      <button @click="pins.toggle(id)">{{ 'Unpin' if id in pins.ids else 'Pin' }} this order</button>
+      <article class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5 dark:bg-slate-900 dark:ring-white/10">
+        <header class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 p-6 sm:p-8 dark:border-white/5">
+          <div>
+            <div class="flex items-center gap-3">
+              <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Order #{{ id }}</h1>
+              <components.StatusBadge :status="order['status']" />
+            </div>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Placed {{ nice_date(order['date']) }}</p>
+          </div>
+          <button type="button" @click="pins.toggle(id)" :aria-pressed="'true' if pinned else 'false'"
+                  :class="'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition ' + ('bg-indigo-600 text-white shadow-sm hover:bg-indigo-500' if pinned else 'text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100 dark:text-slate-200 dark:ring-white/15 dark:hover:bg-white/5')">
+            <svg class="size-4" viewBox="0 0 24 24" :fill="'currentColor' if pinned else 'none'" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path stroke-linejoin="round" d="M17.6 3.3c1.1.1 1.9 1.1 1.9 2.2V21L12 17.3 4.5 21V5.5c0-1.1.8-2.1 1.9-2.2a48.5 48.5 0 0 1 11.2 0Z" />
+            </svg>
+            {{ 'Pinned' if pinned else 'Pin order' }}
+          </button>
+        </header>
+
+        <div class="flex items-center gap-4 p-6 sm:px-8">
+          <span class="flex size-12 shrink-0 items-center justify-center rounded-full bg-indigo-100 font-semibold text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300">
+            {{ initials(order['customer']) }}
+          </span>
+          <div class="min-w-0">
+            <p class="font-semibold text-slate-900 dark:text-white">{{ order['customer'] }}</p>
+            <p class="truncate text-sm text-slate-500 dark:text-slate-400">{{ order['email'] }}</p>
+          </div>
+        </div>
+
+        <dl class="grid grid-cols-1 gap-px bg-slate-100 sm:grid-cols-3 dark:bg-white/5">
+          <div class="bg-white px-6 py-5 sm:px-8 dark:bg-slate-900">
+            <dt class="text-sm text-slate-500 dark:text-slate-400">Items</dt>
+            <dd class="mt-1 text-2xl font-semibold text-slate-900 tabular-nums dark:text-white">{{ order['items'] }}</dd>
+          </div>
+          <div class="bg-white px-6 py-5 sm:px-8 dark:bg-slate-900">
+            <dt class="text-sm text-slate-500 dark:text-slate-400">Total</dt>
+            <dd class="mt-1 text-2xl font-semibold text-slate-900 tabular-nums dark:text-white">{{ money(order['total']) }}</dd>
+          </div>
+          <div class="bg-white px-6 py-5 sm:px-8 dark:bg-slate-900">
+            <dt class="text-sm text-slate-500 dark:text-slate-400">Per item</dt>
+            <dd class="mt-1 text-2xl font-semibold text-slate-900 tabular-nums dark:text-white">{{ money(order['total'] / order['items']) }}</dd>
+          </div>
+        </dl>
+      </article>
     </Else>
-  </section>
+  </div>
 </template>
 
 <code>
 # route sets this page's URL; {id} arrives as the int declared below.
 import asyncio
-from pyweft import set_title
+from pyweft import Link, set_title
 from pyweft.routing import back
 import orders_data
+from orders_data import initials, money, nice_date
 from pins import pins
 
 route = "/orders/{id}"
@@ -27,4 +91,8 @@ async def on_init(self):
     set_title(f"Order #{self.id} - Shop")   # the tab, or the window
     await asyncio.sleep(0.4)        # a real app fetches from its server here
     self.order = orders_data.find(self.id) or {}
+
+@property
+def pinned(self):
+    return self.id in pins.ids
 </code>

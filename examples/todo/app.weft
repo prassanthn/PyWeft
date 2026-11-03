@@ -1,44 +1,84 @@
 <template>
-  <div class="todo-app">
-    <h1>Todos <small>{{ remaining_label }} left</small></h1>
+  <div class="min-h-screen bg-linear-to-br from-indigo-50 via-white to-sky-50 px-4 py-12 sm:py-20 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950">
+    <main class="mx-auto max-w-xl">
+      <header class="mb-8 flex items-end justify-between gap-4">
+        <div>
+          <p class="text-sm font-semibold tracking-widest text-indigo-600 uppercase dark:text-indigo-400">Today</p>
+          <h1 class="mt-1 text-4xl font-bold tracking-tight text-slate-900 dark:text-white">Todos</h1>
+        </div>
+        <If cond="items">
+          <span class="rounded-full bg-indigo-600/10 px-3 py-1 text-sm font-medium text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300">
+            {{ remaining_label }} left
+          </span>
+        </If>
+      </header>
 
-    <input @bind="draft" placeholder="what needs doing?" />
-    <button @click="add">add</button>
+      <section class="overflow-hidden rounded-2xl bg-white/80 shadow-xl ring-1 shadow-indigo-900/5 ring-slate-900/5 backdrop-blur dark:bg-slate-900/80 dark:ring-white/10">
+        <form class="flex gap-2 border-b border-slate-100 p-3 dark:border-white/5" @submit.prevent="add">
+          <input @bind="draft" placeholder="What needs doing?" aria-label="New todo"
+                 class="min-w-0 flex-1 rounded-xl border-0 bg-slate-100 px-4 py-3 text-slate-900 ring-indigo-500 outline-none placeholder:text-slate-400 focus:bg-white focus:ring-2 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800" />
+          <button type="submit"
+                  class="rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 active:scale-95">
+            Add
+          </button>
+        </form>
 
-    <ul>
-      <For each="item in items" key="item['id']">
-        <TodoItem :item="item" @toggle="toggle(event)" @remove="remove(event)" />
-      </For>
-    </ul>
+        <nav class="flex gap-1 px-3 pt-3" aria-label="Show">
+          <For each="name in ['all', 'active', 'done']" key="name">
+            <button type="button" @click="show = name"
+                    :aria-pressed="'true' if name == show else 'false'"
+                    :class="'rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition ' + ('bg-slate-900 text-white dark:bg-white dark:text-slate-900' if name == show else 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white')">
+              {{ name }}
+            </button>
+          </For>
+        </nav>
 
-    <If cond="not items">
-      <p class="hint">nothing yet — add one above</p>
-    </If>
+        <ul class="divide-y divide-slate-100 p-3 dark:divide-white/5">
+          <For each="item in shown" key="item['id']">
+            <TodoItem :item="item" @toggle="toggle(event)" @remove="remove(event)" />
+          </For>
+        </ul>
+
+        <If cond="not shown">
+          <div class="flex flex-col items-center px-6 pt-4 pb-12 text-center">
+            <div class="mb-4 flex size-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500 dark:bg-indigo-400/10 dark:text-indigo-300">
+              <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 11l3 3L22 4" />
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              </svg>
+            </div>
+            <p class="font-medium text-slate-900 dark:text-white">{{ empty_title }}</p>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ empty_hint }}</p>
+          </div>
+        </If>
+
+        <If cond="done_count">
+          <footer class="flex items-center justify-between border-t border-slate-100 px-6 py-3 text-sm text-slate-500 dark:border-white/5 dark:text-slate-400">
+            <span>{{ done_count }} done</span>
+            <button type="button" @click="clear_done" class="font-medium text-slate-500 transition hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400">
+              Clear done
+            </button>
+          </footer>
+        </If>
+      </section>
+
+      <p class="mt-6 text-center text-xs text-slate-400 dark:text-slate-500">
+        Saved in this browser. Written in Python with PyWeft.
+      </p>
+    </main>
   </div>
 </template>
 
-<style>
-/* Scoped to this component. The bare `input, button` rule cannot reach the
-   remove button inside TodoItem: that one belongs to the child. */
-.todo-app { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; }
-h1 small { color: #aaa; font-size: 0.9rem; font-weight: normal; }
-input, button { font: inherit; padding: 0.35rem 0.7rem; margin-right: 0.4rem; }
-ul { padding-left: 0; list-style: none; }
-.hint { color: #888; }
-</style>
-
 <code>
+# Styled with Tailwind: head.html links tailwind.css, which the Tailwind CLI
+# builds from the classes in these .weft files (see _tailwind/input.css).
 import humanize  # from PyPI, declared in this app's pyproject.toml
-from pyweft import effect, storage
+from pyweft import effect, set_title, storage
 
 draft: str = ""
 items: list = []
 next_id: int = 1
-
-@property
-def remaining_label(self):
-    # apnumber spells out small numbers: 3 -> "three"
-    return humanize.apnumber(sum(1 for item in self.items if not item["done"]))
+show: str = "all"
 
 def on_init(self):
     # The list from the last visit (pyweft.storage), and ids that carry on
@@ -54,8 +94,36 @@ def remember(self):
 def sync_tab_title(self):
     # Re-runs only when `items` changes (read through remaining_label), so
     # typing in the input does not touch the title.
-    import js
-    js.document.title = f"{self.remaining_label} left · todos"
+    set_title(f"{self.remaining_label} left · todos")
+
+@property
+def remaining_label(self):
+    # apnumber spells out small numbers: 3 -> "three"
+    return humanize.apnumber(sum(1 for item in self.items if not item["done"]))
+
+@property
+def done_count(self):
+    return sum(1 for item in self.items if item["done"])
+
+@property
+def shown(self):
+    if self.show == "active":
+        return [item for item in self.items if not item["done"]]
+    if self.show == "done":
+        return [item for item in self.items if item["done"]]
+    return self.items
+
+@property
+def empty_title(self):
+    if not self.items:
+        return "Nothing to do yet"
+    return "All done" if self.show == "active" else "Nothing ticked off yet"
+
+@property
+def empty_hint(self):
+    if not self.items:
+        return "Add your first todo above."
+    return "Enjoy the free time." if self.show == "active" else "Tick a todo when it's done."
 
 def add(self):
     text = self.draft.strip()
@@ -70,4 +138,7 @@ def toggle(self, item):
 
 def remove(self, item):
     self.items = [i for i in self.items if i["id"] != item["id"]]
+
+def clear_done(self):
+    self.items = [i for i in self.items if not i["done"]]
 </code>

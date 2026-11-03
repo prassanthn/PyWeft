@@ -1,33 +1,52 @@
 <template>
-  <div class="shell">
-    <header>
-      <strong>Shop</strong>
-      <nav>
-        <Link to="/">Home</Link>
-        <Link to="/orders">Orders</Link>
-        <Link to="/help">Help</Link>
-      </nav>
-      <span class="pins">Pinned: {{ pins.count }}</span>
+  <div class="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <header class="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-slate-900/80">
+      <div class="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:gap-6 sm:px-6">
+        <Link to="/" class="flex items-center gap-2.5 font-semibold text-slate-900 dark:text-white">
+          <span class="flex size-8 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm">
+            <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+              <path d="M3 6h18" />
+              <path d="M16 10a4 4 0 0 1-8 0" />
+            </svg>
+          </span>
+          <span class="hidden sm:inline">Shop</span>
+        </Link>
+        <nav class="flex gap-1">
+          <For each="link in nav_links" key="link['to']">
+            <Link :to="link['to']"
+                  class="rounded-lg px-2.5 py-2 text-sm font-medium text-slate-600 sm:px-3 transition hover:bg-slate-100 hover:text-slate-900 aria-[current=page]:bg-indigo-50 aria-[current=page]:text-indigo-700 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white dark:aria-[current=page]:bg-indigo-400/10 dark:aria-[current=page]:text-indigo-300">
+              {{ link['label'] }}
+            </Link>
+          </For>
+        </nav>
+        <span class="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700 dark:bg-white/5 dark:text-slate-300">
+          <svg class="size-4 text-indigo-600 dark:text-indigo-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M17.6 3.3c1.1.1 1.9 1.1 1.9 2.2V21L12 17.3 4.5 21V5.5c0-1.1.8-2.1 1.9-2.2a48.5 48.5 0 0 1 11.2 0Z" />
+          </svg>
+          {{ pins.count }}<span class="sr-only sm:not-sr-only">pinned</span>
+        </span>
+      </div>
     </header>
-    <main><Pages /></main>
+    <main class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+      <Pages />
+    </main>
   </div>
 </template>
 
 <code>
 # Each .weft file in pages/ is a screen: pages/orders.weft is #/orders.
 # orders_data.py holds the data the pages share; pins.py is a Store, state
-# that any page changes and the header shows.
+# that any page changes and the header shows. Styled with Tailwind: head.html
+# links tailwind.css, built from these files' classes (_tailwind/input.css).
 from pyweft import Link, router
 from pins import pins
 
 Pages = router("pages")
-</code>
 
-<style>
-header { display: flex; align-items: center; gap: 2rem; padding: 0.75rem 0; border-bottom: 1px solid #ddd; }
-nav { display: flex; gap: 1rem; }
-nav a { color: #555; text-decoration: none; padding: 0.25rem 0; border-bottom: 2px solid transparent; }
-nav a.active { color: #111; border-bottom-color: #4f46e5; }
-main { padding: 1rem 0; }
-.pins { margin-left: auto; color: #555; font-size: 0.9rem; }
-</style>
+nav_links: list = [
+    {"to": "/", "label": "Dashboard"},
+    {"to": "/orders", "label": "Orders"},
+    {"to": "/help", "label": "Help"},
+]
+</code>

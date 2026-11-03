@@ -18,6 +18,9 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
   kept apart per app; on the desktop, a JSON file in the user's data
   folder; in tests, memory.
 - The todo example remembers its list, and the tutorial has a step for it.
+- The todo and shop examples are restyled with Tailwind CSS (built with
+  its CLI), in light and dark, and work at phone width. The shop has a
+  dashboard, an orders table and a reusable status badge.
 
 ## 0.2.1
 

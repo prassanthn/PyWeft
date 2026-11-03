@@ -7,7 +7,8 @@ description: PyWeft apps running live in your browser, with their source.
 These are real PyWeft apps, running in your browser: Python runs on the page
 itself, with no server behind it. Each opens in a new tab, and starts in a
 few seconds the first time while the browser downloads Python, faster after
-that.
+that. The todo and shop apps are styled with [Tailwind
+CSS](guide/projects.md#using-css-frameworks), in light and dark.
 
 <!-- Raw HTML because the live apps aren't pages mkdocs knows; paths are
      relative to this page's address, /examples/. -->
@@ -24,10 +25,11 @@ title up to date with an effect.
 
 ## Shop orders
 
-A small back office with several pages: a `pages/` folder for the screens,
-links and the Back button, typed values from the address
-(`#/orders/1001`), a `Store` for pinned orders shared between pages, a
-shared Python module for the data, and exporting to a CSV file.
+A small back office: a dashboard, an orders table with filters, and a page
+per order. It shows a `pages/` folder for the screens, links and the Back
+button, typed values from the address (`#/orders/1047`), a `Store` for
+pinned orders shared between pages, a shared Python module for the data, a
+component used by several pages, and exporting to a CSV file.
 
 <a class="md-button md-button--primary" href="../live/shop/" target="_blank">Open the app</a>
 [Source](https://github.com/prassanthn/PyWeft/tree/main/examples/shop){ .md-button }

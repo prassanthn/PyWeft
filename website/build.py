@@ -14,6 +14,7 @@ and examples are ordinary `pyweft build` output under live/.
 
 from __future__ import annotations
 
+import os
 import posixpath
 import re
 import shutil
@@ -58,6 +59,9 @@ LIVE = {
     "todo": "examples/todo",
     "shop": "examples/shop",
 }
+# Examples styled with Tailwind's CLI, and the Tailwind they're built with
+TAILWIND_APPS = ["examples/todo", "examples/shop"]
+os.environ.setdefault("TAILWINDCSS_VERSION", "v4.3.3")
 
 _slug = slugify(case="lower")
 _HEADING = re.compile(r"(#{1,6}) (.+)")
@@ -210,6 +214,11 @@ def main() -> None:
     assemble()
     run = lambda *args: subprocess.run([sys.executable, *args], check=True, cwd=REPO)  # noqa: E731
     run("-m", "mkdocs", "build", "--strict", "--config-file", str(HERE / "mkdocs.yml"))
+    for app in TAILWIND_APPS:
+        # The committed tailwind.css could lag behind a template; the live
+        # app gets one built from the classes it has now.
+        run("-m", "pytailwindcss", "-i", f"{app}/_tailwind/input.css",
+            "-o", f"{app}/tailwind.css", "--minify")
     for name, app in LIVE.items():
         run("-m", "pyweft", "build", app, "--out", str(SITE / "live" / name))
     print(f"built {SITE}")

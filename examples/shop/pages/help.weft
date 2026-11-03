@@ -1,12 +1,29 @@
 <template>
-  <section>
-    <h1>Help</h1>
-    <p>Orders are shipped within two days. Questions? Write to the shop.</p>
-  </section>
+  <div class="mx-auto max-w-3xl space-y-6">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl dark:text-white">Help</h1>
+      <p class="mt-1 text-slate-500 dark:text-slate-400">Answers to what customers ask most.</p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <For each="topic in topics" key="topic['title']">
+        <section class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-900/5 dark:bg-slate-900 dark:ring-white/10">
+          <h2 class="font-semibold text-slate-900 dark:text-white">{{ topic['title'] }}</h2>
+          <p class="mt-2 text-sm/6 text-slate-600 dark:text-slate-400">{{ topic['text'] }}</p>
+        </section>
+      </For>
+    </div>
+  </div>
 </template>
 
 <code>
 from pyweft import set_title
+
+topics: list = [
+    {"title": "Shipping", "text": "Orders are shipped within two working days, with tracking by email."},
+    {"title": "Returns", "text": "Send anything back within 30 days for a full refund."},
+    {"title": "Payment", "text": "Orders stay pending until the payment arrives, usually within a day."},
+    {"title": "Contact", "text": "Questions? Write to the shop, and we'll answer within a day."},
+]
 
 def on_init(self):
     set_title("Help - Shop")

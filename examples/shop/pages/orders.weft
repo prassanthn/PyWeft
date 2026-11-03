@@ -1,25 +1,94 @@
 <template>
-  <section>
-    <h1>Orders</h1>
-    <p class="filters">
-      Show:
-      <For each="choice in ['all', 'paid', 'pending', 'refunded']" key="choice">
-        <Link :to="'/orders' if choice == 'all' else '/orders?status=' + choice"
-              :class="'on' if choice == status else None">{{ choice }}</Link>
+  <div class="space-y-6">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl dark:text-white">Orders</h1>
+        <p class="mt-1 text-slate-500 dark:text-slate-400">{{ len(shown) }} {{ 'order' if len(shown) == 1 else 'orders' }}, {{ money(shown_total) }} in all.</p>
+      </div>
+      <div class="flex gap-2">
+        <If cond="pins.count">
+          <button type="button" @click="clear_pins"
+                  class="rounded-lg px-3.5 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-300 transition hover:bg-slate-100 dark:text-slate-200 dark:ring-white/15 dark:hover:bg-white/5">
+            Clear pins
+          </button>
+        </If>
+        <button type="button" @click="export"
+                class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 active:scale-95">
+          <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.6L6.3 8.2a.75.75 0 1 0-1.1 1l4.25 4.5a.75.75 0 0 0 1.1 0l4.25-4.5a.75.75 0 1 0-1.1-1l-2.95 3.15v-8.6Z" />
+            <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
+          </svg>
+          Export CSV
+        </button>
+      </div>
+    </div>
+
+    <nav class="inline-flex flex-wrap gap-1 rounded-xl bg-slate-200/60 p-1 dark:bg-white/5" aria-label="Status">
+      <!-- Plain links: <Link> marks a page active by its path alone, and
+           these differ only in the query, so they say which one is current. -->
+      <For each="choice in ['all'] + STATUSES" key="choice">
+        <a :href="'#/orders' if choice == 'all' else '#/orders?status=' + choice"
+           :aria-current="'page' if choice == status else None"
+           :class="'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition ' + ('bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white' if choice == status else 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white')">
+          {{ choice }}
+          <span class="rounded-full bg-slate-900/5 px-1.5 text-xs tabular-nums dark:bg-white/10">{{ counts[choice] }}</span>
+        </a>
       </For>
-    </p>
-    <ul>
-      <For each="order in shown" key="order['id']">
-        <li><Link :to="'/orders/' + str(order['id'])">#{{ order['id'] }}</Link>
-          {{ order['customer'] }} ({{ order['status'] }})
-          <If cond="order['id'] in pins.ids"><b>pinned</b></If></li>
-      </For>
-    </ul>
-    <p class="tools">
-      <button @click="export">Export CSV</button>
-      <If cond="pins.count"><button @click="clear_pins">Clear pins</button></If>
-    </p>
-  </section>
+    </nav>
+
+    <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-900/5 dark:bg-slate-900 dark:ring-white/10">
+      <!-- relative: the sr-only label is positioned, and must scroll with the
+           table rather than widen the page. -->
+      <div class="relative overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="border-b border-slate-200 bg-slate-50 text-xs font-semibold tracking-wide text-slate-500 uppercase dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+            <tr>
+              <th class="px-6 py-3">Order</th>
+              <th class="px-6 py-3">Customer</th>
+              <th class="px-6 py-3">Status</th>
+              <th class="hidden px-6 py-3 text-right md:table-cell">Items</th>
+              <th class="px-6 py-3 text-right">Total</th>
+              <th class="w-14 px-4 py-3"><span class="sr-only">Pin</span></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 dark:divide-white/5">
+            <For each="order in shown" key="order['id']">
+              <tr class="transition hover:bg-slate-50 dark:hover:bg-white/5">
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <Link :to="'/orders/' + str(order['id'])" class="font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">#{{ order['id'] }}</Link>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ nice_date(order['date']) }}</div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-3">
+                    <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300">
+                      {{ initials(order['customer']) }}
+                    </span>
+                    <div class="min-w-0">
+                      <div class="truncate font-medium text-slate-900 dark:text-white">{{ order['customer'] }}</div>
+                      <div class="truncate text-slate-500 dark:text-slate-400">{{ order['email'] }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4"><components.StatusBadge :status="order['status']" /></td>
+                <td class="hidden px-6 py-4 text-right text-slate-600 tabular-nums md:table-cell dark:text-slate-300">{{ order['items'] }}</td>
+                <td class="px-6 py-4 text-right font-medium text-slate-900 tabular-nums dark:text-white">{{ money(order['total']) }}</td>
+                <td class="px-4 py-4 text-right">
+                  <button type="button" @click="pins.toggle(order['id'])"
+                          :aria-label="('Unpin' if order['id'] in pins.ids else 'Pin') + ' order ' + str(order['id'])"
+                          :aria-pressed="'true' if order['id'] in pins.ids else 'false'"
+                          :class="'rounded-lg p-1.5 transition hover:bg-slate-100 dark:hover:bg-white/10 ' + ('text-indigo-600 dark:text-indigo-400' if order['id'] in pins.ids else 'text-slate-300 hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400')">
+                    <svg class="size-5" viewBox="0 0 24 24" :fill="'currentColor' if order['id'] in pins.ids else 'none'" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                      <path stroke-linejoin="round" d="M17.6 3.3c1.1.1 1.9 1.1 1.9 2.2V21L12 17.3 4.5 21V5.5c0-1.1.8-2.1 1.9-2.2a48.5 48.5 0 0 1 11.2 0Z" />
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+            </For>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </template>
 
 <code>
@@ -27,7 +96,7 @@
 import csv
 import io
 from pyweft import Link, dialogs, set_title
-from orders_data import ORDERS
+from orders_data import ORDERS, STATUSES, initials, money, nice_date
 from pins import pins
 
 status: str = "all"
@@ -40,6 +109,17 @@ def shown(self):
     if self.status == "all":
         return ORDERS
     return [o for o in ORDERS if o["status"] == self.status]
+
+@property
+def shown_total(self):
+    return sum(o["total"] for o in self.shown)
+
+@property
+def counts(self):
+    counts = {"all": len(ORDERS)}
+    for name in STATUSES:
+        counts[name] = sum(1 for o in ORDERS if o["status"] == name)
+    return counts
 
 async def export(self):
     # A Save As dialog in the desktop app, a download in the browser.
@@ -54,9 +134,3 @@ async def clear_pins(self):
     if await dialogs.confirm(f"Unpin {count}?", title="Clear pins"):
         pins.ids = []
 </code>
-
-<style>
-.filters { display: flex; gap: 0.75rem; align-items: center; }
-.on { font-weight: 700; text-decoration: none; color: #111; }
-.tools { display: flex; gap: 0.5rem; }
-</style>
