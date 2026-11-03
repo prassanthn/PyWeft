@@ -51,6 +51,8 @@ later mobile: only the transport differs.
    [PyPI packages](#using-pypi-packages),
    [calling JavaScript](#calling-javascript),
    [files and dialogs](#files-and-dialogs),
+   [loading data (http)](#loading-data-pywefthttp),
+   [saving data between visits (storage)](#saving-data-between-visits-pyweftstorage),
    [building for deployment](#building-for-deployment),
    [a desktop app](#a-desktop-app-pyweft-run---desktop),
    [handing it out](#handing-out-a-desktop-app-pyweft-build---desktop)
@@ -1868,6 +1870,101 @@ async def clear(self):
   where `pyweft run` would take them for edits.
 - **In tests**, `dialogs.set_host()` installs a stand-in that answers
   instead of the user; without one, the calls raise an error saying so.
+
+### Loading data: pyweft.http
+
+`pyweft.http` calls web APIs and loads files, the same way in the browser
+and in a [desktop app](#a-desktop-app-pyweft-run---desktop). Requests are
+`async`, so make them in `async` handlers or an `async def on_init`:
+
+```python
+from pyweft import http
+
+orders: list = []
+error: str = ""
+
+async def on_init(self):
+    self.orders = await http.get_json("https://api.example.com/orders")
+
+async def save(self, order):
+    response = await http.post("https://api.example.com/orders", json=order)
+    if not response.ok:
+        self.error = f"Couldn't save the order ({response.status})"
+```
+
+| Call | Returns |
+|---|---|
+| `get_json(url)` | the body parsed as JSON; `http.HTTPError` unless the status is 2xx |
+| `get(url)`, `post(url)`, `put(url)`, `patch(url)`, `delete(url)` | a `Response`, whatever its status |
+| `request(method, url)` | the same, for any method |
+
+Each takes `params=` (added to the URL's query), `headers=`, `timeout=`
+(seconds, 30 by default) and a body: `json=` (any JSON value) or `data=`
+(bytes, text, or a dict sent as a form).
+
+- **A `Response`** has `status`, `ok` (a 2xx status), `headers` (names in
+  lower case), `data` (the bytes), `text` and `json()`.
+  `raise_for_status()` raises `http.HTTPError` unless it's 2xx.
+- **A relative URL is a file your app ships.** Put data files in
+  `assets/`, and `await http.get_json("assets/prices.json")` reads them in
+  the browser and in a desktop window alike.
+- **Failures:** no answer at all (offline, a mistyped address) raises
+  `http.NetworkError`; a slow server raises `TimeoutError`.
+- **In the browser, the browser's rules apply.** A request to another site
+  only works if that server allows it (it must send CORS headers; public
+  APIs usually do). There is no such rule in a desktop app.
+- **Everyone can see the requests a web app makes**, as with any web page,
+  so an API key in your code isn't secret. Keep secrets on a server of
+  your own and call that.
+- **In tests**, requests go out for real through the standard library.
+  `http.set_host()` installs a stand-in instead: an object with `async
+  request(method, url, headers, body, timeout)` returning `(status,
+  headers, data, url)`.
+
+### Saving data between visits: pyweft.storage
+
+`pyweft.storage` keeps small amounts of data, such as settings, a draft or
+a list, until the next visit:
+
+```python
+from pyweft import effect, storage
+
+items: list = []
+
+def on_init(self):
+    self.items = storage.get("todos", [])   # [] the first time
+
+@effect
+def keep(self):
+    storage.set("todos", self.items)        # runs again whenever items changes
+```
+
+| Call | Does |
+|---|---|
+| `get(key, default=None)` | the stored value, or `default` |
+| `set(key, value)` | stores `value`, replacing what was there |
+| `delete(key)`, `clear()` | removes one key, or everything this app stored |
+| `has(key)`, `keys()` | whether a key has a value; every key, sorted |
+
+- **Values are anything JSON can hold:** numbers, text, `True`/`False`/
+  `None`, and lists and dicts of those. Anything else raises `TypeError`;
+  turn dates into text first, for example.
+- **`get` returns a copy.** Changing a list you got back doesn't change
+  what's stored until you `set` it again, which is what the effect above
+  does.
+- **The calls aren't `async`**, so they work anywhere: in `on_init`, an
+  effect, a property, or a module of your app.
+- **Where it lives:** in the browser, the browser's local storage for your
+  site (about 5 MB in all, cleared if the visitor clears site data), kept
+  apart per app by the `[project]` name in its `pyproject.toml`. In a
+  desktop app, a JSON file in the user's data folder:
+  `%APPDATA%\<name>\storage.json` on Windows,
+  `~/Library/Application Support/<name>/` on macOS,
+  `~/.local/share/<name>/` on Linux.
+- **Not in `run_in_background`:** the worker can't reach the page's
+  storage, so read what the function needs first and pass it in.
+- **In tests** it lives in memory. `storage.set_host(storage.MemoryStorage())`
+  starts a test empty; `storage.FileStorage(path)` keeps it in a file.
 
 ### Building for deployment
 

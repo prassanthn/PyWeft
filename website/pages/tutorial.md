@@ -14,6 +14,7 @@ you'll use most of what everyday PyWeft code needs:
 - computed values with `@property`
 - a component of your own, with props and events
 - scoped styles
+- saving data between visits
 - building the app for the web and the desktop
 
 You need Python 3.10 or newer and a terminal. The commands use
@@ -433,7 +434,38 @@ and centres the app in a column.
     </code>
     ```
 
-## 8. Ship it
+## 8. Remember the list
+
+Reload the page and the list is gone: state lives as long as the page.
+`pyweft.storage` keeps it until the next visit. Add an import at the top of
+the `<code>` block in `app.weft`, and two methods:
+
+```python title="todo/app.weft (in the code block)"
+from pyweft import effect, storage
+
+def on_init(self):
+    self.items = storage.get("todos", [])
+    self.next_id = max((item["id"] for item in self.items), default=0) + 1
+
+@effect
+def remember(self):
+    storage.set("todos", self.items)
+```
+
+- **`on_init`** runs once, when the component first appears. It reads the
+  saved list, or `[]` the first time, and carries on numbering after the
+  highest id.
+- **`@effect`** marks a method that runs after the page updates, and again
+  whenever the state it read has changed. `remember` reads `items`, so it
+  saves the list after every add, tick and removal, and not on every
+  keystroke in the text box.
+- **Where it's kept:** in the browser, the browser's storage for the site;
+  in a desktop app, a file in the user's data folder. Your code is the same
+  for both.
+
+Add a few items, reload, and they're still there.
+
+## 9. Ship it
 
 Stop `pyweft run` with ++ctrl+c++, then build the app:
 
@@ -463,8 +495,8 @@ uv run pyweft build todo --desktop
 
 ## Where next
 
-- **Save the list between visits**, load data from the web or run slow work
-  in the background: [async handlers and background
+- **Load data from the web**: [pyweft.http](guide/projects.md#loading-data-pywefthttp);
+  and run slow work without freezing the page: [background
   work](guide/first-component.md#async-handlers-and-background-work).
 - **Use ready-made controls** instead of plain inputs and buttons:
   [pyweft-ui](controls/index.md), and the

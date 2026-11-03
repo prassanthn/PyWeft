@@ -4,7 +4,7 @@ Markup in XML, logic in Python, one render core that emits transport-agnostic
 patches so desktop (webview), web (Pyodide) and mobile can share a codebase.
 """
 
-from . import dialogs
+from . import dialogs, http, storage
 from .background import BackgroundError, run_in_background
 from .component import (
     Component,
@@ -43,6 +43,8 @@ __all__ = [
     "Store",
     "set_title",
     "dialogs",
+    "http",
+    "storage",
     "collect_styles",
     "scope_css",
     "diff",

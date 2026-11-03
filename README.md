@@ -185,6 +185,9 @@ To see every control live, clone this repository and run
 - **Files and dialogs:** `pyweft.dialogs` opens and saves files and asks for
   confirmation with the same code on both targets: the browser's picker and
   downloads on the web, the system's own dialogs on the desktop.
+- **Data in and out:** `pyweft.http` calls web APIs and loads your app's
+  data files, and `pyweft.storage` keeps settings and lists between visits,
+  with the same code in the browser and on the desktop.
 - **A fast dev loop:** hot reload that keeps your app's state, and readable
   errors that point to your `.weft` file and line.
 - **Fast first load:** your app's first screen is rendered ahead of time and
@@ -206,6 +209,7 @@ To see every control live, clone this repository and run
 | Run it as a desktop app | [A desktop app](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#a-desktop-app-pyweft-run---desktop) |
 | Hand out a desktop app (`.exe`, `.app`) | [Handing out a desktop app](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#handing-out-a-desktop-app-pyweft-build---desktop) |
 | Open and save files, ask for confirmation | [Files and dialogs](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#files-and-dialogs) |
+| Call web APIs, save data between visits | [Loading data](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#loading-data-pywefthttp), [saving data](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#saving-data-between-visits-pyweftstorage) |
 | Name the app, give it an icon | [The app's title and icon](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#the-apps-title-and-icon) |
 | Test components without a browser | [Using the engine from plain Python](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#6-using-the-engine-from-plain-python) |
 

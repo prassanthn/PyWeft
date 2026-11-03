@@ -201,3 +201,48 @@ def test_the_page_and_its_files(tmp_path):
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_storage_is_a_file_and_relative_urls_reach_the_assets(tmp_path):
+    # As run_desktop sets it up: the window's server, and a data file.
+    import threading
+
+    from pyweft import http, storage
+
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "prices.json").write_text('{"tea": 3}', encoding="utf-8")
+    (tmp_path / "app.weft").write_text(textwrap.dedent("""
+        <template><p>{{ prices }} {{ visits }}</p></template>
+        <code>
+        from pyweft import http, storage
+        prices: dict = {}
+        visits: int = 0
+
+        async def on_init(self):
+            self.visits = storage.get("visits", 0) + 1
+            storage.set("visits", self.visits)
+            self.prices = await http.get_json("assets/prices.json")
+        </code>
+    """), encoding="utf-8")
+    server = make_server(tmp_path)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+    data = tmp_path / "data" / "storage.json"
+    try:
+        for visit in (1, 2):
+            window = FakeWindow()
+            app = DesktopApp(tmp_path, window, base_url=url, storage_file=data)
+            app.start()
+            try:
+                flush(app, lambda: app.renderer.component.prices, timeout=5)
+                window.dom = app.api.mount("/")["tree"]
+                assert text(window.dom[0]) == f"{{'tea': 3}} {visit}"
+            finally:
+                app.stop()
+        assert json.loads(data.read_text(encoding="utf-8")) == {"visits": 2}
+    finally:
+        server.shutdown()
+        server.server_close()
+        http.set_host(http.Urllib())
+        storage.set_host(storage.MemoryStorage())
+        routing.set_host(routing.MemoryHistory())

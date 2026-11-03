@@ -14,9 +14,10 @@ that.
 
 ## Todos
 
-The todo app from the [tutorial](tutorial.md), plus a package from PyPI
-(`humanize`, which spells out "three left") and an effect that keeps the
-browser tab's title up to date.
+The todo app from the [tutorial](tutorial.md): it remembers your list
+between visits with `pyweft.storage`, uses a package from PyPI
+(`humanize`, which spells out "three left"), and keeps the browser tab's
+title up to date with an effect.
 
 <a class="md-button md-button--primary" href="../live/todo/" target="_blank">Open the app</a>
 [Source](https://github.com/prassanthn/PyWeft/tree/main/examples/todo){ .md-button }

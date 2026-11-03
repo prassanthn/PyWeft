@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import json
+import os
 import re
 import sys
 import threading
@@ -32,7 +33,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import unquote
 
-from . import dialogs, routing
+from . import dialogs, http, routing, storage
 from .component import load_component
 from .differ import diff
 from .hotreload import format_error, hot_swap
@@ -225,9 +226,20 @@ class DesktopApp:
     """One app, one window. ``window`` is anything with ``evaluate_js``:
     a pywebview window, or a stand-in in tests."""
 
-    def __init__(self, app_dir: Path, window: Any = None):
+    def __init__(
+        self,
+        app_dir: Path,
+        window: Any = None,
+        base_url: str | None = None,
+        storage_file: Path | None = None,
+    ):
         self.app_dir = Path(app_dir).resolve()
         self.window = window
+        # Where the window's page is served, so relative pyweft.http URLs
+        # (assets/data.json) work as they do in the browser.
+        self.base_url = base_url
+        # pyweft.storage's file; in memory without one (tests).
+        self.storage_file = storage_file
         self.here = "/"
         self.tree: list = []
         self.renderer: Renderer | None = None
@@ -281,6 +293,10 @@ class DesktopApp:
         sys.path.insert(0, str(self.app_dir))  # the app's own modules
         routing.set_host(_Location(self))
         dialogs.set_host(_Dialogs(self))
+        http.set_host(http.Urllib(base_url=self.base_url))
+        storage.set_host(
+            storage.FileStorage(self.storage_file) if self.storage_file else storage.MemoryStorage()
+        )
         self.cls = load_component(self.app_dir / "app.weft")
         self.renderer = Renderer(self.cls())
         # Already on the loop thread whenever app code changes state, except
@@ -539,10 +555,22 @@ def watch(app: DesktopApp, stop: threading.Event, interval: float = 0.3) -> None
             app.js("location.reload()")  # head.html, assets: the page remounts
 
 
+def data_dir(app_id: str) -> Path:
+    """Where a desktop app keeps its data (pyweft.storage): the user's
+    application data folder, in a folder named after the app."""
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming"
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share"
+    return Path(base) / app_id
+
+
 def run_desktop(app_dir: Path, dev: bool = True) -> None:
     """The app in a window until it closes. ``dev`` (``pyweft run``) adds
     hot reload and terminal messages; a packaged app runs without them."""
-    from .cli import CliError, app_identity, app_pyweft_files
+    from .cli import CliError, app_id, app_identity, app_pyweft_files
 
     app_pyweft_files(app_dir)  # fails fast without an app.weft
     identity = app_identity(app_dir)  # and on a mistake in the settings
@@ -555,15 +583,16 @@ def run_desktop(app_dir: Path, dev: bool = True) -> None:
             'uv add "pyweft[desktop]"  (or: pip install "pyweft[desktop]")'
         ) from None
 
-    app = DesktopApp(app_dir)
+    server = make_server(app_dir)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+    app = DesktopApp(app_dir, base_url=url, storage_file=data_dir(app_id(app_dir)) / "storage.json")
     try:
         app.start()
     except Exception as exc:  # noqa: BLE001 - shown as a CLI error
         app.stop()
+        server.shutdown()
         raise CliError(format_error(exc, root=str(Path(app_dir).resolve()))) from None
-    server = make_server(app_dir)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    url = f"http://127.0.0.1:{server.server_address[1]}/"
     app.window = webview.create_window(identity.title, url, js_api=app.api, **options)
     stop = threading.Event()
     if dev:

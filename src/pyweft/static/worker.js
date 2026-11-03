@@ -46,6 +46,9 @@ async function init({ pyodideUrl, modules, appFiles, packages, libraries = [] })
 import sys
 sys.path[:0] = ["/pyweft-src", "/pyweft-libs", "/app"]
 
+from pyweft import webhost
+webhost.install_worker()
+
 def pyweft_worker_call(request):
     from pyodide.ffi import to_js
     from pyweft.background import execute

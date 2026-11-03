@@ -8,6 +8,17 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **`pyweft.http`**: call web APIs and load the app's data files, with the
+  same code in the browser (the page's fetch) and on the desktop (the
+  standard library). `get_json`, `get`/`post`/`put`/`patch`/`delete`,
+  `request`; JSON, form and text bodies, query parameters, timeouts. A
+  relative URL is a file the app ships (`assets/prices.json`).
+- **`pyweft.storage`**: keep data between visits: `get`, `set`, `delete`,
+  `has`, `keys`, `clear`, for any JSON value. The browser's local storage,
+  kept apart per app; on the desktop, a JSON file in the user's data
+  folder; in tests, memory.
+- The todo example remembers its list, and the tutorial has a step for it.
+
 ## 0.2.1
 
 - The PyPI page installs from PyPI, and its links to the guide and the

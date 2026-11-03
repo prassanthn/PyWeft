@@ -234,6 +234,26 @@ def app_identity(app_dir: Path) -> AppIdentity:
     return AppIdentity(title=title.strip(), icon=icon)
 
 
+def app_id(app_dir: Path) -> str:
+    """A stable name for keeping the app's data apart (pyweft.storage): the
+    ``[project]`` name from its pyproject.toml, else the folder's name.
+    Renaming the project starts its saved data afresh."""
+    name = ""
+    pyproject = app_dir / "pyproject.toml"
+    if pyproject.exists():
+        text = pyproject.read_text(encoding="utf-8")
+        if tomllib is not None:
+            try:
+                name = tomllib.loads(text).get("project", {}).get("name", "")
+            except tomllib.TOMLDecodeError as exc:
+                raise CliError(f"{pyproject}: {exc}") from None
+        else:
+            name = _flat_table(text, "project").get("name", "")
+    if not isinstance(name, str) or not name.strip():
+        name = app_dir.resolve().name
+    return re.sub(r"[^a-z0-9._-]+", "-", name.strip().lower()).strip("-.") or "app"
+
+
 # mimetypes reads the Windows registry, which can be wrong or missing these.
 _CONTENT_TYPES = {
     ".css": "text/css",
@@ -515,6 +535,7 @@ def render_shell(
             "__PYWEFT_LIBRARIES__",
             json.dumps([{"name": lib.name, "files": lib.files} for lib in app_libraries(app_dir)]),
         )
+        .replace("__PYWEFT_APP_ID__", json.dumps(app_id(app_dir)))
         .replace("__PYWEFT_DEV__", "true" if dev else "false")
         .replace("__PYWEFT_SINCE__", str(since))
         .replace("__PYWEFT_CSS__", css)
