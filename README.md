@@ -7,6 +7,12 @@ running on your machine. No JavaScript to write, no build step.
 
 *PyWeft: the weft is the thread woven through the warp to make fabric.*
 
+**[Website](https://prassanthn.github.io/PyWeft/)**: a step-by-step
+[tutorial](https://prassanthn.github.io/PyWeft/tutorial/), the
+[guide](https://prassanthn.github.io/PyWeft/guide/), and the
+[controls](https://prassanthn.github.io/PyWeft/controls/gallery/) and
+[examples](https://prassanthn.github.io/PyWeft/examples/) running live.
+
 ```xml
 <template>
   <div>
@@ -253,12 +259,22 @@ With pip: `pip install -e ".[dev]"` and `pip install -e packages/pyweft-ui`.
 Releases go to PyPI by pushing a version tag; [RELEASING.md](https://github.com/prassanthn/PyWeft/blob/main/RELEASING.md)
 has the steps, and [CHANGELOG.md](https://github.com/prassanthn/PyWeft/blob/main/CHANGELOG.md) what each release changed.
 
+The website is rebuilt and published on every push to `main`. To build it
+locally:
+
+```bash
+uv sync --group website
+uv run python website/build.py
+uv run python -m http.server -d website/_build/site    # http://127.0.0.1:8000/
+```
+
 ```
 src/pyweft/           the framework (zero runtime dependencies)
   static/             the browser side: runtime.js, the page shell, the worker
 packages/pyweft-ui/   the control toolkit, released as its own package
-docs/                 the guide
+docs/                 the guide (the website splits it into pages)
 examples/             a headless demo, the todo app and the shop (pages)
+website/              the website: home page, tutorial, build script
 tests/                the framework's tests
 ```
 
