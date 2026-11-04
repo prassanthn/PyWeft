@@ -1,0 +1,96 @@
+<template>
+  <div class="accordion">
+    <For each="c in choices" key="c['key']" index="i">
+      <Expansion ref="p-{{ i }}" :title="c['label']" :description="c['description']" :icon="c['icon']"
+                 :disabled="disabled or c['disabled']" :value="is_open(c['value'])" :toggle="toggle"
+                 :level="level" :lazy="lazy" arrows="true"
+                 @update="choose(c['value'], event)" @arrow="arrow(i, event)"><Slot :panel="c['value']" /></Expansion>
+    </For>
+  </div>
+</template>
+
+<code>
+# <ui.Accordion options="Account, Billing, Privacy" @bind="section">
+#   <If cond="panel == 'Account'"> ... </If>
+#   <ElseIf cond="panel == 'Billing'"> ... </ElseIf>
+# </ui.Accordion>
+# A stack of Expansion panels. The content between the tags is each panel's
+# body; `panel` inside it is that panel's value. Opening one closes the
+# others; multiple="true" lets several stay open and binds a list. Unbound,
+# it keeps its own state (all closed to start). options take Select's forms;
+# a dict can add description, icon and disabled. Keyboard: Up/Down move
+# between headers, Home/End jump to the first and last.
+import itertools
+
+from pyweft_ui.options import normalize
+
+value = None              # the open panel's value; multiple: a list of them
+options: list = []
+multiple: bool = False
+disabled: bool = False
+toggle: str = "after"
+level: int = 3
+lazy: bool = False
+
+_picked = None            # unbound state, once clicked
+
+@property
+def choices(self):
+    out = []
+    for c in normalize(self.options):
+        extra = c["data"] if isinstance(c["data"], dict) else {}
+        c["description"] = str(extra.get("description") or "")
+        c["key"] = str(c["value"])
+        out.append(c)
+    return out
+
+@property
+def opened(self):
+    """The open panels' values, as a list."""
+    current = self.value if self.value is not None else self._picked
+    if self.multiple:
+        return list(current or [])
+    return [] if current is None else [current]
+
+def is_open(self, val):
+    return val in self.opened
+
+def choose(self, val, now_open):
+    if self.multiple:
+        keep = [c["value"] for c in self.choices
+                if (c["value"] == val and now_open) or (c["value"] != val and c["value"] in self.opened)]
+        new = keep
+    else:
+        new = val if now_open else None
+    self._picked = new
+    self.emit("update", new)
+
+def arrow(self, index, key):
+    usable = [i for i, c in enumerate(self.choices) if not (self.disabled or c["disabled"])]
+    if not usable:
+        return
+    if key == "home":
+        target = usable[0]
+    elif key == "end":
+        target = usable[-1]
+    else:
+        later = [i for i in usable if i > index]
+        earlier = [i for i in usable if i < index]
+        if key == "down":
+            target = later[0] if later else usable[0]
+        else:
+            target = earlier[-1] if earlier else usable[-1]
+    self.focus(f"p-{target}")
+</code>
+
+<style>
+/* The panels' own roots carry this component's scope, so they can be
+   joined into one stack; an open panel stands apart from its neighbours. */
+.accordion { display: flex; flex-direction: column; }
+.accordion > .expansion { border-radius: 0; margin-top: -1px; }
+.accordion > .expansion:first-child { margin-top: 0; border-top-left-radius: var(--ui-radius, 8px); border-top-right-radius: var(--ui-radius, 8px); }
+.accordion > .expansion:last-child { border-bottom-left-radius: var(--ui-radius, 8px); border-bottom-right-radius: var(--ui-radius, 8px); }
+.accordion > .expansion.open { margin: 12px 0; border-radius: var(--ui-radius, 8px); }
+.accordion > .expansion.open:first-child { margin-top: 0; }
+.accordion > .expansion.open:last-child { margin-bottom: 0; }
+</style>

@@ -202,6 +202,51 @@ These three replace almost all layout CSS.
 A card shows a header only when it has a `title`, `subtitle`, or a
 `title`/`actions` fill, and a footer only when it has a `footer` fill.
 
+### Panels that open and close: Expansion and Accordion
+
+**`Expansion`** is a panel whose content opens and closes under its header,
+for details people only sometimes need:
+
+```xml
+<ui.Expansion title="Delivery" description="Address and speed" icon="send" @bind="delivery_open">
+  <ui.TextField label="Street" @bind="street" />
+  <Fill name="actions">
+    <ui.Button variant="ghost" @click="delivery_open = False">Cancel</ui.Button>
+    <ui.Button @click="save">Save</ui.Button>
+  </Fill>
+</ui.Expansion>
+```
+
+- `@bind` a bool to open and close it from code, or leave it unbound
+  (`open="true"` starts it open). It emits `open` and `close` too.
+- The header shows `title`, `description` and an optional `icon`;
+  `<Fill name="header">` replaces them with your own. The arrow sits on the
+  right; `toggle="before"` moves it left, `toggle="none"` hides it.
+- `<Fill name="actions">` adds a row of buttons under the content.
+- Closed content stays rendered, so what was typed in it survives, but it
+  can't be reached with Tab or by screen readers. **`lazy="true"`** renders
+  it only once the panel is first opened, for content that is slow to build.
+- `disabled="true"` stops it opening; `level` sets the heading level of the
+  header (3 by default).
+
+**`Accordion`** stacks panels and keeps one open at a time:
+
+```xml
+<ui.Accordion :options="questions" @bind="question">
+  <p>{{ answers[panel] }}</p>
+</ui.Accordion>
+```
+
+- `options` take `Select`'s forms; a dict can add `description`, `icon`
+  and `disabled`. The content between the tags is each panel's body, and
+  `panel` inside it is that panel's value, like `Tabs`.
+- `@bind` holds the open panel's value (`None` when all are closed).
+  **`multiple="true"`** lets several stay open and binds a list. Unbound,
+  it keeps its own state.
+- `toggle`, `level`, `lazy` and `disabled` apply to every panel.
+- **Keyboard:** Up and Down move between the headers (skipping disabled
+  ones), Home and End jump to the first and last.
+
 ## 4. Forms
 
 ### The fields
@@ -1328,6 +1373,9 @@ readers and mobile devices work the way people expect:
 - **Tabs** are announced as tabs, with the chosen one marked, and their
   content as the chosen tab's panel. The tab row is one Tab stop: the arrow
   keys move between tabs, and Home and End jump to the first and last.
+- **Expansion panels** have a real button in a heading, saying whether
+  it's open; closed content is out of reach. In an `Accordion`, Up and
+  Down move between the headers.
 - **Tables** use real table headings, and tell screen readers which column
   is sorted and which way.
 - **Menus** are announced as menus, with the button saying whether it's

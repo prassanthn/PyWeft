@@ -1,0 +1,141 @@
+<template>
+  <section :class="classes">
+    <div class="head" role="heading" :aria-level="str(level)">
+      <If cond="arrows">
+        <button type="button" class="header" :id="_id + '-h'" :aria-expanded="'true' if is_open else 'false'"
+                :aria-controls="_id + '-c'" :disabled="disabled" @click="flip()"
+                @keydown.up.prevent="emit('arrow', 'up')" @keydown.down.prevent="emit('arrow', 'down')"
+                @keydown.home.prevent="emit('arrow', 'home')" @keydown.end.prevent="emit('arrow', 'end')">
+          <If cond="toggle == 'before'"><span class="chev"><Icon name="chevron-down" size="1.15em" /></span></If>
+          <If cond="icon"><span class="icon"><Icon :name="icon" size="1.1em" /></span></If>
+          <span class="titles"><Slot name="header"><span class="title">{{ title }}</span><If cond="description"><span class="desc">{{ description }}</span></If></Slot></span>
+          <If cond="toggle == 'after'"><span class="chev"><Icon name="chevron-down" size="1.15em" /></span></If>
+        </button>
+      </If>
+      <Else>
+        <button type="button" class="header" :id="_id + '-h'" :aria-expanded="'true' if is_open else 'false'"
+                :aria-controls="_id + '-c'" :disabled="disabled" @click="flip()">
+          <If cond="toggle == 'before'"><span class="chev"><Icon name="chevron-down" size="1.15em" /></span></If>
+          <If cond="icon"><span class="icon"><Icon :name="icon" size="1.1em" /></span></If>
+          <span class="titles"><Slot name="header"><span class="title">{{ title }}</span><If cond="description"><span class="desc">{{ description }}</span></If></Slot></span>
+          <If cond="toggle == 'after'"><span class="chev"><Icon name="chevron-down" size="1.15em" /></span></If>
+        </button>
+      </Else>
+    </div>
+    <div class="body" role="region" :id="_id + '-c'" :aria-labelledby="_id + '-h'" :inert="not is_open">
+      <div class="inner">
+        <If cond="rendered">
+          <div class="content"><Slot /></div>
+          <If cond="has_slot('actions')"><div class="actions"><Slot name="actions" /></div></If>
+        </If>
+      </div>
+    </div>
+  </section>
+</template>
+
+<code>
+# <ui.Expansion title="Shipping" description="Where and how fast" @bind="shipping_open">
+#   ... content ...
+#   <Fill name="actions"><ui.Button @click="save">Save</ui.Button></Fill>
+# </ui.Expansion>
+# A panel that opens and closes under its header. @bind a bool, or leave it
+# unbound (open="true" to start open). <Fill name="header"> replaces the
+# title and description. toggle: after (the arrow on the right), before,
+# none. Closed content stays rendered (typed text survives) but can't be
+# reached; lazy="true" renders it only once the panel is first opened.
+# Emits update (the new bool, for @bind), open and close.
+# arrows="true" (Accordion sets it): Up/Down/Home/End on the header emit
+# "arrow" with "up"/"down"/"home"/"end" instead of scrolling the page.
+import itertools
+
+title: str = ""
+description: str = ""
+icon: str = ""            # an Icon name shown before the title
+value = None              # bound: open or not; None = keep its own state
+open: bool = False        # unbound: start open
+disabled: bool = False
+toggle: str = "after"     # after, before, none
+level: int = 3            # the heading level of the header
+lazy: bool = False
+arrows: bool = False
+
+_ids = itertools.count(1)
+_open = None              # unbound state, once clicked
+_seen = False             # opened at least once (lazy)
+
+def on_init(self):
+    self._id = f"ui-expansion-{next(_ids)}"
+
+@property
+def is_open(self):
+    if self.value is not None:
+        return bool(self.value)
+    return self.open if self._open is None else self._open
+
+@property
+def rendered(self):
+    if self.is_open:
+        self._seen = True
+    return not self.lazy or self._seen
+
+@property
+def classes(self):
+    names = ["expansion"]
+    if self.is_open:
+        names.append("open")
+    if self.disabled:
+        names.append("disabled")
+    return " ".join(names)
+
+def flip(self):
+    new = not self.is_open
+    self._open = new
+    self.emit("update", new)
+    self.emit("open" if new else "close", None)
+</code>
+
+<style>
+.expansion {
+  border: 1px solid var(--ui-border, #d1d9e0); border-radius: var(--ui-radius, 8px);
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+  transition: margin 0.2s ease;
+}
+.head { margin: 0; }
+.header {
+  display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box;
+  padding: 14px 16px; border: 0; border-radius: inherit; background: transparent;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+  transition: background-color 0.15s, border-radius 0.2s;
+}
+.open .header { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.header:hover:not(:disabled) { background: var(--ui-subtle, #f6f8fa); }
+.header:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ui-primary, #4f46e5) 45%, transparent);
+}
+.header:disabled { cursor: not-allowed; color: var(--ui-muted, #59636e); }
+.titles { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 16px; }
+.title { font-weight: 600; }
+.desc { font-size: 0.9rem; color: var(--ui-muted, #59636e); }
+.icon, .chev { display: inline-flex; flex: none; color: var(--ui-muted, #59636e); }
+.chev { transition: transform 0.2s ease; }
+.open .chev { transform: rotate(180deg); }
+/* Height animates through the grid row (0fr -> 1fr); the content is
+   clipped while it moves, then unclipped so popovers inside can escape. */
+.body {
+  display: grid; grid-template-rows: 0fr; visibility: hidden;
+  transition: grid-template-rows 0.2s ease, visibility 0.2s;
+}
+.open > .body { grid-template-rows: 1fr; visibility: visible; }
+.inner { min-height: 0; overflow: hidden; }
+.open > .body > .inner { animation: ui-expansion-unclip 0s 0.2s forwards; }
+@keyframes ui-expansion-unclip { to { overflow: visible; } }
+.content { padding: 4px 16px 16px; }
+.actions {
+  display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px;
+  padding: 10px 16px; border-top: 1px solid var(--ui-border, #d1d9e0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .expansion, .body, .chev { transition: none; }
+}
+</style>

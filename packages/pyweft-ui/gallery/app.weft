@@ -146,6 +146,37 @@ tags={{ repr(tags) }}  invitees={{ repr(invitees) }}</pre>
           <pre class="code">{{ CODE['sliders'] }}</pre>
         </ui.Card>
 
+        <ui.Card title="Expansion panels" id="expansion-panels" subtitle="Open one, or a stack where one is open at a time">
+          <ui.Column gap="lg">
+            <ui.Expansion title="Delivery" description="Address and speed" icon="send" @bind="delivery_open">
+              <ui.Column>
+                <ui.TextField label="Street" @bind="street" />
+                <ui.RadioGroup label="Speed" options="Standard, Express" @bind="speed" />
+              </ui.Column>
+              <Fill name="actions">
+                <ui.Button variant="ghost" @click="delivery_open = False">Cancel</ui.Button>
+                <ui.Button @click="delivery_open = False">Save</ui.Button>
+              </Fill>
+            </ui.Expansion>
+            <ui.Row align="center">
+              <ui.Switch label="Several open at once" @bind="many_open" />
+            </ui.Row>
+            <If cond="many_open">
+              <ui.Accordion :options="FAQ" multiple="true" @bind="faq_open">
+                <p class="faq">{{ FAQ_ANSWERS[panel] }}</p>
+              </ui.Accordion>
+            </If>
+            <Else>
+              <ui.Accordion :options="FAQ" @bind="faq">
+                <p class="faq">{{ FAQ_ANSWERS[panel] }}</p>
+              </ui.Accordion>
+            </Else>
+            <pre class="state">delivery_open={{ delivery_open }}  street={{ repr(street) }}  speed={{ repr(speed) }}
+faq={{ repr(faq_open if many_open else faq) }}</pre>
+            <pre class="code">{{ CODE['expansion'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
         <ui.Card title="Dates and menus" id="dates-and-menus">
           <ui.Column gap="lg">
             <ui.Grid min_width="16rem" gap="lg">
@@ -275,7 +306,7 @@ import asyncio
 import datetime
 from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Autocomplete", "Chips", "Sliders", "Dates and menus", "Calendars", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Autocomplete", "Chips", "Sliders", "Expansion panels", "Dates and menus", "Calendars", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -331,6 +362,24 @@ volume: int = 40
 price: tuple = (100, 350)
 rating: int = 4
 opacity: float = 0.8
+delivery_open: bool = False
+street: str = ""
+speed: str = "Standard"
+many_open: bool = False
+faq = "install"
+faq_open: list = ["install"]
+FAQ = [
+    {"value": "install", "label": "How do I install it?", "icon": "download"},
+    {"value": "browser", "label": "Does it run in the browser?", "icon": "external"},
+    {"value": "desktop", "label": "And on the desktop?", "description": "Windows, macOS, Linux"},
+    {"value": "mobile", "label": "Mobile apps", "description": "Not yet", "disabled": True},
+]
+FAQ_ANSWERS = {
+    "install": "uv add pyweft pyweft-ui (or pip install), then pyweft new myapp.",
+    "browser": "Yes: pyweft run serves it, pyweft build makes a static site.",
+    "desktop": "pyweft run --desktop opens a native window; pyweft build --desktop packages it.",
+    "mobile": "",
+}
 
 def drop_filter(self, name):
     self.filters = [f for f in self.filters if f != name]
@@ -473,6 +522,14 @@ def submit(self):
 
 <ui.Autocomplete label="City" :options="cities" match="none" :loading="searching"
                  @search="find_cities(event)" @bind="city" />""",
+    "expansion": """<ui.Expansion title="Delivery" description="Address and speed" @bind="delivery_open">
+  ... fields ...
+  <Fill name="actions"><ui.Button @click="save">Save</ui.Button></Fill>
+</ui.Expansion>
+
+<ui.Accordion :options="faq" @bind="question">
+  <p>{{ answers[panel] }}</p>
+</ui.Accordion>""",
     "sliders": """<ui.Slider label="Volume" @bind="volume" format="{}%" />
 <ui.Slider label="Price" :min="0" :max="500" :step="10" range="true"
            @bind="price" format="${}" value_label="side" />
@@ -540,6 +597,7 @@ toast("Item deleted.", action="Undo", on_action=self.undo)""",
   font-size: 0.72rem; font-weight: 700;
   background: color-mix(in srgb, var(--ui-primary) 15%, transparent); color: var(--ui-primary);
 }
+.faq { margin: 0; color: var(--ui-muted, #59636e); }
 .avatar.small { width: 1.35rem; height: 1.35rem; font-size: 0.6rem; margin-left: -0.45em; }
 .person { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .person-name { font-weight: 600; }

@@ -14,6 +14,10 @@ releasing moves them under the new version (see
   `query`) and the empty state with `<Fill name="empty">`. For server
   results: `@search`, `match="none"` and `loading`. `free="true"` keeps
   whatever was typed.
+- **`Expansion`**: a panel that opens and closes under its header, with a
+  description, icon, action row, custom header and `lazy` content.
+- **`Accordion`**: a stack of expansion panels, one open at a time or
+  `multiple`, with arrow-key movement between headers.
 - **`Slider`**: drag a thumb to pick a number, or two for a range; steps,
   ticks and labelled marks, a value bubble with a `format`, keyboard
   support, and `lazy` updates on release.
