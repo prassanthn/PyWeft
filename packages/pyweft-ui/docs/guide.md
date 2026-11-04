@@ -29,6 +29,7 @@ fields; this guide is the how-to.
    - [Right-click menus: ContextMenu](#right-click-menus-contextmenu)
 6. [Messages, badges and loading](#6-messages-badges-and-loading)
 7. [Dialogs](#7-dialogs)
+   - [Sheets from the bottom: BottomSheet](#sheets-from-the-bottom-bottomsheet)
 8. [Tabs](#8-tabs)
    - [A task in steps: Stepper](#a-task-in-steps-stepper)
 9. [Tables](#9-tables)
@@ -979,6 +980,45 @@ what was typed into it:
 X); when your own code sets the field to `False`, you're already there to do
 whatever's needed.
 
+### Sheets from the bottom: BottomSheet
+
+A bottom sheet slides up from the bottom of the window, over a dimmed
+page. It suits phones, where it sits under the thumb: a list of actions,
+or a few settings such as filters.
+
+```xml
+<ui.Button @click="sharing = True">Share</ui.Button>
+<ui.BottomSheet title="Share" @bind="sharing" @select="share(event)" :items="[
+    {'value': 'link', 'label': 'Copy link', 'icon': 'copy'},
+    {'value': 'email', 'label': 'Email', 'icon': 'send', 'description': 'Opens your mail app'},
+]" />
+
+<ui.BottomSheet title="Filters" @bind="filtering">
+  <ui.Chips label="Status" options="Open, Done" multiple="true" @bind="status" />
+  <Fill name="actions">
+    <ui.Button variant="primary" @click="filtering = False">Show results</ui.Button>
+  </Fill>
+</ui.BottomSheet>
+```
+
+- **`@bind`** a bool, as with `Dialog`: open while it is `True`.
+- **`items`** (the forms `Menu` takes; dicts may add `icon`,
+  `description`, `danger`, `disabled`) make it a list of actions: choosing
+  one emits `select` with its value and closes the sheet. Anything else
+  goes between the tags, and `<Fill name="actions">` is a row of buttons
+  pinned to its bottom.
+- **Closing:** Esc, a tap on the dimmed page, or a swipe down on the top of
+  the sheet (drag the handle down and let go). `dismissible="false"`
+  leaves only your own buttons. `@close` says how it closed: `"esc"`,
+  `"backdrop"`, `"swipe"` or `"select"`; setting the bound field yourself
+  emits nothing.
+- It is full width on a phone and centred on wider screens, at most
+  `max_width` wide (`40rem`). Tall content scrolls inside it (it takes up
+  to 85% of the window's height). Without a `title`, name it for screen
+  readers with `aria_label`.
+- Once opened, it stays on the page while closed (hidden and out of reach)
+  so it can slide away; what was typed in it is kept until you clear it.
+
 ## 8. Tabs
 
 `Tabs` shows a row of tabs. Bind it to a field, and put what each tab shows
@@ -1488,6 +1528,9 @@ readers and mobile devices work the way people expect:
   works with Space and Enter. Radio buttons move with the arrow keys.
 - **Alerts are announced:** `warning` and `danger` alerts interrupt, `info`
   and `success` wait politely.
+- **Bottom sheets** behave like dialogs for the keyboard and screen
+  readers: focus moves in, Tab stays inside, Esc closes, and focus goes
+  back to where it was.
 - **Dialogs** are announced as dialogs, move focus into themselves when they
   open (so Esc closes them straight away), keep Tab and Shift+Tab inside
   while open, close with Esc, and give focus back to whatever had it

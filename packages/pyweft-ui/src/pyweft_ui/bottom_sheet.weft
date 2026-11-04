@@ -1,0 +1,184 @@
+<template>
+  <div class="host">
+    <If cond="value or _seen">
+      <div :class="'layer open' if value else 'layer'" :inert="not value"
+           @keydown.esc.stop="dismiss('esc')" @pointerup="drop(event)" @pointercancel="cancel_grab()">
+        <div class="backdrop" @click="dismiss('backdrop')"></div>
+        <!-- Tab past either end lands on a guard, which sends focus round. -->
+        <span class="guard" tabindex="0" data-focus-guard="" @focus="focus_last('box')"></span>
+        <div class="sheet" role="dialog" aria-modal="true" :aria-label="title or aria_label or None"
+             tabindex="-1" ref="box" :style="'max-width: ' + max_width">
+          <div :class="'grip' + (' grabbable' if dismissible else '')" @pointerdown="grab(event)">
+            <If cond="dismissible"><span class="handle" aria-hidden="true"></span></If>
+            <If cond="title"><h2 class="title">{{ title }}</h2></If>
+          </div>
+          <div class="body">
+            <If cond="item_list">
+              <div class="items">
+                <For each="it in item_list" key="it['key']">
+                  <button type="button" :class="'item danger' if it['danger'] else 'item'"
+                          :disabled="it['disabled']" @click="choose(it)">
+                    <If cond="it['icon']"><span class="icon"><Icon :name="it['icon']" size="1.25em" /></span></If>
+                    <span class="text">
+                      <span class="label">{{ it['label'] }}</span>
+                      <If cond="it['description']"><span class="desc">{{ it['description'] }}</span></If>
+                    </span>
+                  </button>
+                </For>
+              </div>
+            </If>
+            <Slot />
+          </div>
+          <If cond="has_slot('actions')"><div class="actions"><Slot name="actions" /></div></If>
+        </div>
+        <span class="guard" tabindex="0" data-focus-guard="" @focus="focus_first('box')"></span>
+      </div>
+    </If>
+  </div>
+</template>
+
+<code>
+# <ui.BottomSheet title="Share" @bind="sharing" :items="actions" @select="share(event)" />
+# <ui.BottomSheet title="Filters" @bind="filtering"> ... <Fill name="actions">...</Fill> </ui.BottomSheet>
+# A panel that slides up from the bottom of the window while the bound
+# field is True. items (Menu's forms; dicts may add icon, description,
+# danger, disabled) are a list of actions: choosing one emits "select"
+# with its value and closes the sheet. Any other content goes between the
+# tags; <Fill name="actions"> is a row pinned to its bottom.
+# Esc, a tap on the backdrop, or a swipe down on the top of the sheet
+# close it (unless dismissible="false"), emitting "close" with "esc",
+# "backdrop", "swipe" or "select". Focus moves in as it opens, Tab stays
+# inside, and focus goes back as it closes.
+from pyweft import effect
+
+from pyweft_ui.options import normalize
+
+value: bool = False
+title: str = ""
+aria_label: str = ""      # names a sheet without a title for screen readers
+items: list = []
+max_width: str = "40rem"  # on wide screens it is centred, at most this wide
+dismissible: bool = True
+
+_open = False
+_seen = False             # opened once: stays on the page so it can slide away
+_grab = None              # where a swipe started (clientY)
+
+_SWIPE = 60               # pixels down that close it
+
+@effect
+def follow_focus(self):
+    # Runs when value changes, however it changed: the bound field, Esc,
+    # a swipe, an item, or the app's own buttons.
+    if self.value and not self._open:
+        self._open = True
+        self._seen = True
+        self.save_focus()
+        self.focus("box")
+    elif not self.value and self._open:
+        self._open = False
+        self._grab = None
+        self.restore_focus()
+
+@property
+def item_list(self):
+    out = []
+    for i, c in enumerate(normalize(self.items)):
+        extra = c["data"] if isinstance(c["data"], dict) else {}
+        out.append({
+            "key": f"{i}-{c['value']}", "value": c["value"], "label": c["label"], "icon": c["icon"],
+            "description": str(extra.get("description") or ""), "danger": bool(extra.get("danger")),
+            "disabled": c["disabled"],
+        })
+    return out
+
+def close(self, reason="close"):
+    if not self.value:
+        return
+    self.emit("update", False)
+    self.emit("close", reason)
+
+def dismiss(self, reason):
+    if self.dismissible:
+        self.close(reason)
+
+def choose(self, it):
+    self.emit("select", it["value"])
+    self.close("select")
+
+# A swipe: down on the top of the sheet, up anywhere (the layer covers the
+# window, so letting go off the handle still counts) far enough below.
+def grab(self, event):
+    if self.dismissible and self.value:
+        self._grab = event.get("clientY")
+
+def drop(self, event):
+    start, self._grab = self._grab, None
+    end = event.get("clientY")
+    if start is not None and end is not None and end - start >= _SWIPE:
+        self.close("swipe")
+
+def cancel_grab(self):
+    self._grab = None
+</code>
+
+<style>
+.host { display: contents; }
+/* Rendered from the first opening on: closed, it slides away, then is
+   hidden and inert, so nothing in it can be reached. */
+.layer {
+  position: fixed; inset: 0; z-index: 1000; pointer-events: none;
+  visibility: hidden; transition: visibility 0s 0.25s;
+}
+.layer.open { pointer-events: auto; visibility: visible; transition: none; }
+.backdrop {
+  position: absolute; inset: 0; background: rgba(15, 23, 42, 0.5);
+  opacity: 0; transition: opacity 0.25s ease;
+}
+.open .backdrop { opacity: 1; animation: ui-bottom-sheet-fade 0.25s ease-out; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; margin: 0 auto;
+  width: 100%; max-height: 85vh; box-sizing: border-box;
+  display: flex; flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+  border-radius: calc(var(--ui-radius, 8px) * 1.75) calc(var(--ui-radius, 8px) * 1.75) 0 0;
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.25);
+  outline: none;
+  transform: translateY(100%); transition: transform 0.25s ease-in;
+}
+.open .sheet { transform: none; transition: transform 0.25s ease-out; animation: ui-bottom-sheet-up 0.25s ease-out; }
+.grip { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 20px 4px; }
+.grip.grabbable { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.handle { width: 36px; height: 4px; border-radius: 2px; background: var(--ui-border, #d1d9e0); }
+.title { align-self: stretch; margin: 4px 0 0; font-size: 1.05rem; font-weight: 650; }
+.body { flex: 1; min-height: 0; overflow: auto; padding: 8px 20px 20px; }
+.items { display: flex; flex-direction: column; margin: 0 -12px; }
+.item {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  padding: 12px; border: 0; border-radius: var(--ui-radius, 8px);
+  background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.item:hover:not(:disabled) { background: var(--ui-subtle, #f6f8fa); }
+.item:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ui-primary, #4f46e5) 40%, transparent);
+}
+.item:disabled { opacity: 0.5; cursor: not-allowed; }
+.item.danger { color: var(--ui-danger, #d1242f); }
+.icon { display: inline-flex; color: var(--ui-muted, #59636e); }
+.danger .icon { color: inherit; }
+.text { display: flex; flex-direction: column; min-width: 0; }
+.label { font-weight: 550; }
+.desc { font-size: 0.83rem; color: var(--ui-muted, #59636e); }
+.actions {
+  display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;
+  padding: 12px 20px; border-top: 1px solid var(--ui-border, #d1d9e0);
+}
+.guard { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; outline: none; }
+@keyframes ui-bottom-sheet-fade { from { opacity: 0; } }
+@keyframes ui-bottom-sheet-up { from { transform: translateY(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .layer, .backdrop, .sheet, .open .sheet, .open .backdrop { transition: none; animation: none; }
+}
+</style>

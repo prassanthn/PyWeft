@@ -14,6 +14,9 @@ releasing moves them under the new version (see
   `query`) and the empty state with `<Fill name="empty">`. For server
   results: `@search`, `match="none"` and `loading`. `free="true"` keeps
   whatever was typed.
+- **`BottomSheet`**: a panel sliding up from the bottom, as a list of
+  actions or any content with an actions row; closes with Esc, a tap
+  outside or a swipe down, and keeps focus inside like `Dialog`.
 - **`Stepper`**: a task in steps with Back / Next, per-step checks
   through `@next` (a `Form` per step), optional and error steps, `linear`
   mode, vertical layout and labels under the numbers.

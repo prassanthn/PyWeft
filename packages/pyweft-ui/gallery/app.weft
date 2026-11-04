@@ -284,6 +284,28 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['dialog'] }}</pre>
         </ui.Card>
 
+        <ui.Card title="Bottom sheet" id="bottom-sheet" subtitle="Slides up from the bottom: swipe it down, press Esc or tap outside">
+          <ui.Row align="center">
+            <ui.Button icon="send" @click="sharing = True">Share</ui.Button>
+            <ui.Button variant="secondary" icon="settings" @click="filtering = True">Filters</ui.Button>
+            <span class="note">{{ sheet_note }}</span>
+          </ui.Row>
+          <ui.BottomSheet title="Share" @bind="sharing" :items="SHARE"
+                          @select="shared = event" @close="sheet_closed = event" />
+          <ui.BottomSheet title="Filters" @bind="filtering" @close="sheet_closed = event">
+            <ui.Column gap="lg">
+              <ui.Chips label="Status" options="Open, In progress, Done" multiple="true" @bind="filter_status" />
+              <ui.Slider label="Price" :max="500" :step="10" range="true" format="${}" value_label="side" @bind="filter_price" />
+              <ui.Switch label="Only items in stock" @bind="filter_stock" />
+            </ui.Column>
+            <Fill name="actions">
+              <ui.Button variant="ghost" @click="reset_filters">Reset</ui.Button>
+              <ui.Button variant="primary" @click="filtering = False">Show results</ui.Button>
+            </Fill>
+          </ui.BottomSheet>
+          <pre class="code">{{ CODE['sheet'] }}</pre>
+        </ui.Card>
+
         <ui.Card title="Tabs" id="tabs">
           <ui.Column gap="lg">
             <ui.Tabs label="Project" options="Overview, Activity, Settings" @bind="tab">
@@ -338,7 +360,7 @@ import asyncio
 import datetime
 from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Dialog", "Bottom sheet", "Tabs", "Table", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -382,6 +404,34 @@ check_in = None
 stay = None
 last_action: str = ""
 menu_choice = None
+sharing: bool = False
+filtering: bool = False
+shared = None
+sheet_closed = None
+filter_status: list = ["Open"]
+filter_price: tuple = (0, 500)
+filter_stock: bool = False
+SHARE = [
+    {"value": "link", "label": "Copy link", "icon": "copy"},
+    {"value": "email", "label": "Email", "icon": "send", "description": "Opens your mail app"},
+    {"value": "download", "label": "Download", "icon": "download"},
+    {"value": "print", "label": "Print", "icon": "external", "disabled": True},
+]
+
+@property
+def sheet_note(self):
+    parts = []
+    if self.shared:
+        parts.append(f"Shared by {self.shared}")
+    if self.sheet_closed:
+        parts.append(f"last closed by {self.sheet_closed}")
+    filters = ", ".join(self.filter_status) or "any status"
+    parts.append(f"filters: {filters}, ${self.filter_price[0]}-{self.filter_price[1]}"
+                 + (", in stock" if self.filter_stock else ""))
+    return "; ".join(parts)
+
+def reset_filters(self):
+    self.filter_status, self.filter_price, self.filter_stock = [], (0, 500), False
 FILE_MENU = [
     {"heading": "Document"},
     {"value": "new", "label": "New", "icon": "plus", "hint": "Ctrl+N"},
@@ -651,6 +701,17 @@ events = [
     "feedback": """<ui.Alert kind="success">Saved.</ui.Alert>
 <ui.Alert kind="danger" title="Failed" dismissible="true" @close="hide()">...</ui.Alert>
 <ui.Badge kind="success">active</ui.Badge>  <ui.Spinner />  <ui.Icon name="star" />""",
+    "sheet": """<ui.BottomSheet title="Share" @bind="sharing" :items="[
+    {'value': 'link', 'label': 'Copy link', 'icon': 'copy'},
+    {'value': 'email', 'label': 'Email', 'description': 'Opens your mail app'},
+]" @select="share(event)" />
+
+<ui.BottomSheet title="Filters" @bind="filtering">
+  ... any content ...
+  <Fill name="actions">
+    <ui.Button variant="primary" @click="filtering = False">Show results</ui.Button>
+  </Fill>
+</ui.BottomSheet>""",
     "dialog": """<ui.Button @click="confirming = True">Delete project</ui.Button>
 <ui.Dialog title="Delete project?" @bind="confirming">
   <p>This can't be undone.</p>
