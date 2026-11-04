@@ -161,6 +161,60 @@ class Route:
         return params
 
 
+# Every router()'s routes, by its pages folder (a reload replaces its entry),
+# so trail() can name the levels of a URL.
+_ROUTE_TABLES: dict[str, tuple[Route, ...]] = {}
+
+
+@dataclass(frozen=True)
+class Crumb:
+    """One level of a breadcrumb trail: ``to`` is the path to link to, or
+    None for a level with no page of its own."""
+
+    to: str | None
+    label: str
+
+
+def trail(path: str | None = None, home: str = "Home") -> list[Crumb]:
+    """The breadcrumb trail for ``path`` (the current location by default),
+    one crumb per level: ``/orders/7`` gives Home, Orders, Order 7.
+
+    A level's label is its page's ``crumb`` (``crumb = "Orders"`` in the
+    code block; ``crumb = "Order {id}"`` fills in route parameters), else
+    its URL segment made readable (``order-items`` -> "Order items"), and
+    ``home`` for ``/``. A level no page answers to is a crumb with no link;
+    ``/`` is left out when no page answers to it."""
+    if path is None:
+        path = location().path
+    segments = [part for part in path.split("/") if part]
+    routes = [route for table in reversed(_ROUTE_TABLES.values()) for route in table]
+    crumbs: list[Crumb] = []
+    for depth in range(len(segments) + 1):
+        prefix = segments[:depth]
+        to = "/" + "/".join(prefix)
+        match = next(((r, params) for r in routes if (params := r.match(prefix)) is not None), None)
+        if match is None:
+            if depth:
+                crumbs.append(Crumb(None, _readable(prefix[-1])))
+            continue
+        route, params = match
+        label = vars(route.page).get("crumb")
+        if isinstance(label, str) and label:
+            try:
+                label = label.format_map(params)
+            except (KeyError, IndexError, ValueError):
+                pass
+        else:
+            label = _readable(prefix[-1]) if depth else home
+        crumbs.append(Crumb(to, label))
+    return crumbs
+
+
+def _readable(segment: str) -> str:
+    text = segment.replace("-", " ").replace("_", " ").strip()
+    return text[:1].upper() + text[1:] if text else segment
+
+
 def _route_for(rel: Path) -> str:
     parts = list(rel.with_suffix("").parts)
     if parts[-1] == "index":
@@ -316,6 +370,9 @@ def router(folder: str | Path = "pages") -> type:
         routes.append(route)
     # Fixed segments before parameters, so /orders/new wins over /orders/{id}.
     routes.sort(key=lambda r: tuple(p.startswith("{") for p in r.parts))
+    # Newest last (a reload moves its folder there): trail() asks it first.
+    _ROUTE_TABLES.pop(str(base), None)
+    _ROUTE_TABLES[str(base)] = tuple(routes)
 
     return type(
         "Pages",

@@ -247,3 +247,20 @@ def test_pages_get_scoped_styles_under_the_app_root(tmp_path):
     pages = {"index.weft": "<template><h1>x</h1></template><style>h1 { color: red; }</style>"}
     App, r, tree = mount(tmp_path, pages=pages)
     assert "data-w-pages-index" in next(n for n in walk(tree) if n.tag == "h1").attrs
+
+
+def test_trail_names_each_level(tmp_path):
+    pages = dict(PAGES)
+    pages["orders.weft"] = pages["orders.weft"].replace("status: str", 'crumb = "All orders"\n        status: str')
+    pages["order.weft"] = pages["order.weft"].replace('route = "/orders/{id}"', 'route = "/orders/{id}"\n        crumb = "Order #{id}"')
+    App, renderer, tree = mount(tmp_path, pages=pages)
+    crumbs = lambda path: [(c.to, c.label) for c in routing.trail(path)]  # noqa: E731
+    assert crumbs("/") == [("/", "Home")]
+    assert crumbs("/orders") == [("/", "Home"), ("/orders", "All orders")]
+    assert crumbs("/orders/7") == [("/", "Home"), ("/orders", "All orders"), ("/orders/7", "Order #7")]
+    assert crumbs("/orders/new") == [("/", "Home"), ("/orders", "All orders"), ("/orders/new", "New")]
+    # /settings has no page of its own: a crumb with no link.
+    assert crumbs("/settings/user-profile") == [("/", "Home"), (None, "Settings"), ("/settings/user-profile", "User profile")]
+    assert [c.label for c in routing.trail("/", home="Start")] == ["Start"]
+    navigate("/orders/3")
+    assert [c.label for c in routing.trail()] == ["Home", "All orders", "Order #3"]

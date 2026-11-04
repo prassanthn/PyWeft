@@ -1343,6 +1343,15 @@ the redirect again.
 `on_init` to name the browser tab or window after it (see
 [the app's title and icon](#the-apps-title-and-icon)).
 
+**Breadcrumbs:** give a page a `crumb` in its code block (`crumb = "Orders"`,
+or `crumb = "Order #{id}"` to fill in route parameters), and
+`pyweft.routing.trail()` gives the trail to the current page: one
+`Crumb(to, label)` per level, so `/orders/7` is Home, Orders, Order #7. A
+page without a `crumb` is named after its URL segment (`order-items`
+becomes "Order items"), and a level with no page of its own (`/settings`
+when only `/settings/profile` exists) comes with `to=None`.
+`pyweft-ui`'s `<ui.Breadcrumbs auto="true" />` shows it.
+
 **The page for unknown addresses** is `pages/not_found.weft`; declare
 `path: str = ""` in it to show the address that was asked for. Without the
 file, a plain "There is no page at …" message is shown.
@@ -1822,7 +1831,7 @@ accessible controls as components:
 with `from pyweft_ui import ui` in the code block. It covers layout
 (`AppShell`, `Row`, `Column`, `Grid`, `Card`, `Divider`, `Carousel`, `Expansion`, `Accordion`), form fields (`TextField`,
 `TextArea`, `NumberField`, `Select`, `Autocomplete`, `Chips`, `ChipInput`, `ButtonToggle`,
-`Slider`, `RadioGroup`, `Checkbox`, `Switch`, `DatePicker`, `DateRangePicker`, `Calendar`), data and navigation (`Table` with sorting, `Tree`, `Tabs`, `Stepper`,
+`Slider`, `RadioGroup`, `Checkbox`, `Switch`, `DatePicker`, `DateRangePicker`, `Calendar`), data and navigation (`Table` with sorting, `Tree`, `Tabs`, `Stepper`, `Breadcrumbs`,
 `EventCalendar`), actions
 and feedback (`Button`, `Menu`, `ContextMenu`, `Dialog`, `BottomSheet`, `Popover`, `Tooltip`, `Alert`, `Toaster` with `toast()`, `Badge`, `Spinner`, `Progress`,
 `Icon`) and a `Theme` with light, dark and system modes and your own
@@ -2392,7 +2401,7 @@ Working today:
 - **Data in and out:** `pyweft.http` calls web APIs and loads the app's
   data files; `pyweft.storage` keeps data between visits. Same code on
   both targets.
-- **Controls:** `pyweft-ui`, 43 ready-made, themeable controls: layout,
+- **Controls:** `pyweft-ui`, 44 ready-made, themeable controls: layout,
   form fields with validation, autocomplete, chips, sliders and masks, date and date-range pickers,
   calendars of events, menus, tabs, tables, dialogs, toasts (see
   "Ready-made controls" in section 5), with a live gallery.

@@ -8,6 +8,9 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **Breadcrumb trails:** `pyweft.routing.trail()` names each level of the
+  current URL from the router: a page's `crumb = "Orders"` (or
+  `"Order #{id}"`, filled from the route), else its URL segment.
 - **`pyweft check APP`** finds mistakes without running the app: template
   and Python errors, missing components, unknown names in expressions,
   handlers and `@bind` fields that don't exist, props a component doesn't
