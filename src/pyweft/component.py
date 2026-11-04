@@ -231,7 +231,9 @@ def component_from_source(
     and only matters when the source has a ``<style>`` block. ``filename`` is
     what tracebacks show for errors in the code block."""
     template_src, _, style_src = split_source(src)
-    nodes = parse_template(template_src)
+    # Lines in the template tree (and its error messages) are file lines.
+    first_line = src.count(chr(10), 0, block_spans(src)["template"][0]) + 1
+    nodes = parse_template(template_src, first_line)
 
     code_globals: dict[str, Any] = {}
     exec(compile_code_block(src, filename or f"<{name}.weft>"), code_globals)

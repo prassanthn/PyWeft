@@ -28,6 +28,8 @@ from __future__ import annotations
 import re
 import textwrap
 import xml.etree.ElementTree as ET
+from contextvars import ContextVar
+from xml.parsers import expat
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -52,6 +54,8 @@ class TStatic:
 @dataclass
 class TElement:
     tag: str
+    # Where it is in the file (0 if unknown); not part of what it means.
+    line: int = field(default=0, compare=False, repr=False, kw_only=True)
     attrs: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
     # Event spec ("click", "keydown.enter") -> handler source; see events.py.
     events: dict[str, str] = field(default_factory=dict)
@@ -69,6 +73,7 @@ class TIf:
     """branches is [(cond_src, children), ...]; a None cond is the else."""
 
     branches: list[tuple[str | None, list[Any]]]
+    line: int = field(default=0, compare=False, repr=False, kw_only=True)
 
 
 @dataclass
@@ -78,6 +83,7 @@ class TFor:
     index_var: str | None = None
     key_expr: str | None = None
     children: list[Any] = field(default_factory=list)
+    line: int = field(default=0, compare=False, repr=False, kw_only=True)
 
 
 @dataclass
@@ -90,6 +96,7 @@ class TSlot:
     attrs: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
     expr_attrs: dict[str, str] = field(default_factory=dict)
     children: list[Any] = field(default_factory=list)
+    line: int = field(default=0, compare=False, repr=False, kw_only=True)
 
 
 @dataclass
@@ -99,6 +106,7 @@ class TFill:
 
     name: str
     children: list[Any] = field(default_factory=list)
+    line: int = field(default=0, compare=False, repr=False, kw_only=True)
 
 
 # ------------------------------------------------------------ source slicing
@@ -246,13 +254,72 @@ def rewrite_at_directives(src: str) -> str:
 # --------------------------------------------------------------- conversion
 
 
-def parse_template(template_src: str) -> list[Any]:
+_ROOT_TAG = "<pyweft-root>"
+# Line numbers of the elements being converted, by id(): ElementTree keeps
+# none, and its C elements take no extra attributes.
+_LINES: ContextVar[dict[int, int]] = ContextVar("_LINES", default={})
+
+
+def parse_template(template_src: str, first_line: int = 1) -> list[Any]:
+    """The template tree. ``first_line`` is the file line the template text
+    starts on, so nodes' ``line`` and error messages count file lines."""
     src = rewrite_at_directives(template_src)
+    root, lines = _parse_xml(_ROOT_TAG + src + "</pyweft-root>", first_line - 1)
+    token = _LINES.set(lines)
     try:
-        root = ET.fromstring("<pyweft-root>" + src + "</pyweft-root>")
-    except ET.ParseError as exc:
-        raise TemplateError(f"template is not well-formed XML: {exc}") from exc
-    return _convert_children(root)
+        return _convert_children(root)
+    finally:
+        _LINES.reset(token)
+
+
+def _parse_xml(text: str, line_offset: int) -> tuple[ET.Element, dict[int, int]]:
+    """ElementTree's tree, built from expat directly so each element's line
+    is known. Names are handled as ElementTree does (namespaces as {uri}name;
+    comments and processing instructions dropped)."""
+    parser = expat.ParserCreate(namespace_separator="}")
+    parser.buffer_text = True
+    lines: dict[int, int] = {}
+    stack: list[ET.Element] = []
+    found: list[ET.Element] = []
+
+    def name(raw: str) -> str:
+        return "{" + raw if "}" in raw else raw
+
+    def start(tag: str, attrs: dict[str, str]) -> None:
+        el = ET.Element(name(tag), {name(k): v for k, v in attrs.items()})
+        lines[id(el)] = parser.CurrentLineNumber + line_offset
+        if stack:
+            stack[-1].append(el)
+        else:
+            found.append(el)
+        stack.append(el)
+
+    def end(tag: str) -> None:
+        stack.pop()
+
+    def chars(data: str) -> None:
+        current = stack[-1]
+        if len(current):
+            current[-1].tail = (current[-1].tail or "") + data
+        else:
+            current.text = (current.text or "") + data
+
+    parser.StartElementHandler = start
+    parser.EndElementHandler = end
+    parser.CharacterDataHandler = chars
+    try:
+        parser.Parse(text, True)
+    except expat.ExpatError as exc:
+        column = exc.offset - (len(_ROOT_TAG) if exc.lineno == 1 else 0)
+        raise TemplateError(
+            f"template is not well-formed XML: {expat.ErrorString(exc.code)}: "
+            f"line {exc.lineno + line_offset}, column {column + 1}"
+        ) from None
+    return found[0], lines
+
+
+def _line(el: ET.Element) -> int:
+    return _LINES.get().get(id(el), 0)
 
 
 def _text_nodes(text: str | None) -> list[Any]:
@@ -318,7 +385,7 @@ def _convert_if(kids: list[ET.Element], i: int) -> tuple[TIf, int]:
             branches.append((None, _convert_children(nxt)))
             j += 1
             break
-    return TIf(branches), j
+    return TIf(branches, line=_line(node)), j
 
 
 def _convert_for(el: ET.Element) -> TFor:
@@ -334,6 +401,7 @@ def _convert_for(el: ET.Element) -> TFor:
         index_var=el.get("index"),
         key_expr=el.get("key"),
         children=_convert_children(el),
+        line=_line(el),
     )
 
 
@@ -377,6 +445,7 @@ def _convert_slot(el: ET.Element) -> TSlot:
         attrs=attrs,
         expr_attrs=expr_attrs,
         children=_convert_children(el),
+        line=_line(el),
     )
 
 
@@ -384,7 +453,7 @@ def _convert_fill(el: ET.Element) -> TFill:
     extra = sorted(set(el.attrib) - {"name"})
     if extra:
         raise TemplateError(f"<Fill> takes only name=, not {', '.join(extra)}")
-    return TFill(name=_slot_name(el, required=True), children=_convert_children(el))
+    return TFill(name=_slot_name(el, required=True), children=_convert_children(el), line=_line(el))
 
 
 def _convert_element(el: ET.Element) -> TElement:
@@ -431,4 +500,5 @@ def _convert_element(el: ET.Element) -> TElement:
         key_expr=key_expr,
         children=_convert_children(el),
         expr_attrs=expr_attrs,
+        line=_line(el),
     )

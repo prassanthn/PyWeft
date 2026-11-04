@@ -166,3 +166,33 @@ def test_malformed_xml_raises_template_error():
 def test_formatting_whitespace_is_dropped():
     nodes = parse_template("<div>\n  <span>a</span>\n</div>")
     assert all(not isinstance(n, TStatic) for n in nodes[0].children)
+
+
+def test_nodes_know_their_file_line():
+    nodes = parse_template(
+        "<div>\n  <p>a</p>\n  <For each=\"x in xs\" key=\"x\"><b>{{ x }}</b></For>\n"
+        "  <If cond=\"x\"><i/></If>\n</div>",
+        first_line=5,
+    )
+    div = nodes[0]
+    loop, branch = div.children[1], div.children[2]
+    assert (div.line, div.children[0].line, loop.line, loop.children[0].line, branch.line) == (5, 6, 7, 7, 8)
+    # Positions don't take part in equality: the same template elsewhere is equal.
+    assert parse_template("<p>a</p>") == parse_template("\n\n<p>a</p>")
+
+
+def test_xml_errors_name_the_file_line_and_column():
+    with pytest.raises(TemplateError, match=r"mismatched tag: line 11, column 10"):
+        parse_template("<div>\n<p>oops</div>", first_line=10)
+    with pytest.raises(TemplateError, match=r"not well-formed \(invalid token\): line 1, column 9"):
+        parse_template('<p a="1 < 2">x</p>')
+
+
+def test_loaded_components_count_lines_from_the_top_of_the_file():
+    from pyweft import component_from_source
+
+    cls = component_from_source("<code>\nx = 1\n</code>\n\n<template>\n  <div>\n    <p>{{ x }}</p>\n  </div>\n</template>\n")
+    div = cls.__template__[0]
+    assert (div.line, div.children[0].line) == (6, 7)
+    with pytest.raises(TemplateError, match=r"mismatched tag: line 5, column 3"):
+        component_from_source("<template>\n<div>\n\n\n</span>\n</template>")
