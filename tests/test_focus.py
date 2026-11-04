@@ -96,3 +96,12 @@ def test_refs_belong_to_the_component_that_wrote_them():
 def test_focus_needs_a_rendered_component():
     with pytest.raises(RuntimeError, match=r"focus\(\) needs the component to be rendered"):
         FIELD().focus("x")
+
+
+def test_keep_in_view_names_the_element():
+    app, renderer, tree = mount()
+    app.keep_in_view("city")
+    app.scroll_to("name")
+    commands = renderer.take_commands()
+    assert [c["op"] for c in commands] == ["keep_in_view", "scroll_to"]
+    assert _node_at(to_dicts(tree), commands[0]["path"])["attrs"]["class"] == "field"

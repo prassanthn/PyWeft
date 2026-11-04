@@ -123,6 +123,13 @@ class Component:
         """Scroll the page so the element marked ``ref`` is in view."""
         self._pw_request("scroll_to", ref)
 
+    def keep_in_view(self, ref: str) -> None:
+        """Shift the element marked ``ref`` sideways just enough to keep it
+        inside the window, for a popup that opens next to something near
+        the edge: a menu, a calendar. It is measured once it is on the
+        page, so call this as it opens."""
+        self._pw_request("keep_in_view", ref)
+
     def save_focus(self) -> None:
         """Remember what has focus now, for ``restore_focus()``: a popup
         saves it as it opens and gives it back as it closes."""

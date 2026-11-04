@@ -8,6 +8,11 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **`keep_in_view(ref)`**: a component asks for an element to be shifted
+  sideways just enough to stay inside the window, measured once it's on
+  the page: for menus and pop-ups opening near the edge. Carried out by
+  the browser and the desktop window alike.
+
 - Fixed: a function in a code block that ran C code importing through its
   globals failed with `KeyError: '__builtins__'`; `datetime.date.today()`
   did. The loader no longer removes `__builtins__` from the code block's

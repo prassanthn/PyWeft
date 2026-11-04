@@ -320,6 +320,20 @@ const PyWeftRuntime = (() => {
         case "scroll_to":
           el?.scrollIntoView({ block: "nearest" });
           break;
+        case "keep_in_view": {
+          // Measured where its CSS put it, then nudged back inside the
+          // window with `translate`, which leaves `transform` (and any
+          // animation using it) alone. 8px of margin from either edge.
+          if (!el) break;
+          el.style.translate = "";
+          const box = el.getBoundingClientRect();
+          const width = document.documentElement.clientWidth;
+          let dx = 0;
+          if (box.right > width - 8) dx = width - 8 - box.right;
+          if (box.left + dx < 8) dx = 8 - box.left;
+          if (dx) el.style.translate = `${Math.round(dx)}px 0`;
+          break;
+        }
         case "save_focus":
           savedFocus.push(document.activeElement);
           break;

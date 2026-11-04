@@ -732,6 +732,7 @@ def save(self):
 | `focus(ref)` | focuses the element (or the first focusable thing inside it) |
 | `focus_first(ref)`, `focus_last(ref)` | focuses the first or last focusable element inside |
 | `scroll_to(ref)` | scrolls the page just enough to show the element |
+| `keep_in_view(ref)` | shifts the element sideways just enough to stay inside the window: for a popup opening near the edge |
 | `save_focus()`, `restore_focus()` | remembers what has focus, and later puts it back, for popups |
 
 `ref` is not written to the page as an attribute.
