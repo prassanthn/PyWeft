@@ -1,0 +1,197 @@
+<template>
+  <div class="field">
+    <If cond="label">
+      <label class="label" :for="_id">{{ label }}<If cond="required"><span class="req" aria-hidden="true"> *</span></If></label>
+    </If>
+    <div class="wrap">
+      <button type="button" ref="trigger" :id="_id" :class="'control' + (' empty' if not path else '')"
+              aria-haspopup="menu" :aria-expanded="'true' if _open else 'false'"
+              :aria-controls="_id + '-list' if _open else None" :aria-invalid="'true' if error else None"
+              :aria-required="'true' if required else None" :disabled="disabled"
+              @click="toggle()" @keydown.down.prevent="open()" @blur="left()">
+        <span class="shown">{{ shown_text or placeholder }}</span>
+        <Icon name="chevron-down" size="1em" />
+      </button>
+      <If cond="clearable and path and not disabled">
+        <button type="button" class="clear" aria-label="Clear" @click="clear()"><Icon name="x" size="0.9em" /></button>
+      </If>
+      <If cond="name">
+        <input type="hidden" :name="name" :value="'' if value is None else str(value)" />
+      </If>
+      <If cond="_open">
+        <div class="backdrop" @click="close(False)"></div>
+        <MenuList class="drop" :items="menu_items" :custom="has_slot('option')" start="first"
+                  :list_id="_id + '-list'" :labelled_by="_id" :chosen="path" :pick_groups="any_level"
+                  drill="true" @select="choose(event)" @close="close(event)" @load="load(event)">
+          <Fill name="item"><Slot name="option" :option="item['data']['data']" :chosen="item['value'] in path" /></Fill>
+        </MenuList>
+      </If>
+    </div>
+    <If cond="error"><span class="error">{{ error }}</span></If>
+    <ElseIf cond="hint"><span class="hint">{{ hint }}</span></ElseIf>
+  </div>
+</template>
+
+<code>
+# <ui.CascadeSelect label="City" :options="places" @bind="city" />
+# Choose from nested options, one level at a time: a country, then a
+# state, then a city. options: dicts with value, label, and children (more
+# options; None = not loaded yet: it emits "load" with the value the first
+# time it opens, fill them in, async is fine), plus icon and disabled.
+# Values must be unique. Only leaves can be chosen unless any_level="true"
+# (then a group's arrow opens it). Binds the chosen value; emits select
+# with the path of values (["au", "nsw", "syd"]) and blur.
+# show_path shows "Australia / New South Wales / Sydney"; clearable adds
+# an x. <Fill name="option"> lays out an option (option, chosen).
+# Keyboard: Enter, Space or Down opens; Up/Down move, Right opens a group,
+# Left goes back, Enter chooses, Esc closes. On narrow screens each level
+# opens over the last, with a row to go back.
+import itertools
+
+label: str = ""
+value = None
+options: list = []
+placeholder: str = "Choose…"
+show_path: bool = False
+separator: str = " / "
+any_level: bool = False
+clearable: bool = False
+hint: str = ""
+error: str = ""
+name: str = ""
+required: bool = False
+disabled: bool = False
+
+_ids = itertools.count(1)
+_open = False
+_asked = None
+
+def on_init(self):
+    self._id = f"ui-cascade-{next(_ids)}"
+    self._asked = set()
+
+def _node(self, raw):
+    if isinstance(raw, dict):
+        return raw.get("value", raw.get("label")), str(raw.get("label", raw.get("value"))), raw
+    if isinstance(raw, (tuple, list)) and len(raw) >= 2:
+        return raw[0], str(raw[1]), {"value": raw[0], "label": raw[1], "children": raw[2] if len(raw) > 2 else ()}
+    return raw, str(raw), {"value": raw, "label": str(raw)}
+
+def _menu(self, nodes):
+    out = []
+    for raw in nodes or []:
+        value, text, data = self._node(raw)
+        item = {"value": value, "label": text, "icon": data.get("icon") or "",
+                "disabled": bool(data.get("disabled")), "data": raw}
+        if "children" in data and data["children"] is None:
+            item["items"] = None                       # not loaded yet
+        elif data.get("children"):
+            item["items"] = self._menu(data["children"])
+        out.append(item)
+    return out
+
+@property
+def menu_items(self):
+    return self._menu(self.options)
+
+def _find(self, nodes, target, trail):
+    for raw in nodes or []:
+        value, text, data = self._node(raw)
+        here = trail + [(value, text)]
+        if value == target:
+            return here
+        found = self._find(data.get("children") or [], target, here)
+        if found:
+            return found
+    return None
+
+@property
+def chain(self):
+    """[(value, label), ...] from the top level to the chosen value."""
+    if self.value is None:
+        return []
+    return self._find(self.options, self.value, []) or []
+
+@property
+def path(self):
+    return [v for v, _ in self.chain]
+
+@property
+def shown_text(self):
+    chain = self.chain
+    if not chain:
+        return "" if self.value is None else str(self.value)
+    return self.separator.join(t for _, t in chain) if self.show_path else chain[-1][1]
+
+def toggle(self):
+    if self._open:
+        self.close(True)
+    else:
+        self.open()
+
+def open(self):
+    if not self.disabled:
+        self._open = True
+
+def close(self, refocus):
+    if not self._open:
+        return
+    self._open = False
+    if refocus:
+        self.focus("trigger")
+    else:
+        self.emit("blur", self.value)
+
+def left(self):
+    if not self._open:
+        self.emit("blur", self.value)
+
+def choose(self, value):
+    self._open = False
+    self.focus("trigger")
+    self.emit("update", value)
+    chain = self._find(self.options, value, []) or []
+    self.emit("select", [v for v, _ in chain])
+
+def clear(self):
+    self.emit("update", None)
+    self.emit("select", [])
+    self.focus("trigger")
+
+def load(self, value):
+    if value not in self._asked:
+        self._asked.add(value)
+        self.emit("load", value)
+</code>
+
+<style>
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.label { font-size: 0.9rem; font-weight: 550; }
+.req { color: var(--ui-danger, #d1242f); }
+.wrap { position: relative; display: flex; }
+.control {
+  flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font: inherit; text-align: left; cursor: pointer; color: var(--ui-text, #1f2328);
+  background: var(--ui-surface, #fff);
+  border: 1px solid var(--ui-border, #d1d9e0); border-radius: var(--ui-radius, 8px);
+  padding: 0.5em 0.75em;
+}
+.control.empty .shown { color: var(--ui-muted, #59636e); }
+.shown { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.control:focus-visible, .control[aria-expanded="true"] {
+  outline: none; border-color: var(--ui-primary, #4f46e5);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 25%, transparent);
+}
+.control:disabled { opacity: 0.6; cursor: not-allowed; }
+.control[aria-invalid="true"] { border-color: var(--ui-danger, #d1242f); }
+.clear {
+  position: absolute; right: 2.1rem; top: 50%; transform: translateY(-50%);
+  display: inline-flex; padding: 4px; border: 0; border-radius: 4px; cursor: pointer;
+  background: transparent; color: var(--ui-muted, #59636e);
+}
+.clear:hover { background: var(--ui-subtle, #f6f8fa); color: var(--ui-text, #1f2328); }
+.backdrop { position: fixed; inset: 0; z-index: 999; }
+.drop { position: absolute; top: calc(100% + 4px); left: 0; z-index: 1000; }
+.hint { font-size: 0.82rem; color: var(--ui-muted, #59636e); }
+.error { font-size: 0.82rem; color: var(--ui-danger, #d1242f); }
+</style>

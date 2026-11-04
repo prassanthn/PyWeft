@@ -317,7 +317,7 @@ handlers and Web Worker background work; file and confirmation dialogs on
 both targets; the app's title and icon, and window settings; scoped styles
 and CSS framework support; the `pyweft` CLI with hot reload, static builds
 and pre-rendered first screens; calling web APIs and saving data between
-visits (`pyweft.http`, `pyweft.storage`); `pyweft-ui` with 44
+visits (`pyweft.http`, `pyweft.storage`); `pyweft-ui` with 45
 keyboard-accessible controls (autocomplete, chips, sliders, date and date-range pickers, an
 event calendar and a menu among them), form
 validation and a gallery; both released

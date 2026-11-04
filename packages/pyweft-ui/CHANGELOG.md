@@ -8,6 +8,9 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- **`CascadeSelect`**: choose from nested options one level at a time,
+  with children loaded on demand, the chosen path shown, groups
+  choosable, and a drill-down layout on narrow screens.
 - **`Breadcrumbs`**: the trail to the current page, with icons, a "…"
   menu for long trails, any separator, and `auto="true"` to build it from
   the router (pages name themselves with `crumb = "..."`).

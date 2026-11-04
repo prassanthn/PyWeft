@@ -110,6 +110,24 @@
           </ui.Column>
         </ui.Card>
 
+        <ui.Card title="Cascade select" id="cascade-select" ref="cascade-select" subtitle="Nested options one level at a time; cities load as a country opens">
+          <ui.Grid min_width="16rem" gap="lg">
+            <ui.CascadeSelect label="City" :options="places" @bind="city_pick" show_path="true" clearable="true"
+                              placeholder="Choose a city" @load="load_places(event)"
+                              hint="Countries load their cities as they open" />
+            <ui.CascadeSelect label="Category" :options="CATEGORIES" @bind="category" any_level="true"
+                              hint="A group can be chosen too">
+              <Fill name="option">
+                <If cond="option.get('icon')"><ui.Icon :name="option['icon']" size="1.1em" /></If>
+                <span class="cat-label">{{ option['label'] }}</span>
+                <If cond="option.get('count')"><ui.Badge>{{ option['count'] }}</ui.Badge></If>
+              </Fill>
+            </ui.CascadeSelect>
+          </ui.Grid>
+          <pre class="state">city={{ repr(city_pick) }}  category={{ repr(category) }}</pre>
+          <pre class="code">{{ CODE['cascade'] }}</pre>
+        </ui.Card>
+
         <ui.Card title="Chips" id="chips" ref="chips" subtitle="Choose from a row, or type to add">
           <ui.Column gap="lg">
             <ui.Chips label="Size" options="Small, Medium, Large" @bind="chip_size" required="true" />
@@ -532,6 +550,7 @@ SECTION_CONTROLS = {
     "Stepper": ["Stepper"],
     "Choices": ["RadioGroup", "Checkbox", "Switch"],
     "Autocomplete": ["Autocomplete"],
+    "Cascade select": ["CascadeSelect", "nested", "hierarchy"],
     "Chips": ["Chips", "ChipInput"],
     "Button toggle": ["ButtonToggle"],
     "Sliders": ["Slider"],
@@ -552,7 +571,7 @@ SECTION_CONTROLS = {
     "Toasts": ["Toaster", "toast", "Snackbar"],
     "Layout": ["Row", "Column", "Grid", "Card", "Divider", "AppShell"],
 }
-SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Progress", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Breadcrumbs", "Table", "Tree", "Carousel", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Cascade select", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Progress", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Breadcrumbs", "Table", "Tree", "Carousel", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -601,6 +620,38 @@ sharing: bool = False
 share_pop: bool = False
 toast_look: str = "toast"
 place: int = 0
+city_pick = None
+category = None
+places: list = [
+    {"value": "au", "label": "Australia", "children": None},
+    {"value": "ca", "label": "Canada", "children": None},
+    {"value": "in", "label": "India", "children": None},
+    {"value": "uk", "label": "United Kingdom", "children": None},
+]
+PLACE_DATA = {
+    "au": [("nsw", "New South Wales", ["Sydney", "Newcastle", "Wollongong"]),
+           ("vic", "Victoria", ["Melbourne", "Geelong"]), ("qld", "Queensland", ["Brisbane", "Cairns"])],
+    "ca": [("on", "Ontario", ["Toronto", "Ottawa"]), ("qc", "Quebec", ["Montreal", "Quebec City"])],
+    "in": [("tn", "Tamil Nadu", ["Chennai", "Coimbatore", "Madurai"]), ("ka", "Karnataka", ["Bengaluru", "Mysuru"])],
+    "uk": [("eng", "England", ["London", "Manchester"]), ("sct", "Scotland", ["Edinburgh", "Glasgow"])],
+}
+CATEGORIES = [
+    {"value": "home", "label": "Home and garden", "icon": "home", "count": 3, "children": [
+        {"value": "kitchen", "label": "Kitchen", "children": [
+            {"value": "pans", "label": "Pans"}, {"value": "knives", "label": "Knives"}]},
+        {"value": "garden", "label": "Garden"},
+    ]},
+    {"value": "tech", "label": "Electronics", "icon": "star", "count": 2, "children": [
+        {"value": "audio", "label": "Audio"}, {"value": "phones", "label": "Phones"}]},
+    {"value": "books", "label": "Books", "icon": "file"},
+]
+
+async def load_places(self, country):
+    await asyncio.sleep(0.6)                        # a pretend server
+    states = [{"value": f"{country}-{code}", "label": name,
+               "children": [{"value": f"{country}-{code}-{c.lower().replace(' ', '-')}", "label": c} for c in cities]}
+              for code, name, cities in PLACE_DATA.get(country, [])]
+    self.places = [dict(p, children=states) if p["value"] == country else p for p in self.places]
 crumb_to: str = ""
 LONG_TRAIL = [("/", "Home"), ("/shop", "Shop"), ("/shop/garden", "Garden"), ("/shop/garden/tools", "Tools"),
               ("/shop/garden/tools/hand", "Hand tools"), "Trowel, stainless steel"]
@@ -959,6 +1010,16 @@ def submit(self):
 <!-- In an app with router(): the trail of the current URL, each page
      labelled by `crumb = "Orders"` (or "Order {id}") in its code block -->
 <ui.Breadcrumbs auto="true" home_icon="true" />""",
+    "cascade": """<ui.CascadeSelect label="City" :options="places" @bind="city"
+                  show_path="true" clearable="true" @load="load_cities(event)" />
+
+places = [
+    {"value": "au", "label": "Australia", "children": [
+        {"value": "nsw", "label": "New South Wales", "children": [
+            {"value": "syd", "label": "Sydney"}, ...]},
+    ]},
+    {"value": "ca", "label": "Canada", "children": None},   # loads when opened
+]""",
     "carousel": """<ui.Carousel label="Places" :items="places" @bind="place" loop="true">
   <Fill name="slide">
     <img :src="slide['src']" :alt="slide['alt']" />
@@ -1085,6 +1146,7 @@ toast("Item deleted.", action="Undo", on_action=self.undo)""",
   font-size: 0.72rem; font-weight: 700;
   background: color-mix(in srgb, var(--ui-primary) 15%, transparent); color: var(--ui-primary);
 }
+.cat-label { flex: 1; }
 .place {
   display: flex; flex-direction: column; justify-content: flex-end; gap: 2px;
   height: 14rem; padding: 18px 20px; box-sizing: border-box; color: #fff;

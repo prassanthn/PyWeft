@@ -108,6 +108,7 @@ All have `label`, `hint`, `error`, `required`, `disabled`, `name`, and take
 | `Checkbox` | `bool` | |
 | `Switch` | `bool` | |
 | `Autocomplete` | the chosen option's value (`free="true"`: the typed text) | `options`, `match` (contains, starts, none), `max_results`, `min_chars`, `free`, `loading`, `empty`, `placeholder`, `align`; emits `search` (the text, each keystroke), `select` (the whole option), `enter`. Fills: `option` (with `option`, `active`, `query`), `empty` |
+| `CascadeSelect` | the chosen option's value | nested `options` (`value`, `label`, `children`; `children: None` loads on demand via `load`), `any_level`, `show_path`, `separator`, `clearable`, `placeholder`, `name`; emits `select` (the path), `load`, `blur`. Fill: `option` (with `option`, `chosen`) |
 | `ButtonToggle` | the chosen value; `multiple="true"`: a list | `options` (dicts may add `icon`, `icon_only`, `disabled`), `multiple`, `allow_none`, `check`, `size` (sm, md, lg), `full_width`, `orientation`, `aria_label`, `name` |
 | `Chips` | the chosen value; `multiple="true"`: a list | `options` (dicts may add `icon`, `disabled`), `multiple`, `required`, `removable` (emits `remove`), `selectable`. Fill: `option` (with `option`, `selected`) |
 | `ChipInput` | a list | `options` (suggestions), `free`, `separators`, `max`, `add_on_blur`, `match`, `placeholder`, `name`; emits `add`, `remove`. Fills: `chip` (with `chip`), `option` |

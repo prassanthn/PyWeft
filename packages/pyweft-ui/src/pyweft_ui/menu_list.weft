@@ -1,10 +1,19 @@
 <template>
-  <div ref="root" :class="'list' + (' sub sub-' + side if level else '')" role="menu" :id="list_id or None"
+  <div ref="root" :class="'list' + (' sub sub-' + side if level else '') + (' drill' if drill else '')" role="menu" :id="list_id or None"
        :aria-labelledby="labelled_by or None" :aria-label="aria_label or None"
        @keydown.down.prevent.stop="move(1)" @keydown.up.prevent.stop="move(-1)"
        @keydown.home.prevent.stop="move_to(0)" @keydown.end.prevent.stop="move_to(-1)"
        @keydown.right.prevent.stop="enter_sub()" @keydown.left.prevent.stop="leave()"
        @keydown.tab.stop="emit('close', False)" @keydown.esc.stop="emit('close', True)">
+    <If cond="drill and level">
+      <!-- Narrow screens only (CSS): a submenu covers its parent, so a way back. -->
+      <button type="button" role="menuitem" tabindex="-1" class="back" @click="emit('back')">
+        <Icon name="chevron-left" size="1em" /><span>{{ aria_label }}</span>
+      </button>
+    </If>
+    <If cond="loading and not items">
+      <div class="loading" role="none"><span class="busy" aria-hidden="true"></span>Loading…</div>
+    </If>
     <For each="e in entries" key="e['key']">
       <If cond="e['separator']"><div class="sep" role="separator"></div></If>
       <ElseIf cond="e['heading']"><div class="heading" role="presentation">{{ e['heading'] }}</div></ElseIf>
@@ -12,8 +21,8 @@
         <div class="entry" role="none">
           <button type="button" role="menuitem" tabindex="-1" :ref="'item-' + str(e['index'])"
                   :class="item_class(e)" :disabled="e['disabled']"
-                  :aria-haspopup="'menu' if e['items'] else None"
-                  :aria-expanded="('true' if _sub == e['index'] else 'false') if e['items'] else None"
+                  :aria-haspopup="'menu' if e['group'] else None"
+                  :aria-expanded="('true' if _sub == e['index'] else 'false') if e['group'] else None"
                   @click="choose(e)" @mouseenter="hover(e)" @focus="_active = e['index']">
             <If cond="custom"><Slot name="item" :item="e" /></If>
             <Else>
@@ -24,13 +33,16 @@
               </span>
               <If cond="e['hint']"><span class="hint">{{ e['hint'] }}</span></If>
             </Else>
-            <If cond="e['items']"><span class="more"><Icon :name="'chevron-left' if side == 'left' else 'chevron-right'" size="1em" /></span></If>
+            <If cond="e['group']"><span class="more" @click.stop="open_from_arrow(e)"><Icon :name="'chevron-left' if side == 'left' else 'chevron-right'" size="1em" /></span></If>
           </button>
-          <If cond="_sub == e['index'] and e['items']">
+          <If cond="_sub == e['index'] and e['group']">
             <Dynamic :is="sub_class" key="_sub_key"
                      :props="{'items': e['items'], 'level': level + 1, 'side': side, 'custom': custom,
-                              'start': 'first' if _sub_focus else '', 'aria_label': e['label']}"
-                     @select="emit('select', event)" @close="emit('close', event)" @back="back()">
+                              'start': 'first' if _sub_focus else '', 'aria_label': e['label'],
+                              'chosen': chosen, 'pick_groups': pick_groups, 'drill': drill,
+                              'loading': e['lazy']}"
+                     @select="emit('select', event)" @close="emit('close', event)" @back="back()"
+                     @load="emit('load', event)">
               <Fill name="item"><Slot name="item" :item="item" /></Fill>
             </Dynamic>
           </If>
@@ -48,6 +60,11 @@
 # {"heading": "..."} a group heading. A submenu is this same component,
 # opened beside its item. Emits select (a value), close (refocus the
 # trigger or not) and back (Left in a submenu: its parent takes over).
+# For CascadeSelect: "items": None is a group whose items aren't loaded
+# yet (it emits load with its value as it opens; `loading` shows a
+# spinner), `chosen` marks the values on the chosen path, `pick_groups`
+# makes a click on a group choose it (its arrow opens it), and `drill`
+# makes a submenu cover its parent on narrow screens, with a row back.
 
 items: list = []
 level: int = 0
@@ -58,6 +75,10 @@ list_id: str = ""
 labelled_by: str = ""
 aria_label: str = ""
 vertical: bool = False    # also keep it inside the window up and down
+chosen: list = []
+pick_groups: bool = False
+drill: bool = False
+loading: bool = False
 
 _active = None
 _sub = None               # index of the item whose submenu is open
@@ -103,7 +124,9 @@ def entries(self):
             "description": str(extra.get("description") or ""), "hint": str(extra.get("hint") or ""),
             "danger": bool(extra.get("danger")), "disabled": bool(extra.get("disabled")),
             "items": list(extra.get("items") or []), "data": item,
+            "lazy": "items" in extra and extra["items"] is None,
         })
+        out[-1]["group"] = bool(out[-1]["items"]) or out[-1]["lazy"]
         index += 1
     return out
 
@@ -122,6 +145,8 @@ def item_class(self, e):
         names.append("danger")
     if self._sub == e["index"]:
         names.append("expanded")
+    if e["value"] in self.chosen:
+        names.append("chosen")
     return " ".join(names)
 
 def move(self, delta):
@@ -145,10 +170,12 @@ def open_sub(self, e, focus):
     self._sub = e["index"]
     self._sub_focus = focus
     self._sub_key += 1      # a new submenu instance, so it focuses afresh
+    if e["lazy"]:
+        self.emit("load", e["value"])
 
 def enter_sub(self):
     e = self._entry(self._active)
-    if e and e["items"] and not e["disabled"]:
+    if e and e["group"] and not e["disabled"]:
         self.open_sub(e, True)
 
 def leave(self):
@@ -162,14 +189,19 @@ def back(self):
         self.focus(f"item-{self._active}")
 
 def hover(self, e):
-    if e["items"] and not e["disabled"]:
+    if e["group"] and not e["disabled"]:
         if self._sub != e["index"]:
             self.open_sub(e, False)
     else:
         self._sub = None
 
+def open_from_arrow(self, e):
+    if not e["disabled"]:
+        self._active = e["index"]
+        self.open_sub(e, True)
+
 def choose(self, e):
-    if e["items"]:
+    if e["group"] and not self.pick_groups:
         self._active = e["index"]
         self.open_sub(e, True)
     else:
@@ -203,6 +235,30 @@ def choose(self, e):
 .desc { font-size: 0.8rem; color: var(--ui-muted, #59636e); }
 .hint { margin-left: 1.5em; font-size: 0.8rem; color: var(--ui-muted, #59636e); white-space: nowrap; }
 .more { display: inline-flex; margin-left: auto; color: var(--ui-muted, #59636e); }
+.item.chosen { color: var(--ui-primary, #4f46e5); font-weight: 600; }
+.loading {
+  display: flex; align-items: center; gap: 8px; padding: 0.55em 0.7em;
+  font-size: 0.9rem; color: var(--ui-muted, #59636e);
+}
+.busy {
+  width: 0.85em; height: 0.85em; border-radius: 50%; flex: none;
+  border: 2px solid var(--ui-border, #d1d9e0); border-top-color: var(--ui-primary, #4f46e5);
+  animation: ui-menu-list-spin 0.7s linear infinite;
+}
+@keyframes ui-menu-list-spin { to { transform: rotate(360deg); } }
+.back {
+  display: none; align-items: center; gap: 6px; width: 100%; margin-bottom: 4px;
+  font: inherit; font-size: 0.85rem; font-weight: 600; text-align: left; cursor: pointer;
+  padding: 0.5em 0.6em; border: 0; border-bottom: 1px solid var(--ui-border, #d1d9e0);
+  background: transparent; color: var(--ui-muted, #59636e);
+}
+/* Narrow screens: a submenu opens over its parent (one level at a time),
+   instead of beside it where there's no room. */
+@media (max-width: 600px) {
+  .drill .entry { position: static; }
+  .drill .sub { top: -1px; left: -1px; right: -1px; bottom: auto; min-height: calc(100% + 2px); max-height: 70vh; overflow-y: auto; }
+  .back { display: flex; }
+}
 .sep { height: 1px; margin: 4px 2px; background: var(--ui-border, #d1d9e0); }
 .heading {
   padding: 0.55em 0.7em 0.25em; font-size: 0.75rem; font-weight: 600;

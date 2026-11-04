@@ -289,7 +289,7 @@ lists take `"A, B, C"`, a list of values, `(value, label)` pairs or dicts.
 - Layout: `AppShell` (header, sticky `nav` fill), `Row`, `Column`, `Grid`,
   `Card`, `Divider`, `Carousel`, `Expansion`, `Accordion`, `Tabs`, `Stepper`.
 - Fields: `TextField` (`mask="(999) 999-9999"`), `TextArea`, `NumberField`,
-  `Select`, `Autocomplete`, `Chips`, `ChipInput`, `ButtonToggle`, `Slider`,
+  `Select`, `Autocomplete`, `CascadeSelect`, `Chips`, `ChipInput`, `ButtonToggle`, `Slider`,
   `RadioGroup`, `Checkbox`, `Switch`, `DatePicker`, `DateRangePicker`,
   `Calendar`.
 - Data and navigation: `Table` (sortable), `Tree`, `EventCalendar`,

@@ -15,6 +15,7 @@ fields; this guide is the how-to.
    - [Shaped input: mask](#shaped-input-mask)
    - [Options for Select and RadioGroup](#options-for-select-and-radiogroup)
    - [Suggestions as you type: Autocomplete](#suggestions-as-you-type-autocomplete)
+   - [Nested choices: CascadeSelect](#nested-choices-cascadeselect)
    - [A row of choices: ButtonToggle](#a-row-of-choices-buttontoggle)
    - [Chips: Chips and ChipInput](#chips-chips-and-chipinput)
    - [Sliders](#sliders)
@@ -353,6 +354,7 @@ What each one gives your field:
 | `DatePicker` | a `datetime.date`, or `None` until one is chosen |
 | `Autocomplete` | the chosen option's value (with `free="true"`, the typed text) |
 | `ButtonToggle` | the chosen value; with `multiple="true"`, a list |
+| `CascadeSelect` | the chosen option's value (a leaf, or any level with `any_level="true"`) |
 | `Chips` | the chosen chip's value; with `multiple="true"`, a list |
 | `ChipInput` | a list: the typed texts, or the chosen options' values |
 | `Slider` | a number; with `range="true"`, a `(low, high)` tuple |
@@ -498,6 +500,50 @@ choices: a view switch, text styles, alignment.
 Compared with `Chips`, which also choose one or several: chips are
 separate pills that wrap onto more lines and can be removed, for longer or
 changing lists; a button toggle is one compact bar for a few fixed choices.
+
+### Nested choices: CascadeSelect
+
+For a choice from a hierarchy (country, then state, then city; a product
+category and its subcategories), `CascadeSelect` opens one level at a time:
+
+```xml
+<ui.CascadeSelect label="City" :options="places" @bind="city"
+                  show_path="true" clearable="true" @load="load_cities(event)" />
+```
+
+```python
+places = [
+    {"value": "au", "label": "Australia", "children": [
+        {"value": "nsw", "label": "New South Wales", "children": [
+            {"value": "syd", "label": "Sydney"}, {"value": "new", "label": "Newcastle"}]},
+    ]},
+    {"value": "ca", "label": "Canada", "children": None},   # loaded when it opens
+]
+
+async def load_cities(self, country):
+    states = await fetch_states(country)        # your own code
+    self.places = [dict(p, children=states) if p["value"] == country else p
+                   for p in self.places]
+```
+
+- **`options`** nest the way `Tree` nodes do: `value`, `label`,
+  `children`, plus `icon` and `disabled`. Values must be unique.
+- Choosing a **leaf** binds its value and closes the panel; `@select` also
+  gets the path of values (`["au", "nsw", "syd"]`). With
+  **`any_level="true"`** a group can be chosen too, and its arrow opens it.
+- **`"children": None`** means "not loaded yet": the first time that
+  group opens it emits **`load`** with its value and shows a spinner until
+  you fill its children in (an `async` handler is fine).
+- The field shows the chosen label, or the whole path with
+  **`show_path="true"`** (`separator` sets the " / " between).
+  `clearable="true"` adds a × that clears it.
+- `<Fill name="option">` lays out options (it gets `option` and `chosen`).
+- Keyboard: Enter, Space or Down opens it; Up and Down move, Right opens a
+  group, Left goes back, Enter chooses, Esc closes. On narrow screens each
+  level opens over the last, with a "‹ Back" row at its top.
+- `label`, `hint`, `error`, `required`, `disabled`, `placeholder` and
+  `name` work as on the other fields, and it emits `blur`, so it works
+  with `Form`.
 
 ### Chips: Chips and ChipInput
 
