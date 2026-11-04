@@ -14,7 +14,7 @@
 
       <ui.Column gap="xl">
         <p class="intro">Every control from <b>pyweft-ui</b>, live. Change the theme at the
-          top right; the code under each section is what produced it.</p>
+          top; the code under each section is what produced it.</p>
 
         <ui.Card title="Buttons" id="buttons">
           <ui.Column>

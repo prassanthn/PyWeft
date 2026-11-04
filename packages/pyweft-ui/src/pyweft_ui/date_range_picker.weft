@@ -164,7 +164,7 @@ def clear(self):
 .backdrop { position: fixed; inset: 0; z-index: 999; }
 .popup {
   position: absolute; top: calc(100% + 4px); left: 0; z-index: 1000;
-  width: max-content; max-width: calc(100vw - 24px); padding: 12px;
+  width: max-content; max-width: calc(100vw - 16px); box-sizing: border-box; padding: 12px;
   background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
   border: 1px solid var(--ui-border, #d1d9e0);
   border-radius: calc(var(--ui-radius, 8px) * 1.5);

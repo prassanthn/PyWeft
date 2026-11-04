@@ -25,13 +25,15 @@ _WIDTHS = {"narrow": "40rem", "normal": "64rem", "wide": "80rem", "full": "none"
 <style>
 .shell { display: flex; flex-direction: column; min-height: 100vh; }
 .top {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  /* Wraps when the actions don't fit beside the brand, so a narrow screen
+     gets two rows rather than a page wider than itself. */
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
   padding: 12px 24px;
   border-bottom: 1px solid var(--ui-border, #d1d9e0);
   background: var(--ui-surface, #fff);
 }
-.brand { font-weight: 650; font-size: 1.1rem; }
-.actions { display: flex; align-items: center; gap: 8px; }
+.brand { font-weight: 650; font-size: 1.1rem; min-width: 0; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .frame { display: flex; flex: 1; }
 .side {
   width: 220px; flex-shrink: 0; padding: 16px;

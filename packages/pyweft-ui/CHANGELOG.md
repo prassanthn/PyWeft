@@ -32,6 +32,8 @@ releasing moves them under the new version (see
 - **`Calendar`**: the calendar on its own, always open, for a date or a
   range. `DatePicker` and `DateRangePicker` are built on it.
 - Menus and calendars shift sideways to stay inside the window.
+- `AppShell`'s header wraps onto a second row when its actions don't fit
+  beside the title, so a phone no longer scrolls sideways.
 - Icons `calendar` and `more`. `Card` no longer clips what's inside it, so
   a menu or calendar can open past its edge.
 
