@@ -5,7 +5,7 @@
     </If>
     <textarea class="control" :rows="rows" :value="value" :name="name or None"
               :placeholder="placeholder or None" :required="required" :disabled="disabled"
-              :aria-invalid="'true' if error else None"
+              :readonly="readonly" :aria-invalid="'true' if error else None"
               @input="emit('update', event.value)" @blur="emit('blur', value)"></textarea>
     <If cond="error"><span class="error">{{ error }}</span></If>
     <ElseIf cond="hint"><span class="hint">{{ hint }}</span></ElseIf>
@@ -23,6 +23,7 @@ error: str = ""
 name: str = ""
 required: bool = False
 disabled: bool = False
+readonly: bool = False    # can be selected and copied, not changed
 </code>
 
 <style>
@@ -41,6 +42,7 @@ disabled: bool = False
   border-color: var(--ui-primary, #4f46e5);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 25%, transparent);
 }
+.control[readonly] { background: var(--ui-subtle, #f6f8fa); }
 .control:disabled { opacity: 0.6; cursor: not-allowed; }
 .control[aria-invalid="true"] { border-color: var(--ui-danger, #d1242f); }
 .hint { font-size: 0.82rem; color: var(--ui-muted, #59636e); }

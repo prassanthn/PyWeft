@@ -606,3 +606,15 @@ def _walk(nodes):
         if isinstance(node, Element):
             yield node
             yield from _walk(node.children)
+
+
+def test_text_fields_can_be_read_only(tmp_path):
+    _, a, r, tree = app(
+        tmp_path,
+        '<div><ui.TextField readonly="true" value="https://x" /><ui.TextArea readonly="true" />'
+        '<ui.NumberField readonly="true" /><ui.TextField value="y" /></div>',
+    )
+    fields = [n for n in _walk(tree) if n.tag in ("input", "textarea")]
+    assert ["readonly" in f.attrs for f in fields] == [True, True, True, False]
+    # The prop is the control's, so nothing lands on the wrapper.
+    assert not any("readonly" in n.attrs for n in _walk(tree) if n.tag == "label")

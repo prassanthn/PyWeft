@@ -5,7 +5,7 @@
     </If>
     <input class="control" :type="type" :value="shown" :name="name or None"
            :placeholder="placeholder or mask_hint or None" :required="required" :disabled="disabled"
-           :data-mask="mask or None" :inputmode="'numeric' if digits_only else None"
+           :readonly="readonly" :data-mask="mask or None" :inputmode="'numeric' if digits_only else None"
            :autocomplete="autocomplete or None" :aria-invalid="'true' if error else None"
            @input="emit('update', event.value)" @keydown.enter="emit('enter', value)"
            @blur="emit('blur', value)" />
@@ -31,6 +31,7 @@ name: str = ""            # the field's name in a <form>
 autocomplete: str = ""
 required: bool = False
 disabled: bool = False
+readonly: bool = False    # can be selected and copied, not changed
 mask: str = ""            # e.g. "(999) 999-9999", "99/99/9999", "aa-9999"
 
 @property
@@ -66,6 +67,7 @@ def digits_only(self):
   border-color: var(--ui-primary, #4f46e5);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 25%, transparent);
 }
+.control[readonly] { background: var(--ui-subtle, #f6f8fa); }
 .control:disabled { opacity: 0.6; cursor: not-allowed; }
 .control[aria-invalid="true"] { border-color: var(--ui-danger, #d1242f); }
 .hint { font-size: 0.82rem; color: var(--ui-muted, #59636e); }

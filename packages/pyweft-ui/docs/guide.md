@@ -289,6 +289,8 @@ for details people only sometimes need:
 All fields take a `label`, a `hint` (small grey text underneath), an `error`
 (shown instead of the hint, in red), `required` (adds a red `*`), `disabled`
 and `name` (the field's name inside a `<form>`), and all work with `@bind`.
+`TextField`, `TextArea` and `NumberField` also take `readonly="true"`: the
+text can be selected and copied but not changed (a link to share, say).
 
 ```xml
 <ui.TextField label="Full name" @bind="name" placeholder="Ada Lovelace" />

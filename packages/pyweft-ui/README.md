@@ -99,9 +99,9 @@ All have `label`, `hint`, `error`, `required`, `disabled`, `name`, and take
 
 | Control | Binds | Extra fields |
 |---|---|---|
-| `TextField` | `str` | `type` (text, email, password, search, url, tel, date, time), `placeholder`, `autocomplete`, `mask` (`"(999) 999-9999"`: 9 digit, a letter, * either); emits `enter` on Enter |
-| `TextArea` | `str` | `rows`, `placeholder` |
-| `NumberField` | `int` or `float` | `min`, `max`, `step`, `placeholder` |
+| `TextField` | `str` | `type` (text, email, password, search, url, tel, date, time), `placeholder`, `autocomplete`, `mask` (`"(999) 999-9999"`: 9 digit, a letter, * either), `readonly`; emits `enter` on Enter |
+| `TextArea` | `str` | `rows`, `placeholder`, `readonly` |
+| `NumberField` | `int` or `float` | `min`, `max`, `step`, `placeholder`, `readonly` |
 | `Select` | the chosen option's value | `options`, `placeholder` |
 | `RadioGroup` | the chosen option's value | `options`, `inline` |
 | `Checkbox` | `bool` | |

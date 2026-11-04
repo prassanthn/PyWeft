@@ -8,6 +8,8 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- `TextField`, `TextArea` and `NumberField` take `readonly`. (The gallery's
+  share popover used it before it existed, which `pyweft check` caught.)
 - **`AppShell`**: the sidebar's contents stay in view while the page
   scrolls (scrolling on their own when taller than the window);
   `sticky_nav="false"` turns it off.
