@@ -21,6 +21,84 @@ const PyWeftRuntime = (() => {
     container = el;
     dispatch = dispatchFn;
     container.replaceChildren();
+    // Capture: an input's mask is applied before its own listeners (and so
+    // before @bind) see the event. Added once per container.
+    if (!container._pyweftMasks) {
+      container.addEventListener("input", applyMask, true);
+      container._pyweftMasks = true;
+    }
+  }
+
+  // ------------------------------------------------------------- input masks
+  // <input data-mask="(999) 999-9999">: 9 a digit, a a letter, * either,
+  // \ makes the next character literal, anything else is literal text.
+  // The JS twin of src/pyweft/masks.py (tokens, typed, fill): keep them in
+  // lockstep. Applied here, in the page, so the cursor stays put.
+  const MASK_SLOTS = { 9: /[0-9]/, a: /[A-Za-z]/, "*": /[A-Za-z0-9]/ };
+
+  function maskTokens(mask) {
+    const out = [];
+    let escaped = false;
+    for (const char of mask) {
+      if (escaped) { out.push(["literal", char]); escaped = false; }
+      else if (char === "\\") escaped = true;
+      else if (char in MASK_SLOTS) out.push(["slot", char]);
+      else out.push(["literal", char]);
+    }
+    return out;
+  }
+
+  function maskTyped(toks, text) {
+    let chars = text.replace(/[^A-Za-z0-9]/g, "");
+    let prefix = "";
+    for (const [kind, char] of toks) {
+      if (kind === "slot") break;
+      if (/[A-Za-z0-9]/.test(char)) prefix += char;
+    }
+    if (prefix && chars.startsWith(prefix)) chars = chars.slice(prefix.length);
+    return chars;
+  }
+
+  function maskFill(toks, chars) {
+    let out = "", pending = "", i = 0;
+    const ends = [];
+    for (const [kind, char] of toks) {
+      if (kind === "literal") { pending += char; continue; }
+      while (i < chars.length && !MASK_SLOTS[char].test(chars[i])) i++;
+      if (i >= chars.length) break;
+      out += pending + chars[i];
+      pending = "";
+      i++;
+      ends.push(out.length);
+    }
+    return [out, ends];
+  }
+
+  function applyMask(ev) {
+    const el = ev.target;
+    if (!(el instanceof HTMLInputElement) || !el.dataset.mask) return;
+    const toks = maskTokens(el.dataset.mask);
+    const caret = el.selectionStart ?? el.value.length;
+    let chars = maskTyped(toks, el.value);
+    // Typed characters before the cursor that the mask takes (a refused
+    // letter mustn't move the cursor on).
+    let before = maskFill(toks, maskTyped(toks, el.value.slice(0, caret)))[1].length;
+    // Backspace over a literal (the ")" in "(555) ") would put it straight
+    // back: take the character before it instead.
+    const previous = el._pyweftMasked;
+    if (ev.inputType === "deleteContentBackward" && previous !== undefined
+        && maskTyped(toks, previous) === chars && before > 0) {
+      chars = chars.slice(0, before - 1) + chars.slice(before);
+      before -= 1;
+    }
+    const [text, ends] = maskFill(toks, chars);
+    el.value = text;
+    el._pyweftMasked = text;
+    // The cursor goes just before the next typed character (so after any
+    // literals in between), or after the last one.
+    let at = 0;
+    if (ends.length) at = before < ends.length ? ends[before] - 1 : ends[ends.length - 1];
+    if (document.activeElement === el) el.setSelectionRange(at, at);
   }
 
   function mount(rootDicts) {

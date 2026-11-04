@@ -32,6 +32,7 @@ later mobile: only the transport differs.
    inline handlers, [the event object](#the-event-object),
    [event modifiers](#event-modifiers),
    [binding form controls](#binding-form-controls),
+   [input masks](#input-masks),
    [focus and scrolling](#moving-focus-and-scrolling-ref), component styles
 4. [Composing components](#4-composing-components): props, events,
    components in folders, [slots](#passing-content-slots),
@@ -688,6 +689,32 @@ template instead of in your method:
   ```xml
   <input @bind="query" @input="search()" />
   ```
+
+### Input masks
+
+`data-mask` shapes what's typed into an input as the user types, such as a
+phone or card number:
+
+```xml
+<input @bind="phone" data-mask="(999) 999-9999" inputmode="numeric" />
+<input @bind="card" data-mask="9999 9999 9999 9999" />
+<input @bind="plate" data-mask="aa-9999" />
+```
+
+- **In a mask**, `9` is a digit, `a` a letter, `*` a letter or digit, and
+  `\` makes the next character literal; anything else is shown as it is,
+  filled in around what's typed (but never after the last character, so
+  Backspace works as expected).
+- **It happens in the page**, before your `@bind` or `@input` sees the
+  event, so the cursor stays where the user is typing, even in the middle.
+  Characters that don't fit (a letter where a digit goes) are refused, and
+  extra ones are dropped. Your field gets the shaped text,
+  `"(555) 123-4567"`.
+- **`pyweft.masks`** has the same rules in Python:
+  `masks.apply("(999) 999-9999", "5551234567")` shapes a starting value,
+  `masks.complete(mask, text)` checks every slot is filled, and
+  `masks.typed(mask, text)` gives just the typed characters
+  (`"5551234567"`), for storing.
 
 ### Moving focus and scrolling: ref
 
