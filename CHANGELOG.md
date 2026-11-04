@@ -8,6 +8,8 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+## 0.3.0
+
 - **`pyweft.http`**: call web APIs and load the app's data files, with the
   same code in the browser (the page's fetch) and on the desktop (the
   standard library). `get_json`, `get`/`post`/`put`/`patch`/`delete`,

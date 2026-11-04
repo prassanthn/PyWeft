@@ -8,6 +8,11 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+## 0.2.0
+
+- For `pyweft` 0.3, which adds `pyweft.http` and `pyweft.storage`. The
+  controls themselves are unchanged.
+
 ## 0.1.1
 
 - The PyPI page installs from PyPI, and its link to the guide works there.
