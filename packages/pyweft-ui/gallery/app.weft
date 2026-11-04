@@ -132,6 +132,20 @@ tags={{ repr(tags) }}  invitees={{ repr(invitees) }}</pre>
           </ui.Column>
         </ui.Card>
 
+        <ui.Card title="Sliders" id="sliders" subtitle="Drag, or use the arrow keys">
+          <ui.Grid min_width="16rem" gap="lg">
+            <ui.Slider label="Volume" @bind="volume" format="{}%" />
+            <ui.Slider label="Price" :min="0" :max="500" :step="10" range="true" @bind="price"
+                       format="${}" value_label="side" hint="Thumbs can pass each other" />
+            <ui.Slider label="Rating" :min="1" :max="5" ticks="true" value_label="always"
+                       marks="1, 3, 5" @bind="rating" />
+            <ui.Slider label="Opacity" :min="0" :max="1" :step="0.05" format="{:.2f}"
+                       lazy="true" @bind="opacity" hint="Updates when released" />
+          </ui.Grid>
+          <pre class="state">volume={{ volume }}  price={{ repr(price) }}  rating={{ rating }}  opacity={{ opacity }}</pre>
+          <pre class="code">{{ CODE['sliders'] }}</pre>
+        </ui.Card>
+
         <ui.Card title="Dates and menus" id="dates-and-menus">
           <ui.Column gap="lg">
             <ui.Grid min_width="16rem" gap="lg">
@@ -261,7 +275,7 @@ import asyncio
 import datetime
 from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Autocomplete", "Chips", "Dates and menus", "Calendars", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Autocomplete", "Chips", "Sliders", "Dates and menus", "Calendars", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -313,6 +327,10 @@ interests: list = ["travel"]
 filters: list = ["Open", "Assigned to me", "This week"]
 tags: list = ["python", "ui"]
 invitees: list = []
+volume: int = 40
+price: tuple = (100, 350)
+rating: int = 4
+opacity: float = 0.8
 
 def drop_filter(self, name):
     self.filters = [f for f in self.filters if f != name]
@@ -455,6 +473,12 @@ def submit(self):
 
 <ui.Autocomplete label="City" :options="cities" match="none" :loading="searching"
                  @search="find_cities(event)" @bind="city" />""",
+    "sliders": """<ui.Slider label="Volume" @bind="volume" format="{}%" />
+<ui.Slider label="Price" :min="0" :max="500" :step="10" range="true"
+           @bind="price" format="${}" value_label="side" />
+<ui.Slider label="Rating" :min="1" :max="5" ticks="true"
+           value_label="always" marks="1, 3, 5" @bind="rating" />
+<ui.Slider label="Opacity" :max="1" :step="0.05" lazy="true" @bind="opacity" />""",
     "chips": """<ui.Chips options="Small, Medium, Large" @bind="size" />
 <ui.Chips :options="interests" multiple="true" @bind="chosen" />
 <ui.Chips :options="filters" removable="true" selectable="false"

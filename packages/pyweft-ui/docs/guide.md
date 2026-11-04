@@ -1,7 +1,7 @@
 # Using pyweft-ui
 
 This guide shows how to build screens with the ready-made controls: forms,
-autocomplete, chips and validation, dates and calendars, layouts, menus, dialogs, tables
+autocomplete, chips, sliders and validation, dates and calendars, layouts, menus, dialogs, tables
 and themes, with complete examples you can paste into an app. The [README](../README.md) has the compact reference of every control's
 fields; this guide is the how-to.
 
@@ -16,6 +16,7 @@ fields; this guide is the how-to.
    - [Options for Select and RadioGroup](#options-for-select-and-radiogroup)
    - [Suggestions as you type: Autocomplete](#suggestions-as-you-type-autocomplete)
    - [Chips: Chips and ChipInput](#chips-chips-and-chipinput)
+   - [Sliders](#sliders)
    - [Checkbox and Switch labels with links](#checkbox-and-switch-labels-with-links)
    - [Dates: DatePicker](#dates-datepicker)
    - [Date ranges: DateRangePicker](#date-ranges-daterangepicker)
@@ -237,6 +238,7 @@ What each one gives your field:
 | `Autocomplete` | the chosen option's value (with `free="true"`, the typed text) |
 | `Chips` | the chosen chip's value; with `multiple="true"`, a list |
 | `ChipInput` | a list: the typed texts, or the chosen options' values |
+| `Slider` | a number; with `range="true"`, a `(low, high)` tuple |
 
 ### Shaped input: mask
 
@@ -392,6 +394,38 @@ keywords. It binds a list:
   `Autocomplete`. It emits `add` and `remove` with the value, and works
   with `Form`: `rules.required()` asks for at least one, `rules.min_length(2)`
   for two.
+
+### Sliders
+
+**`Slider`** picks a number by dragging a thumb along a track, or with
+`range="true"` a pair of numbers with two thumbs:
+
+```xml
+<ui.Slider label="Volume" @bind="volume" format="{}%" />
+<ui.Slider label="Price" :min="0" :max="500" :step="10" range="true"
+           @bind="price" format="${}" value_label="side" />
+<ui.Slider label="Rating" :min="1" :max="5" ticks="true" marks="1, 3, 5" @bind="rating" />
+```
+
+- `min` (0), `max` (100) and `step` (1) set the scale. The value is an
+  `int` while all three are whole numbers, else a `float`, and always lands
+  on a step. A range binds a `(low, high)` tuple; with no value it spans
+  the whole scale.
+- The thumbs of a range can pass each other: the value is always the two
+  positions in order.
+- **`value_label`** shows the value: `drag` (default) in a bubble above the
+  thumb while it's dragged, hovered or focused, `always`, `side` (next to the
+  label) or `none`. **`format`** shapes it (`"{}%"`, `"${}"`,
+  `"{:.2f}"`), and screen readers hear the same text.
+- **`ticks="true"`** draws a dot at every step (up to 100 steps);
+  **`marks`** labels points under the track: `"0, 50, 100"`, or
+  `(value, label)` pairs.
+- The bound field follows the thumb as it moves; **`lazy="true"`** updates it
+  only when the thumb is let go. It emits `change` on release and `blur`.
+- **Keyboard:** arrows move one step, Page Up and Page Down move further,
+  Home and End jump to the ends.
+- `label`, `hint`, `error`, `disabled` and `name` work as on the other
+  fields (a range sends `name_min` and `name_max`), so it works with `Form`.
 
 ### Checkbox and Switch labels with links
 

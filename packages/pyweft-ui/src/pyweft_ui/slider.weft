@@ -1,0 +1,303 @@
+<template>
+  <div class="field">
+    <If cond="label or value_label == 'side'">
+      <div class="top">
+        <If cond="label">
+          <label class="label" :for="_id">{{ label }}<If cond="required"><span class="req" aria-hidden="true"> *</span></If></label>
+        </If>
+        <If cond="value_label == 'side'"><span class="side" aria-hidden="true">{{ side_text }}</span></If>
+      </div>
+    </If>
+    <div :class="classes" :style="'--lo: ' + str(lo_pct) + '; --hi: ' + str(hi_pct)">
+      <div class="track" aria-hidden="true">
+        <span class="fill"></span>
+        <For each="pct in tick_list" key="pct">
+          <span :class="'tick on' if in_fill(pct) else 'tick'" :style="'left: ' + str(pct) + '%'"></span>
+        </For>
+      </div>
+      <input type="range" class="thumb" :id="_id"
+             :min="min" :max="max" :step="step" :value="pos(0)" :name="(name + '_min' if range else name) or None"
+             :disabled="disabled" :aria-label="thumb_label(0)"
+             :aria-valuetext="text(pos(0))" :aria-invalid="'true' if error else None"
+             @input="moved(event.value, 0)" @change="released(event.value, 0)" @blur="emit('blur', current)" />
+      <If cond="range">
+        <input type="range" class="thumb" :min="min" :max="max" :step="step" :value="pos(1)"
+               :name="name + '_max' if name else None" :disabled="disabled"
+               :aria-label="thumb_label(1)" :aria-valuetext="text(pos(1))"
+               @input="moved(event.value, 1)" @change="released(event.value, 1)" @blur="emit('blur', current)" />
+      </If>
+      <If cond="value_label in ('drag', 'always')">
+        <span class="bubble b-lo" aria-hidden="true">{{ text(lo) }}</span>
+        <If cond="range"><span class="bubble b-hi" aria-hidden="true">{{ text(hi) }}</span></If>
+      </If>
+    </div>
+    <If cond="mark_list">
+      <div class="marks" aria-hidden="true">
+        <For each="m in mark_list" key="m['pct']">
+          <span class="mark" :style="'left: ' + str(m['pct']) + '%'">{{ m['label'] }}</span>
+        </For>
+      </div>
+    </If>
+    <If cond="error"><span class="error">{{ error }}</span></If>
+    <ElseIf cond="hint"><span class="hint">{{ hint }}</span></ElseIf>
+  </div>
+</template>
+
+<code>
+# <ui.Slider label="Volume" @bind="volume" />
+# <ui.Slider label="Price" :min="0" :max="500" :step="10" range="true" @bind="price" />
+# Drag a thumb along a track to pick a number, or with range="true" a
+# (low, high) pair. Numbers are ints while min, max and step are whole,
+# else floats, always on a step. The browser's own range input does the
+# dragging, touch and keyboard (arrows, Page Up/Down, Home, End).
+#
+# value_label: drag (a bubble while dragging or focused), always, side
+# (the value next to the label) or none; format="${}" or "{:.0f}%" shapes
+# it, and is what screen readers hear. ticks="true" marks every step;
+# marks="0, 50, 100" (or (value, label) pairs) labels points under it.
+# lazy="true" updates the bound field on release, not while dragging.
+# Emits update (what @bind uses), change (on release) and blur.
+import itertools
+
+_builtin_range = range    # the range field below hides the builtin in this block
+
+label: str = ""
+value = None              # a number; with range, a (low, high) pair
+min: float = 0
+max: float = 100
+step: float = 1
+range: bool = False
+lazy: bool = False
+value_label: str = "drag"  # drag, always, side, none
+format: str = "{}"        # e.g. "${}", "{:.0f}%", "{} kg"
+ticks: bool = False
+marks: list = []
+hint: str = ""
+error: str = ""
+name: str = ""            # sends the value (name_min / name_max for a range) in a <form>
+required: bool = False
+disabled: bool = False
+
+_ids = itertools.count(1)
+_live = None              # the value while dragging, before a lazy update
+_flip = False             # range: the thumbs have passed each other
+
+def on_init(self):
+    self._id = f"ui-slider-{next(_ids)}"
+
+# ------------------------------------------------------------- numbers
+
+@property
+def whole(self):
+    return all(float(x).is_integer() for x in (self.min, self.max, self.step))
+
+def _num(self, x):
+    return int(round(x)) if self.whole else round(float(x), 10)
+
+def snap(self, x):
+    """x moved onto the nearest step, inside min..max."""
+    lo, hi, step = float(self.min), float(self.max), float(self.step) or 1.0
+    x = lo if x < lo else hi if x > hi else x
+    return self._num(lo + round((x - lo) / step) * step)
+
+@property
+def current(self):
+    """The value shown: while dragging (lazy), the dragged one."""
+    if self._live is not None:
+        return self._live
+    if self.range:
+        pair = list(self.value) if self.value else [self.min, self.max]
+        return (self.snap(float(pair[0])), self.snap(float(pair[1])))
+    return self.snap(float(self.min if self.value is None else self.value))
+
+@property
+def lo(self):
+    return self.current[0] if self.range else self.current
+
+@property
+def hi(self):
+    return self.current[1] if self.range else self.current
+
+def _pct(self, x):
+    span = float(self.max) - float(self.min)
+    return round((float(x) - float(self.min)) / span * 100, 3) if span else 0
+
+@property
+def lo_pct(self):
+    return self._pct(self.lo)
+
+@property
+def hi_pct(self):
+    return self._pct(self.hi)
+
+def pos(self, which):
+    """Where thumb 0 or 1 sits. The thumbs may pass each other: each input
+    keeps its own position (the browser does too, so they never disagree)
+    and the value is the two in order."""
+    if not self.range:
+        return self.current
+    return (self.hi if which == 0 else self.lo) if self._flip else (self.lo if which == 0 else self.hi)
+
+def thumb_label(self, which):
+    if not self.label:
+        return None
+    if not self.range:
+        return self.label
+    low = (which == 1) if self._flip else (which == 0)
+    return self.label + (", minimum" if low else ", maximum")
+
+def text(self, x):
+    if isinstance(x, float) and x.is_integer():
+        x = int(x)        # 5, not 5.0, when a fractional step lands on it
+    return self.format.format(x)
+
+@property
+def side_text(self):
+    return f"{self.text(self.lo)} – {self.text(self.hi)}" if self.range else self.text(self.lo)
+
+@property
+def classes(self):
+    names = ["slider"]
+    if self.range:
+        names.append("is-range")
+    if self.value_label == "always":
+        names.append("bubbles")
+    if self.disabled:
+        names.append("off")
+    if self.mark_list:
+        names.append("marked")
+    return " ".join(names)
+
+def in_fill(self, pct):
+    start = self.lo_pct if self.range else 0
+    return start <= pct <= self.hi_pct
+
+@property
+def tick_list(self):
+    if not self.ticks:
+        return []
+    span, step = float(self.max) - float(self.min), float(self.step) or 1.0
+    count = int(round(span / step))
+    if count <= 0 or count > 100:
+        return []
+    return [round(i / count * 100, 3) for i in _builtin_range(count + 1)]
+
+@property
+def mark_list(self):
+    items = self.marks
+    if isinstance(items, str):
+        items = [part.strip() for part in items.split(",") if part.strip()]
+    out = []
+    for item in items or []:
+        if isinstance(item, dict):
+            val, text = item.get("value"), item.get("label")
+        elif isinstance(item, (tuple, list)) and len(item) == 2:
+            val, text = item
+        else:
+            val, text = item, None
+        val = float(val)
+        out.append({"pct": self._pct(val), "label": str(text) if text is not None else self.text(val)})
+    return out
+
+# ------------------------------------------------------------- moving
+
+def _next(self, raw, which):
+    x = self.snap(float(raw))
+    if not self.range:
+        return x
+    # Stopping a thumb at the other can't work: the browser has already
+    # moved it, and an unchanged value sends it no correction. So they pass.
+    places = [self.pos(0), self.pos(1)]
+    places[which] = x
+    self._flip = places[0] > places[1]
+    return tuple(sorted(places))
+
+def moved(self, raw, which):
+    new = self._next(raw, which)
+    if self.lazy:
+        self._live = new
+    else:
+        self._live = None
+        self.emit("update", new)
+
+def released(self, raw, which):
+    new = self._next(raw, which)
+    self._live = None
+    if self.lazy or new != self.current:
+        self.emit("update", new)
+    self.emit("change", new)
+</code>
+
+<style>
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.label { font-size: 0.9rem; font-weight: 550; }
+.req { color: var(--ui-danger, #d1242f); }
+.side { font-size: 0.9rem; font-variant-numeric: tabular-nums; color: var(--ui-muted, #59636e); }
+/* The track and fill are drawn here; the range inputs on top are
+   transparent except for their thumbs. --lo/--hi are percentages. */
+.slider { --thumb: 18px; position: relative; height: 28px; margin: 0 2px; }
+.slider.bubbles { margin-top: 26px; }
+.track {
+  position: absolute; left: calc(var(--thumb) / 2); right: calc(var(--thumb) / 2); top: 50%;
+  height: 4px; margin-top: -2px; border-radius: 999px;
+  background: var(--ui-border, #d1d9e0);
+}
+.fill {
+  position: absolute; top: 0; bottom: 0; border-radius: 999px;
+  left: 0; width: calc(var(--hi) * 1%);
+  background: var(--ui-primary, #4f46e5);
+}
+.is-range .fill { left: calc(var(--lo) * 1%); width: calc((var(--hi) - var(--lo)) * 1%); }
+.tick {
+  position: absolute; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%;
+  background: color-mix(in srgb, var(--ui-text, #1f2328) 35%, transparent);
+}
+.tick.on { background: color-mix(in srgb, var(--ui-on-primary, #fff) 80%, transparent); }
+input[type="range"] {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+  -webkit-appearance: none; appearance: none; background: transparent; outline: none;
+  pointer-events: none;
+}
+input[type="range"]::-webkit-slider-runnable-track { background: transparent; height: 100%; }
+input[type="range"]::-moz-range-track { background: transparent; }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; pointer-events: auto; cursor: grab;
+  width: var(--thumb); height: var(--thumb); margin-top: calc((28px - var(--thumb)) / 2);
+  border-radius: 50%; border: 2px solid var(--ui-primary, #4f46e5); background: var(--ui-surface, #fff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: box-shadow 0.15s, transform 0.1s;
+}
+input[type="range"]::-moz-range-thumb {
+  pointer-events: auto; cursor: grab; box-sizing: border-box;
+  width: var(--thumb); height: var(--thumb);
+  border-radius: 50%; border: 2px solid var(--ui-primary, #4f46e5); background: var(--ui-surface, #fff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+input[type="range"]:active::-webkit-slider-thumb { cursor: grabbing; transform: scale(1.1); }
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ui-primary, #4f46e5) 30%, transparent);
+}
+input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ui-primary, #4f46e5) 30%, transparent);
+}
+.off { opacity: 0.55; }
+.off input[type="range"]::-webkit-slider-thumb { cursor: not-allowed; }
+/* The value above a thumb: while it's dragged or focused, or always. */
+.bubble {
+  position: absolute; bottom: calc(100% + 2px); transform: translateX(-50%);
+  padding: 2px 7px; border-radius: 6px; white-space: nowrap; pointer-events: none;
+  font-size: 0.78rem; font-weight: 600; font-variant-numeric: tabular-nums;
+  background: var(--ui-text, #1f2328); color: var(--ui-surface, #fff);
+  opacity: 0; transition: opacity 0.12s;
+}
+.b-lo { left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--lo) / 100); }
+.b-hi { left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--hi) / 100); }
+.bubbles .bubble, .slider:hover .bubble, .slider:focus-within .bubble { opacity: 1; }
+.marks { position: relative; height: 1.2em; margin: 0 calc(9px + 2px); }
+.mark {
+  position: absolute; top: 0; transform: translateX(-50%);
+  font-size: 0.75rem; color: var(--ui-muted, #59636e); white-space: nowrap;
+}
+.hint { font-size: 0.82rem; color: var(--ui-muted, #59636e); }
+.error { font-size: 0.82rem; color: var(--ui-danger, #d1242f); }
+</style>

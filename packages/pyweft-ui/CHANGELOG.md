@@ -14,6 +14,9 @@ releasing moves them under the new version (see
   `query`) and the empty state with `<Fill name="empty">`. For server
   results: `@search`, `match="none"` and `loading`. `free="true"` keeps
   whatever was typed.
+- **`Slider`**: drag a thumb to pick a number, or two for a range; steps,
+  ticks and labelled marks, a value bubble with a `format`, keyboard
+  support, and `lazy` updates on release.
 - **`Chips`**: a row of chips to choose one or several from, with icons,
   removable chips (`@remove`) and a keyboard row (arrows, Space, Delete).
 - **`ChipInput`**: type and press Enter or a comma to add a chip, × or
