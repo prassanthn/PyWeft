@@ -106,6 +106,7 @@ All have `label`, `hint`, `error`, `required`, `disabled`, `name`, and take
 | `Checkbox` | `bool` | |
 | `Switch` | `bool` | |
 | `Autocomplete` | the chosen option's value (`free="true"`: the typed text) | `options`, `match` (contains, starts, none), `max_results`, `min_chars`, `free`, `loading`, `empty`, `placeholder`, `align`; emits `search` (the text, each keystroke), `select` (the whole option), `enter`. Fills: `option` (with `option`, `active`, `query`), `empty` |
+| `ButtonToggle` | the chosen value; `multiple="true"`: a list | `options` (dicts may add `icon`, `icon_only`, `disabled`), `multiple`, `allow_none`, `check`, `size` (sm, md, lg), `full_width`, `orientation`, `aria_label`, `name` |
 | `Chips` | the chosen value; `multiple="true"`: a list | `options` (dicts may add `icon`, `disabled`), `multiple`, `required`, `removable` (emits `remove`), `selectable`. Fill: `option` (with `option`, `selected`) |
 | `ChipInput` | a list | `options` (suggestions), `free`, `separators`, `max`, `add_on_blur`, `match`, `placeholder`, `name`; emits `add`, `remove`. Fills: `chip` (with `chip`), `option` |
 | `Slider` | an `int` or `float`; `range="true"`: `(low, high)` | `min`, `max`, `step`, `range`, `value_label` (drag/always/side/none), `format`, `ticks`, `marks`, `lazy`, `name`; emits `change`, `blur` |
@@ -149,7 +150,7 @@ function), `align` and `sortable`. Left out, they come from the first row.
 | `Alert` | `kind` (info, success, warning, danger), `title`, `dismissible` | Emits `close`. |
 | `Badge` | `kind` (neutral, primary, info, success, warning, danger) | |
 | `Spinner` | `size`, `label` | |
-| `Icon` | `name`, `size` | check, x, plus, minus, search, info, alert, chevron-up/down/left/right, menu, trash, edit, send, user, home, star, heart, download, upload, external, copy, settings, sun, moon, calendar, more |
+| `Icon` | `name`, `size` | check, x, plus, minus, search, info, alert, chevron-up/down/left/right, menu, trash, edit, send, user, home, star, heart, download, upload, external, copy, settings, sun, moon, calendar, more, bold, italic, underline, align-left/center/right, list, grid |
 
 ## Checking forms
 

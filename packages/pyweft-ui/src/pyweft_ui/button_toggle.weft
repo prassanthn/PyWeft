@@ -1,0 +1,209 @@
+<template>
+  <div class="field">
+    <If cond="label">
+      <span class="label" :id="_id + '-label'">{{ label }}<If cond="required"><span class="req" aria-hidden="true"> *</span></If></span>
+    </If>
+    <div :class="group_class" :role="'group' if multiple else 'radiogroup'"
+         :aria-labelledby="_id + '-label' if label else None" :aria-label="None if label else (aria_label or None)"
+         :aria-orientation="'vertical' if orientation == 'vertical' else None"
+         :aria-invalid="'true' if error else None" :aria-required="'true' if required and not multiple else None"
+         @keydown.left.prevent="step(-1)" @keydown.right.prevent="step(1)"
+         @keydown.up.prevent="step(-1)" @keydown.down.prevent="step(1)"
+         @keydown.home.prevent="step_to(0)" @keydown.end.prevent="step_to(-1)">
+      <For each="b in buttons" key="b['key']">
+        <button type="button" :class="b['classes']" :ref="'b-' + str(b['index'])"
+                :role="None if multiple else 'radio'"
+                :aria-checked="None if multiple else ('true' if b['selected'] else 'false')"
+                :aria-pressed="('true' if b['selected'] else 'false') if multiple else None"
+                :aria-label="b['label'] if b['icon_only'] else None" :title="b['label'] if b['icon_only'] else None"
+                :tabindex="'0' if b['index'] == tab_stop else '-1'"
+                :disabled="disabled or b['disabled']" @click="toggle(b['index'])" @focus="_focus = b['index']">
+          <If cond="b['selected'] and check and not b['icon_only']"><Icon name="check" size="1em" /></If>
+          <ElseIf cond="b['icon']"><Icon :name="b['icon']" :size="'1.15em' if b['icon_only'] else '1em'" /></ElseIf>
+          <If cond="not b['icon_only']"><span class="text">{{ b['label'] }}</span></If>
+        </button>
+      </For>
+    </div>
+    <If cond="name">
+      <For each="v in form_values" key="v">
+        <input type="hidden" :name="name" :value="v" />
+      </For>
+    </If>
+    <If cond="error"><span class="error">{{ error }}</span></If>
+    <ElseIf cond="hint"><span class="hint">{{ hint }}</span></ElseIf>
+  </div>
+</template>
+
+<code>
+# <ui.ButtonToggle options="Day, Week, Month" @bind="view" />
+# <ui.ButtonToggle multiple="true" :options="styles" @bind="chosen" />
+# A joined row of buttons for a small fixed set of choices: a view switch,
+# text styles, alignment. Binds the chosen option's value, or with
+# multiple="true" a list (in the options' order). options take Select's
+# forms; a dict may add icon, icon_only (just the icon; the label still
+# names it) and disabled.
+# One choice stays chosen when clicked again unless allow_none="true".
+# A chosen button shows a check mark (check="false" hides it).
+# size: sm, md, lg; full_width stretches the buttons evenly; orientation
+# vertical stacks them. label, hint, error, required, disabled and name
+# (hidden inputs for a <form>) as on the other fields.
+# Keyboard: one Tab stop; arrows and Home/End move. One choice: moving
+# chooses (a radio group). multiple: Space or Enter toggles.
+import itertools
+
+from pyweft_ui.options import normalize
+
+label: str = ""
+aria_label: str = ""      # names a group without a label for screen readers
+value = None
+options: list = []
+multiple: bool = False
+allow_none: bool = False
+check: bool = True
+size: str = "md"          # sm, md, lg
+full_width: bool = False
+orientation: str = "horizontal"
+required: bool = False
+disabled: bool = False
+name: str = ""
+hint: str = ""
+error: str = ""
+
+_ids = itertools.count(1)
+_focus = None             # the button that is the Tab stop (multiple)
+
+def on_init(self):
+    self._id = f"ui-button-toggle-{next(_ids)}"
+
+@property
+def chosen(self):
+    if self.multiple:
+        current = self.value or []
+        return list(current) if isinstance(current, (list, tuple, set)) else [current]
+    return [] if self.value is None else [self.value]
+
+@property
+def buttons(self):
+    chosen = self.chosen
+    out = []
+    for i, c in enumerate(normalize(self.options)):
+        extra = c["data"] if isinstance(c["data"], dict) else {}
+        selected = c["value"] in chosen
+        classes = "btn selected" if selected else "btn"
+        out.append({
+            "index": i, "key": f"{i}-{c['value']}", "value": c["value"], "label": c["label"],
+            "icon": c["icon"], "icon_only": bool(extra.get("icon_only")) and bool(c["icon"]),
+            "disabled": c["disabled"], "selected": selected, "classes": classes,
+        })
+    return out
+
+@property
+def usable(self):
+    if self.disabled:
+        return []
+    return [b["index"] for b in self.buttons if not b["disabled"]]
+
+@property
+def tab_stop(self):
+    usable = self.usable
+    if not usable:
+        return None
+    if self.multiple:
+        return self._focus if self._focus in usable else usable[0]
+    picked = [b["index"] for b in self.buttons if b["selected"] and b["index"] in usable]
+    return picked[0] if picked else usable[0]
+
+@property
+def group_class(self):
+    names = ["group", "size-" + self.size, self.orientation]
+    if self.full_width:
+        names.append("full")
+    if self.error:
+        names.append("invalid")
+    return " ".join(names)
+
+@property
+def form_values(self):
+    return [str(v) for v in self.chosen]
+
+def toggle(self, index):
+    b = self.buttons[index]
+    if self.disabled or b["disabled"]:
+        return
+    self._focus = index
+    if self.multiple:
+        keep = [x["value"] for x in self.buttons
+                if (x["value"] in self.chosen) != (x["index"] == index)]
+        self.emit("update", keep)
+    elif b["selected"]:
+        if self.allow_none and not self.required:
+            self.emit("update", None)
+    else:
+        self.emit("update", b["value"])
+
+def step(self, delta):
+    usable = self.usable
+    if not usable:
+        return
+    at = self.tab_stop
+    position = usable.index(at) if at in usable else 0
+    self.step_to((position + delta) % len(usable))
+
+def step_to(self, position):
+    usable = self.usable
+    if not usable:
+        return
+    index = usable[position]
+    self._focus = index
+    if not self.multiple:
+        # A radio group: moving chooses.
+        b = self.buttons[index]
+        if not b["selected"]:
+            self.emit("update", b["value"])
+    self.focus(f"b-{index}")
+</code>
+
+<style>
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; align-items: flex-start; }
+.label { font-size: 0.9rem; font-weight: 550; }
+.req { color: var(--ui-danger, #d1242f); }
+.group {
+  display: inline-flex; max-width: 100%; overflow: hidden;
+  border: 1px solid var(--ui-border, #d1d9e0); border-radius: var(--ui-radius, 8px);
+  background: var(--ui-surface, #fff);
+}
+.group.full { display: flex; align-self: stretch; }
+.group.vertical { flex-direction: column; }
+.group.invalid { border-color: var(--ui-danger, #d1242f); }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4em;
+  margin: 0; border: 0; border-left: 1px solid var(--ui-border, #d1d9e0);
+  background: transparent; color: var(--ui-text, #1f2328);
+  font: inherit; font-weight: 550; line-height: 1.2; white-space: nowrap; cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.btn:first-child { border-left: 0; }
+.vertical .btn { border-left: 0; border-top: 1px solid var(--ui-border, #d1d9e0); justify-content: flex-start; }
+.vertical .btn:first-child { border-top: 0; }
+.full .btn { flex: 1 1 0; min-width: 0; }
+.size-sm .btn { font-size: 0.82rem; padding: 0.35em 0.7em; }
+.size-md .btn { font-size: 0.92rem; padding: 0.5em 0.95em; }
+.size-lg .btn { font-size: 1rem; padding: 0.65em 1.2em; }
+.btn:hover:not(:disabled) { background: var(--ui-subtle, #f6f8fa); }
+.btn.selected {
+  background: color-mix(in srgb, var(--ui-primary, #4f46e5) 14%, var(--ui-surface, #fff));
+  color: color-mix(in srgb, var(--ui-primary, #4f46e5) 80%, var(--ui-text, #1f2328));
+}
+.btn.selected:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ui-primary, #4f46e5) 20%, var(--ui-surface, #fff));
+}
+.btn:focus-visible {
+  outline: none; position: relative; z-index: 1;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ui-primary, #4f46e5) 55%, transparent);
+}
+.btn:disabled { cursor: not-allowed; color: var(--ui-muted, #59636e); opacity: 0.6; }
+.text { overflow: hidden; text-overflow: ellipsis; }
+.hint { font-size: 0.82rem; color: var(--ui-muted, #59636e); }
+.error { font-size: 0.82rem; color: var(--ui-danger, #d1242f); }
+@media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+</style>

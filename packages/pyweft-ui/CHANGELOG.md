@@ -14,6 +14,11 @@ releasing moves them under the new version (see
   `query`) and the empty state with `<Fill name="empty">`. For server
   results: `@search`, `match="none"` and `loading`. `free="true"` keeps
   whatever was typed.
+- **`ButtonToggle`**: a joined row of buttons, one choice (a radio group)
+  or several, with icon-only buttons, a check mark, sizes, full width and
+  a vertical layout.
+- Icons: `bold`, `italic`, `underline`, `align-left`, `align-center`,
+  `align-right`, `list`, `grid`.
 - **`BottomSheet`**: a panel sliding up from the bottom, as a list of
   actions or any content with an actions row; closes with Esc, a tap
   outside or a swipe down, and keeps focus inside like `Dialog`.

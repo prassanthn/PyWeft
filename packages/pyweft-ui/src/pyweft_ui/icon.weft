@@ -40,6 +40,14 @@ _PATHS = {
     "moon": "M20 14.5A8 8 0 0 1 9.5 4A8 8 0 1 0 20 14.5z",
     "calendar": "M4 6h16v14H4zM4 10h16M8 3.5v4M16 3.5v4",
     "more": "M5 11a1 1 0 1 0 0 2a1 1 0 1 0 0-2zM12 11a1 1 0 1 0 0 2a1 1 0 1 0 0-2zM19 11a1 1 0 1 0 0 2a1 1 0 1 0 0-2z",
+    "bold": "M7 5h6a3.5 3.5 0 0 1 0 7H7zM7 12h7a3.5 3.5 0 0 1 0 7H7z",
+    "italic": "M10 5h8M6 19h8M14 5l-4 14",
+    "underline": "M7 4v7a5 5 0 0 0 10 0V4M5 20h14",
+    "align-left": "M4 6h16M4 10h10M4 14h16M4 18h10",
+    "align-center": "M4 6h16M7 10h10M4 14h16M7 18h10",
+    "align-right": "M4 6h16M10 10h10M4 14h16M10 18h10",
+    "list": "M9 6h11M9 12h11M9 18h11M4.5 6h.5M4.5 12h.5M4.5 18h.5",
+    "grid": "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
 }
 
 @property

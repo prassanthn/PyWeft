@@ -15,6 +15,7 @@ fields; this guide is the how-to.
    - [Shaped input: mask](#shaped-input-mask)
    - [Options for Select and RadioGroup](#options-for-select-and-radiogroup)
    - [Suggestions as you type: Autocomplete](#suggestions-as-you-type-autocomplete)
+   - [A row of choices: ButtonToggle](#a-row-of-choices-buttontoggle)
    - [Chips: Chips and ChipInput](#chips-chips-and-chipinput)
    - [Sliders](#sliders)
    - [Checkbox and Switch labels with links](#checkbox-and-switch-labels-with-links)
@@ -284,6 +285,7 @@ What each one gives your field:
 | `Checkbox`, `Switch` | a `bool` |
 | `DatePicker` | a `datetime.date`, or `None` until one is chosen |
 | `Autocomplete` | the chosen option's value (with `free="true"`, the typed text) |
+| `ButtonToggle` | the chosen value; with `multiple="true"`, a list |
 | `Chips` | the chosen chip's value; with `multiple="true"`, a list |
 | `ChipInput` | a list: the typed texts, or the chosen options' values |
 | `Slider` | a number; with `range="true"`, a `(low, high)` tuple |
@@ -394,6 +396,41 @@ async def find_cities(self, query):
   its value); `min_chars` waits for that many characters; `placeholder`,
   `hint`, `error`, `required`, `disabled` and `@blur` work as on the other
   fields, so `Form` checks it like any other.
+
+### A row of choices: ButtonToggle
+
+A button toggle is a joined row of buttons for a small, fixed set of
+choices: a view switch, text styles, alignment.
+
+```xml
+<ui.ButtonToggle label="Range" options="Day, Week, Month" @bind="view" />
+
+<ui.ButtonToggle aria_label="Text style" multiple="true" @bind="styles" :options="[
+    {'value': 'bold', 'label': 'Bold', 'icon': 'bold', 'icon_only': True},
+    {'value': 'italic', 'label': 'Italic', 'icon': 'italic', 'icon_only': True},
+]" />
+
+<ui.ButtonToggle label="Plan" options="Monthly, Yearly" full_width="true" @bind="plan" />
+```
+
+- One choice binds the chosen value; **`multiple="true"`** binds a list,
+  in the options' order. Clicking the chosen button again keeps it chosen,
+  unless `allow_none="true"`.
+- `options` take `Select`'s forms; a dict can add `icon`, **`icon_only`**
+  (just the icon: the label becomes its name for screen readers and its
+  tooltip) and `disabled`. A chosen button shows a check mark;
+  `check="false"` hides it.
+- `size` is `sm`, `md` or `lg`; **`full_width="true"`** stretches the
+  buttons evenly across the row; `orientation="vertical"` stacks them.
+- `label`, `hint`, `error`, `required`, `disabled` and `name` work as on
+  the other fields. Without a `label`, name the group with `aria_label`.
+- **Keyboard:** the row is one Tab stop and the arrow keys move along it.
+  With one choice it is a radio group, so moving chooses; with
+  `multiple`, Space or Enter toggles the button with focus.
+
+Compared with `Chips`, which also choose one or several: chips are
+separate pills that wrap onto more lines and can be removed, for longer or
+changing lists; a button toggle is one compact bar for a few fixed choices.
 
 ### Chips: Chips and ChipInput
 
@@ -1336,7 +1373,8 @@ Available names: `check`, `x`, `plus`, `minus`, `search`, `info`, `alert`,
 `chevron-up`, `chevron-down`, `chevron-left`, `chevron-right`, `menu`,
 `trash`, `edit`, `send`, `user`, `home`, `star`, `heart`, `download`,
 `upload`, `external`, `copy`, `settings`, `sun`, `moon`, `calendar`,
-`more`.
+`more`, `bold`, `italic`, `underline`, `align-left`, `align-center`,
+`align-right`, `list`, `grid`.
 
 ## 13. Themes
 

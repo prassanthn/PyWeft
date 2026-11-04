@@ -137,6 +137,26 @@ tags={{ repr(tags) }}  invitees={{ repr(invitees) }}</pre>
           </ui.Column>
         </ui.Card>
 
+        <ui.Card title="Button toggle" id="button-toggle" subtitle="A joined row of buttons: one choice, or several">
+          <ui.Column gap="lg">
+            <ui.Row align="end">
+              <ui.ButtonToggle aria_label="Layout" :options="LAYOUTS" @bind="layout" />
+              <ui.ButtonToggle label="Range" options="Day, Week, Month" @bind="range_view" size="sm" />
+            </ui.Row>
+            <ui.Row align="center">
+              <ui.ButtonToggle aria_label="Text style" multiple="true" :options="TEXT_STYLES" @bind="text_styles" />
+              <ui.ButtonToggle aria_label="Alignment" :options="ALIGNS" @bind="text_align" />
+            </ui.Row>
+            <p :class="'sample ' + ' '.join(text_styles)" :style="'text-align: ' + text_align">
+              The weft is the thread woven through the warp to make fabric.
+            </p>
+            <ui.ButtonToggle label="Plan" options="Monthly, Yearly, Lifetime" full_width="true" @bind="plan_period"
+                             hint="full_width stretches the buttons evenly" />
+            <pre class="state">layout={{ repr(layout) }}  range={{ repr(range_view) }}  styles={{ repr(text_styles) }}  align={{ repr(text_align) }}</pre>
+            <pre class="code">{{ CODE['toggle'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
         <ui.Card title="Sliders" id="sliders" subtitle="Drag, or use the arrow keys">
           <ui.Grid min_width="16rem" gap="lg">
             <ui.Slider label="Volume" @bind="volume" format="{}%" />
@@ -360,7 +380,7 @@ import asyncio
 import datetime
 from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Dialog", "Bottom sheet", "Tabs", "Table", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Dialog", "Bottom sheet", "Tabs", "Table", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -472,6 +492,18 @@ filters: list = ["Open", "Assigned to me", "This week"]
 tags: list = ["python", "ui"]
 invitees: list = []
 volume: int = 40
+layout: str = "list"
+range_view: str = "Week"
+text_styles: list = ["bold"]
+text_align: str = "left"
+plan_period: str = "Yearly"
+LAYOUTS = [{"value": "list", "label": "List", "icon": "list"}, {"value": "grid", "label": "Grid", "icon": "grid"}]
+TEXT_STYLES = [{"value": "bold", "label": "Bold", "icon": "bold", "icon_only": True},
+               {"value": "italic", "label": "Italic", "icon": "italic", "icon_only": True},
+               {"value": "underline", "label": "Underline", "icon": "underline", "icon_only": True}]
+ALIGNS = [{"value": "left", "label": "Align left", "icon": "align-left", "icon_only": True},
+          {"value": "center", "label": "Align centre", "icon": "align-center", "icon_only": True},
+          {"value": "right", "label": "Align right", "icon": "align-right", "icon_only": True}]
 price: tuple = (100, 350)
 rating: int = 4
 opacity: float = 0.8
@@ -672,6 +704,14 @@ def submit(self):
 <ui.Accordion :options="faq" @bind="question">
   <p>{{ answers[panel] }}</p>
 </ui.Accordion>""",
+    "toggle": """<ui.ButtonToggle options="Day, Week, Month" @bind="view" />
+
+<ui.ButtonToggle aria_label="Text style" multiple="true" @bind="styles" :options="[
+    {'value': 'bold', 'label': 'Bold', 'icon': 'bold', 'icon_only': True},
+    {'value': 'italic', 'label': 'Italic', 'icon': 'italic', 'icon_only': True},
+]" />
+
+<ui.ButtonToggle label="Plan" options="Monthly, Yearly" full_width="true" @bind="plan" />""",
     "sliders": """<ui.Slider label="Volume" @bind="volume" format="{}%" />
 <ui.Slider label="Price" :min="0" :max="500" :step="10" range="true"
            @bind="price" format="${}" value_label="side" />
@@ -750,6 +790,10 @@ toast("Item deleted.", action="Undo", on_action=self.undo)""",
   font-size: 0.72rem; font-weight: 700;
   background: color-mix(in srgb, var(--ui-primary) 15%, transparent); color: var(--ui-primary);
 }
+.sample { margin: 0; padding: 12px 14px; border-radius: var(--ui-radius, 8px); background: var(--ui-subtle); }
+.sample.bold { font-weight: 700; }
+.sample.italic { font-style: italic; }
+.sample.underline { text-decoration: underline; }
 .faq { margin: 0; color: var(--ui-muted, #59636e); }
 .avatar.small { width: 1.35rem; height: 1.35rem; font-size: 0.6rem; margin-left: -0.45em; }
 .person { display: flex; flex-direction: column; min-width: 0; flex: 1; }
