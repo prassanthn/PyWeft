@@ -44,6 +44,8 @@
             <ui.Select label="Size" placeholder="Choose a size" options="Small, Medium, Large" @bind="size" />
             <ui.TextField label="Date" type="date" @bind="date" />
             <ui.TextField label="Password" type="password" @bind="password" />
+            <ui.TextField label="Phone" mask="(999) 999-9999" @bind="phone" hint="Shaped as you type" />
+            <ui.TextField label="Card number" mask="9999 9999 9999 9999" @bind="card" />
           </ui.Grid>
           <ui.TextArea label="Notes" rows="3" @bind="notes" placeholder="Anything else?" />
           <pre class="state">{{ form_state }}</pre>
@@ -223,6 +225,8 @@ size = None
 date: str = ""
 password: str = ""
 notes: str = ""
+phone: str = ""
+card: str = ""
 plan: str = "pro"
 updates: bool = True
 agreed: bool = False
@@ -298,7 +302,8 @@ def answer(self, text):
 @property
 def form_state(self):
     return (f"name={self.name!r} email={self.email!r} quantity={self.quantity!r}\n"
-            f"size={self.size!r} date={self.date!r} notes={self.notes!r}")
+            f"size={self.size!r} date={self.date!r} notes={self.notes!r}\n"
+            f"phone={self.phone!r} card={self.card!r}")
 
 CODE = {
     "buttons": """<ui.Button variant="primary" @click="save">Primary</ui.Button>
@@ -308,7 +313,8 @@ CODE = {
     "form": """<ui.TextField label="Name" required="true" @bind="name" hint="Your full name" />
 <ui.NumberField label="Quantity" min="1" max="99" @bind="quantity" />
 <ui.Select label="Size" options="Small, Medium, Large" @bind="size" />
-<ui.TextArea label="Notes" rows="3" @bind="notes" />""",
+<ui.TextArea label="Notes" rows="3" @bind="notes" />
+<ui.TextField label="Phone" mask="(999) 999-9999" @bind="phone" />""",
     "validation": """form = Form(
     email=[rules.required(), rules.email()],
     password=[rules.required(), rules.min_length(8)],

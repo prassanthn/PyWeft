@@ -208,6 +208,7 @@ and `name` (the field's name inside a `<form>`), and all work with `@bind`.
 <ui.Checkbox label="Airport pickup" @bind="pickup" />
 <ui.Switch label="Email me offers" @bind="offers" />
 <ui.DatePicker label="Arrival" @bind="arrival" />
+<ui.TextField label="Phone" mask="(999) 999-9999" @bind="phone" />
 ```
 
 What each one gives your field:
@@ -219,6 +220,25 @@ What each one gives your field:
 | `Select`, `RadioGroup` | the chosen option's value |
 | `Checkbox`, `Switch` | a `bool` |
 | `DatePicker` | a `datetime.date`, or `None` until one is chosen |
+
+### Shaped input: mask
+
+`TextField`'s `mask` shapes what's typed, keeping the cursor where the user
+is typing: `9` is a digit, `a` a letter, `*` either, and anything else is
+shown as it is.
+
+```xml
+<ui.TextField label="Phone" mask="(999) 999-9999" @bind="phone" />
+<ui.TextField label="Card number" mask="9999 9999 9999 9999" @bind="card" />
+<ui.TextField label="Plate" mask="aa-9999" placeholder="AB-1234" @bind="plate" />
+```
+
+Your field gets the shaped text, `"(555) 123-4567"`, and a starting value
+such as `"5551234567"` is shown in the shape. Without a `placeholder` the
+field shows the mask's shape, `(___) ___-____`, and a mask of digits only
+brings up the number pad on phones. To check it's all there,
+`rules.masked("(999) 999-9999")`; for just the digits,
+`pyweft.masks.typed(mask, phone)`.
 
 ### Options for Select and RadioGroup
 
@@ -433,6 +453,7 @@ from pyweft_ui import rules
 | `pattern(regex, message)` | the whole text matches `regex` |
 | `one_of(choices)` | the value is one of `choices` |
 | `same_as("field", message)` | the value equals another field's, as when a password is typed twice |
+| `masked(mask, message)` | the text fills every slot of an input `mask` |
 | `check(test, message)` | `test(value)` is true: `check(lambda v: v != "admin", "That name is taken")` |
 
 Every rule takes the message to show, and has a sensible one if you leave

@@ -220,3 +220,32 @@ def test_fields_emit_blur(tmp_path):
         r.dispatch(find(tree, tag(name)).events["blur"], {})
     assert a.left == ["area", "number", "select"]
     assert find(tree, cls("error")) is None
+
+
+def test_a_masked_text_field(tmp_path):
+    _, a, r, tree = app(
+        tmp_path,
+        '<div><ui.TextField label="Phone" mask="(999) 999-9999" @bind="phone" /></div>',
+        'phone: str = "5551234567"',
+    )
+    field = find(tree, tag("input"))
+    assert field.attrs["data-mask"] == "(999) 999-9999"
+    assert field.attrs["value"] == "(555) 123-4567"   # a raw starting value, shaped
+    assert field.attrs["inputmode"] == "numeric"     # digits only: the number pad
+    assert field.attrs["placeholder"] == "(___) ___-____"
+    r.dispatch(field.events["input"], {"value": "(555) 98"})  # what the runtime sends
+    assert a.phone == "(555) 98"
+
+    _, b, r2, tree2 = app(
+        tmp_path / "plate" if (tmp_path / "plate").mkdir() is None else tmp_path,
+        '<div><ui.TextField label="Plate" mask="aa-9999" placeholder="AB-1234" @bind="plate" /></div>',
+        'plate: str = ""',
+    )
+    plate = find(tree2, tag("input"))
+    assert "inputmode" not in plate.attrs and plate.attrs["placeholder"] == "AB-1234"
+
+
+def test_masked_rule():
+    rule = rules.masked("(999) 999-9999", "Enter the whole number")
+    assert rule("") is None and rule("(555) 123-4567") is None
+    assert rule("(555) 12") == "Enter the whole number"

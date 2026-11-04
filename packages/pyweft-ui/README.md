@@ -95,7 +95,7 @@ All have `label`, `hint`, `error`, `required`, `disabled`, `name`, and take
 
 | Control | Binds | Extra fields |
 |---|---|---|
-| `TextField` | `str` | `type` (text, email, password, search, url, tel, date, time), `placeholder`, `autocomplete`; emits `enter` on Enter |
+| `TextField` | `str` | `type` (text, email, password, search, url, tel, date, time), `placeholder`, `autocomplete`, `mask` (`"(999) 999-9999"`: 9 digit, a letter, * either); emits `enter` on Enter |
 | `TextArea` | `str` | `rows`, `placeholder` |
 | `NumberField` | `int` or `float` | `min`, `max`, `step`, `placeholder` |
 | `Select` | the chosen option's value | `options`, `placeholder` |

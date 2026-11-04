@@ -136,6 +136,16 @@ def same_as(field: str, message: str = "These don't match") -> Rule:
     return rule
 
 
+def masked(mask: str, message: str = "Fill this in completely") -> Rule:
+    """Text that fills every slot of an input mask, for a field with
+    ``mask=``: ``rules.masked("(999) 999-9999")``."""
+    from pyweft import masks
+
+    def rule(value):
+        return None if is_empty(value) or masks.complete(mask, str(value)) else message
+    return rule
+
+
 def check(test: Callable[[Any], Any], message: str) -> Rule:
     """Your own test: ``check(lambda v: v != "admin", "That name is taken")``.
     ``test`` gets the value and returns something true when it's fine."""

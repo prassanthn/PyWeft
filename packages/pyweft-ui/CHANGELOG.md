@@ -35,6 +35,9 @@ releasing moves them under the new version (see
   week (timed events by the hour, side by side when they overlap) or
   agenda; `months="3"` shows several months. Emits `select`, `day` and
   `navigate`.
+- `TextField` takes a `mask` (`"(999) 999-9999"`) that shapes what's typed,
+  with a matching placeholder and the number pad for digits; and
+  `rules.masked(mask)` checks it's complete.
 - Menus and calendars shift sideways to stay inside the window.
 - `AppShell`'s header wraps onto a second row when its actions don't fit
   beside the title, so a phone no longer scrolls sideways.

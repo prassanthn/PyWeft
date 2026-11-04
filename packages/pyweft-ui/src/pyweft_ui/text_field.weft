@@ -3,8 +3,9 @@
     <If cond="label">
       <span class="label">{{ label }}<If cond="required"><span class="req" aria-hidden="true"> *</span></If></span>
     </If>
-    <input class="control" :type="type" :value="value" :name="name or None"
-           :placeholder="placeholder or None" :required="required" :disabled="disabled"
+    <input class="control" :type="type" :value="shown" :name="name or None"
+           :placeholder="placeholder or mask_hint or None" :required="required" :disabled="disabled"
+           :data-mask="mask or None" :inputmode="'numeric' if digits_only else None"
            :autocomplete="autocomplete or None" :aria-invalid="'true' if error else None"
            @input="emit('update', event.value)" @keydown.enter="emit('enter', value)"
            @blur="emit('blur', value)" />
@@ -17,6 +18,9 @@
 # <ui.TextField label="Email" type="email" @bind="email" :error="errors.get('email')" />
 # Emits "update" as you type (that is what @bind uses), "enter" on Enter,
 # and "blur" when the user leaves it (for Form's touch()).
+# mask="(999) 999-9999" shapes what's typed (9 a digit, a a letter, * either,
+# anything else shown as is); the bound field gets the shaped text.
+from pyweft import masks as _masks
 label: str = ""
 value: str = ""
 type: str = "text"        # text, email, password, search, url, tel, date, time
@@ -27,6 +31,22 @@ name: str = ""            # the field's name in a <form>
 autocomplete: str = ""
 required: bool = False
 disabled: bool = False
+mask: str = ""            # e.g. "(999) 999-9999", "99/99/9999", "aa-9999"
+
+@property
+def shown(self):
+    # A starting value such as "5551234567" shows in the mask's shape.
+    return _masks.apply(self.mask, self.value) if self.mask and self.value else self.value
+
+@property
+def mask_hint(self):
+    if not self.mask:
+        return ""
+    return "".join("_" if kind == "slot" else char for kind, char in _masks.tokens(self.mask))
+
+@property
+def digits_only(self):
+    return bool(self.mask) and all(char == "9" for kind, char in _masks.tokens(self.mask) if kind == "slot")
 </code>
 
 <style>
