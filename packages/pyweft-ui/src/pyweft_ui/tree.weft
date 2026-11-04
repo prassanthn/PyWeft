@@ -1,0 +1,391 @@
+<template>
+  <div :class="classes" role="tree" :aria-label="label or None"
+       :aria-multiselectable="'true' if checkable else None"
+       @keydown.down.prevent="move(1)" @keydown.up.prevent="move(-1)"
+       @keydown.home.prevent="move_to(0)" @keydown.end.prevent="move_to(-1)"
+       @keydown.right.prevent="go_in()" @keydown.left.prevent="go_out()"
+       @keydown.enter.prevent="activate(_focus_key)" @keydown.space.prevent="press(_focus_key)"
+       @keydown="typed(event)">
+    <For each="row in rows" key="row['key']">
+      <div role="treeitem" :ref="'n-' + row['key']" :class="row['classes']"
+           :aria-level="str(row['level'] + 1)" :aria-setsize="str(row['setsize'])"
+           :aria-posinset="str(row['posinset'])" :aria-expanded="row['aria_expanded']"
+           :aria-selected="None if checkable else ('true' if row['selected'] else 'false')"
+           :aria-checked="row['check'] if checkable else None"
+           :aria-disabled="'true' if row['disabled'] else None"
+           :aria-busy="'true' if row['loading'] else None"
+           :tabindex="'0' if row['tab'] else '-1'"
+           @click="press(row['key'])" @dblclick="activate(row['key'])" @focus="_focus_key = row['key']">
+        <For each="g in row['guides']" key="g"><span class="guide" aria-hidden="true"></span></For>
+        <span class="twisty" aria-hidden="true" @click.stop="toggle(row['key'])">
+          <If cond="row['loading']"><span class="busy"></span></If>
+          <ElseIf cond="row['is_parent']"><Icon name="chevron-right" size="1em" /></ElseIf>
+        </span>
+        <If cond="checkable">
+          <span :class="'box ' + row['check']" aria-hidden="true">
+            <If cond="row['check'] == 'true'"><Icon name="check" size="0.8em" /></If>
+            <ElseIf cond="row['check'] == 'mixed'"><Icon name="minus" size="0.8em" /></ElseIf>
+          </span>
+        </If>
+        <If cond="row['icon']"><span class="node-icon"><Icon :name="row['icon']" size="1.1em" /></span></If>
+        <span class="text"><Slot name="node" :node="row" :level="row['level']" :expanded="row['expanded']"
+              :selected="row['selected']">{{ row['before'] }}<If cond="row['match']"><mark>{{ row['match'] }}</mark></If>{{ row['after'] }}</Slot></span>
+      </div>
+    </For>
+    <If cond="not rows"><div class="empty">{{ no_matches if filter.strip() else empty }}</div></If>
+  </div>
+</template>
+
+<code>
+# <ui.Tree :nodes="files" @bind="selected" @activate="open_file(event)" />
+# <ui.Tree :nodes="permissions" checkable="true" @bind="granted" />
+# A tree of nodes that open and close. nodes: dicts with value, label and
+# optionally icon, children (a list; None = has children not loaded yet,
+# see "load"), disabled and keys of your own (node['data']); text or
+# (value, label[, children]) tuples too. Values must be unique.
+# @bind: the selected node's value; checkable="true": a checkbox per node
+# and @bind is the list of checked leaves (checking a parent checks all
+# under it; partly checked parents show a dash).
+# expanded: values open at the start; expand_all="true" opens everything
+# loaded. filter: only nodes whose label contains it, with the parents on
+# the way, opened, and the match marked.
+# Emits update, activate (Enter or double-click on a leaf), toggle
+# ({"value", "open"}) and load (the value of a node with children None,
+# the first time it opens: fill its children in, async is fine).
+# <Fill name="node"> lays out a node's content (node, level, expanded,
+# selected). lines="true" draws guide lines.
+# Keyboard: one Tab stop. Up/Down move, Right opens or goes to the first
+# child, Left closes or goes to the parent, Home/End, * opens all siblings,
+# a letter jumps to the next node starting with it, Space selects or
+# checks, Enter activates (or opens and closes a parent).
+label: str = ""           # names the tree for screen readers
+nodes: list = []
+value = None
+checkable: bool = False
+expanded: list = []
+expand_all: bool = False
+filter: str = ""
+lines: bool = False
+empty: str = "Nothing here"
+no_matches: str = "No matches"
+
+_picked = None
+_focus_key = None
+
+def on_init(self):
+    self._open = {str(v) for v in self.expanded}
+    self._closed = set()      # closed by hand while expand_all is on
+    self._asked = set()       # load already emitted
+    for key in list(self._open):
+        node = self._node(key)
+        if node and node["lazy"]:
+            self._ask(node)
+
+# ------------------------------------------------------------- the tree
+
+def _norm(self, items, parent):
+    out = []
+    for item in items or []:
+        if isinstance(item, dict):
+            value = item.get("value", item.get("label"))
+            text = item.get("label", value)
+            kids = item["children"] if "children" in item else ()
+            icon, disabled = item.get("icon") or "", bool(item.get("disabled"))
+        elif isinstance(item, (tuple, list)):
+            value, text = item[0], item[1]
+            kids = item[2] if len(item) > 2 else ()
+            icon, disabled = "", False
+        else:
+            value, text, kids, icon, disabled = item, item, (), "", False
+        node = {
+            "key": str(value), "value": value, "label": str(text), "icon": icon,
+            "disabled": disabled, "data": item, "parent": parent, "lazy": kids is None,
+        }
+        node["children"] = None if kids is None else self._norm(kids, node["key"])
+        node["is_parent"] = kids is None or len(node["children"]) > 0
+        out.append(node)
+    return out
+
+@property
+def tree(self):
+    return self._norm(self.nodes, None)
+
+def _walk(self, nodes):
+    for n in nodes:
+        yield n
+        if n["children"]:
+            yield from self._walk(n["children"])
+
+def _node(self, key):
+    return next((n for n in self._walk(self.tree) if n["key"] == key), None)
+
+def _leaves(self, node):
+    """What checking this node checks: its leaves (a node not loaded yet
+    counts as one)."""
+    if not node["children"]:
+        return [node]
+    out = []
+    for child in node["children"]:
+        out.extend(self._leaves(child))
+    return out
+
+def is_open(self, key):
+    if self.expand_all:
+        return key not in self._closed
+    return key in self._open
+
+# ------------------------------------------------------------- rows
+
+@property
+def checked(self):
+    if not self.checkable:
+        return []
+    current = self.value if self.value is not None else self._picked
+    return [str(v) for v in (current or [])]
+
+@property
+def selected_key(self):
+    if self.checkable:
+        return None
+    current = self.value if self.value is not None else self._picked
+    return None if current is None else str(current)
+
+def _keeps(self, node, q):
+    if q in node["label"].lower():
+        return True
+    return any(self._keeps(c, q) for c in node["children"] or [])
+
+@property
+def rows(self):
+    out = []
+    q = self.filter.strip().lower()
+    self._flat(self.tree, 0, q, out)
+    stop = self._stop([r["key"] for r in out])
+    for r in out:
+        r["tab"] = r["key"] == stop
+    return out
+
+def _flat(self, nodes, level, q, out):
+    shown = [n for n in nodes if not q or self._keeps(n, q)]
+    checked = set(self.checked)
+    for position, n in enumerate(shown, 1):
+        hit = bool(q) and q in n["label"].lower()
+        # A parent kept only for a match below it is opened to show it.
+        forced = bool(q) and not hit
+        is_open = n["is_parent"] and (forced or self.is_open(n["key"]))
+        before, match, after = n["label"], "", ""
+        if hit:
+            at = n["label"].lower().index(q)
+            before, match, after = n["label"][:at], n["label"][at:at + len(q)], n["label"][at + len(q):]
+        leaves = [leaf["key"] for leaf in self._leaves(n)]
+        ticked = sum(1 for k in leaves if k in checked)
+        check = "true" if leaves and ticked == len(leaves) else "mixed" if ticked else "false"
+        icon = n["icon"]
+        if icon == "folder" and is_open:
+            icon = "folder-open"
+        loading = is_open and n["lazy"]
+        names = ["node"]
+        if n["key"] == self.selected_key:
+            names.append("selected")
+        if n["disabled"]:
+            names.append("disabled")
+        if is_open:
+            names.append("open")
+        out.append({
+            "key": n["key"], "value": n["value"], "label": n["label"], "data": n["data"],
+            "icon": icon, "level": level, "guides": list(range(level)),
+            "posinset": position, "setsize": len(shown), "parent": n["parent"],
+            "is_parent": n["is_parent"], "expanded": is_open, "loading": loading,
+            "aria_expanded": ("true" if is_open else "false") if n["is_parent"] else None,
+            "selected": n["key"] == self.selected_key, "disabled": n["disabled"], "check": check,
+            "before": before, "match": match, "after": after, "classes": " ".join(names),
+        })
+        if is_open and n["children"]:
+            # Under a match, everything shows; above one, only what matches.
+            self._flat(n["children"], level + 1, "" if hit else q, out)
+
+def _stop(self, keys):
+    for candidate in (self._focus_key, self.selected_key):
+        if candidate in keys:
+            return candidate
+    return keys[0] if keys else None
+
+@property
+def tab_stop(self):
+    return self._stop([r["key"] for r in self.rows])
+
+@property
+def classes(self):
+    return "tree lines" if self.lines else "tree"
+
+# ------------------------------------------------------------- actions
+
+def _ask(self, node):
+    if node["lazy"] and node["key"] not in self._asked:
+        self._asked.add(node["key"])
+        self.emit("load", node["value"])
+
+def set_open(self, key, now_open):
+    node = self._node(key)
+    if node is None or not node["is_parent"]:
+        return
+    if now_open:
+        self._open.add(key)
+        self._closed.discard(key)
+        self._ask(node)
+    else:
+        self._open.discard(key)
+        self._closed.add(key)
+    self.emit("toggle", {"value": node["value"], "open": now_open})
+
+def toggle(self, key):
+    self.set_open(key, not self.is_open(key))
+
+def press(self, key):
+    """Click or Space: select the node, or check it."""
+    node = self._node(key) if key is not None else None
+    if node is None:
+        return
+    self._focus_key = key
+    if node["disabled"]:
+        return
+    if self.checkable:
+        self._check(node)
+    elif key != self.selected_key:
+        self._picked = node["value"]
+        self.emit("update", node["value"])
+
+def _check(self, node):
+    leaves = [leaf for leaf in self._leaves(node) if not leaf["disabled"]]
+    if not leaves:
+        return
+    current = set(self.checked)
+    keys = {leaf["key"] for leaf in leaves}
+    if keys <= current:
+        current -= keys
+    else:
+        current |= keys
+    # In tree order; values not in the tree (yet) are kept at the end.
+    order = [n for n in self._walk(self.tree) if not n["children"]]
+    known = {n["key"] for n in order}
+    raw = self.value if self.value is not None else (self._picked or [])
+    new = [n["value"] for n in order if n["key"] in current]
+    new += [v for v in raw if str(v) not in known]
+    self._picked = new
+    self.emit("update", new)
+
+def activate(self, key):
+    node = self._node(key) if key is not None else None
+    if node is None or node["disabled"]:
+        return
+    if node["is_parent"]:
+        self.toggle(key)
+    else:
+        self.emit("activate", node["value"])
+
+# ------------------------------------------------------------- keyboard
+
+def _go(self, key):
+    self._focus_key = key
+    self.focus(f"n-{key}")
+
+def move(self, delta):
+    keys = [r["key"] for r in self.rows]
+    if not keys:
+        return
+    at = keys.index(self.tab_stop) if self.tab_stop in keys else 0
+    self._go(keys[(at + delta) % len(keys)] if 0 <= at + delta < len(keys) else keys[at])
+
+def move_to(self, position):
+    keys = [r["key"] for r in self.rows]
+    if keys:
+        self._go(keys[position])
+
+def go_in(self):
+    rows = self.rows
+    row = next((r for r in rows if r["key"] == self.tab_stop), None)
+    if row is None or not row["is_parent"]:
+        return
+    if not row["expanded"]:
+        self.set_open(row["key"], True)
+    else:
+        at = rows.index(row)
+        if at + 1 < len(rows) and rows[at + 1]["parent"] == row["key"]:
+            self._go(rows[at + 1]["key"])
+
+def go_out(self):
+    row = next((r for r in self.rows if r["key"] == self.tab_stop), None)
+    if row is None:
+        return
+    if row["is_parent"] and row["expanded"] and not self.filter.strip():
+        self.set_open(row["key"], False)
+    elif row["parent"] is not None:
+        self._go(row["parent"])
+
+def typed(self, event):
+    key = event.get("key", "")
+    if key == "*":
+        row = next((r for r in self.rows if r["key"] == self.tab_stop), None)
+        if row is not None:
+            for r in self.rows:
+                if r["parent"] == row["parent"] and r["is_parent"] and not r["expanded"]:
+                    self.set_open(r["key"], True)
+        return
+    if len(key) != 1 or not key.strip() or event.get("ctrlKey") or event.get("metaKey") or event.get("altKey"):
+        return
+    keys = [r["key"] for r in self.rows]
+    labels = [r["label"].lower() for r in self.rows]
+    if not keys:
+        return
+    start = keys.index(self.tab_stop) if self.tab_stop in keys else -1
+    for step in range(1, len(keys) + 1):
+        i = (start + step) % len(keys)
+        if labels[i].startswith(key.lower()):
+            self._go(keys[i])
+            return
+</code>
+
+<style>
+.tree { display: flex; flex-direction: column; min-width: 0; outline: none; --indent: 1.4rem; }
+.node {
+  display: flex; align-items: center; gap: 4px; min-height: 2rem; padding: 0 8px 0 4px;
+  border-radius: calc(var(--ui-radius, 8px) - 2px); cursor: pointer; outline: none;
+  color: var(--ui-text, #1f2328); user-select: none;
+}
+.node:hover { background: var(--ui-subtle, #f6f8fa); }
+.node:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ui-primary, #4f46e5) 50%, transparent); }
+.node.selected {
+  background: color-mix(in srgb, var(--ui-primary, #4f46e5) 13%, transparent);
+  color: color-mix(in srgb, var(--ui-primary, #4f46e5) 80%, var(--ui-text, #1f2328));
+  font-weight: 550;
+}
+.node.disabled { color: var(--ui-muted, #59636e); cursor: default; }
+.guide { flex: none; align-self: stretch; width: var(--indent); }
+.lines .guide { background: linear-gradient(var(--ui-border, #d1d9e0), var(--ui-border, #d1d9e0)) no-repeat center / 1px 100%; }
+.twisty {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 1.4rem; height: 1.4rem; border-radius: 4px; color: var(--ui-muted, #59636e);
+}
+.twisty :is(svg) { transition: transform 0.15s ease; }
+.open > .twisty :is(svg) { transform: rotate(90deg); }
+.twisty:hover { background: color-mix(in srgb, var(--ui-text, #1f2328) 8%, transparent); }
+.busy {
+  width: 0.85em; height: 0.85em; border-radius: 50%;
+  border: 2px solid var(--ui-border, #d1d9e0); border-top-color: var(--ui-primary, #4f46e5);
+  animation: ui-tree-spin 0.7s linear infinite;
+}
+.box {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 1rem; height: 1rem; margin-right: 4px; box-sizing: border-box;
+  border: 1.5px solid var(--ui-border, #8c959f); border-radius: 4px;
+  background: var(--ui-surface, #fff); color: var(--ui-on-primary, #fff);
+}
+.box.true, .box.mixed { background: var(--ui-primary, #4f46e5); border-color: var(--ui-primary, #4f46e5); }
+.node-icon { display: inline-flex; flex: none; margin-right: 4px; color: var(--ui-muted, #59636e); }
+.selected .node-icon { color: inherit; }
+.text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+mark { background: color-mix(in srgb, var(--ui-warning, #bf8700) 30%, transparent); color: inherit; border-radius: 2px; }
+.empty { padding: 8px 12px; color: var(--ui-muted, #59636e); font-size: 0.9rem; }
+@keyframes ui-tree-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .twisty :is(svg) { transition: none; } .busy { animation-duration: 2s; } }
+</style>

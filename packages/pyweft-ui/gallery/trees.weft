@@ -1,0 +1,105 @@
+<template>
+  <ui.Grid min_width="18rem" gap="lg">
+    <ui.Column>
+      <ui.TextField label="Files" placeholder="Search" @bind="query" />
+      <div class="box">
+        <ui.Tree label="Files" :nodes="files" @bind="selected" :expanded="['src']" :filter="query"
+                 lines="true" @load="load_folder(event)" @activate="opened = event" />
+      </div>
+      <p class="note">{{ status }}</p>
+    </ui.Column>
+    <ui.Column>
+      <span class="title">Permissions</span>
+      <div class="box">
+        <ui.Tree label="Permissions" :nodes="PERMISSIONS" checkable="true" expand_all="true" @bind="granted">
+          <Fill name="node">
+            {{ node['label'] }}
+            <If cond="node['data'].get('risky')"><ui.Badge kind="warning">admin</ui.Badge></If>
+          </Fill>
+        </ui.Tree>
+      </div>
+      <p class="note">{{ len(granted) }} granted: {{ ', '.join(granted) or 'none' }}</p>
+    </ui.Column>
+  </ui.Grid>
+</template>
+
+<code>
+# A file tree that loads folders when they open (the "docs" and "assets"
+# folders pretend to ask a server), with search; and a permissions tree
+# with checkboxes.
+import asyncio
+import copy
+
+from pyweft_ui import ui
+
+query: str = ""
+selected = "app"
+opened = None
+granted: list = ["orders.read", "orders.write", "users.read"]
+
+FILES = [
+    {"value": "src", "label": "src", "icon": "folder", "children": [
+        {"value": "app", "label": "app.weft", "icon": "file"},
+        {"value": "pages", "label": "pages", "icon": "folder", "children": [
+            {"value": "index", "label": "index.weft", "icon": "file"},
+            {"value": "orders", "label": "orders.weft", "icon": "file"},
+            {"value": "settings", "label": "settings.weft", "icon": "file"},
+        ]},
+        {"value": "store", "label": "store.py", "icon": "file"},
+    ]},
+    {"value": "docs", "label": "docs", "icon": "folder", "children": None},
+    {"value": "assets", "label": "assets", "icon": "folder", "children": None},
+    {"value": "pyproject", "label": "pyproject.toml", "icon": "file"},
+]
+LATER = {
+    "docs": [{"value": "guide", "label": "guide.md", "icon": "file"},
+             {"value": "api", "label": "api.md", "icon": "file"}],
+    "assets": [{"value": "logo", "label": "logo.svg", "icon": "file"},
+               {"value": "icons", "label": "icons", "icon": "folder", "children": None}],
+    "icons": [{"value": "home-svg", "label": "home.svg", "icon": "file"}],
+}
+PERMISSIONS = [
+    {"value": "orders", "label": "Orders", "children": [
+        {"value": "orders.read", "label": "View orders"},
+        {"value": "orders.write", "label": "Edit orders"},
+        {"value": "orders.refund", "label": "Refund orders", "risky": True},
+    ]},
+    {"value": "users", "label": "Users", "children": [
+        {"value": "users.read", "label": "View users"},
+        {"value": "users.invite", "label": "Invite users"},
+        {"value": "users.delete", "label": "Delete users", "risky": True},
+    ]},
+    {"value": "billing", "label": "Billing", "disabled": True},
+]
+
+files: list = copy.deepcopy(FILES)
+
+async def load_folder(self, value):
+    await asyncio.sleep(0.6)            # a pretend server
+    self._fill(self.files, value, copy.deepcopy(LATER.get(value, [])))
+
+def _fill(self, nodes, value, children):
+    for node in nodes:
+        if node["value"] == value:
+            node["children"] = children
+            return True
+        if node.get("children") and self._fill(node["children"], value, children):
+            return True
+    return False
+
+@property
+def status(self):
+    parts = [f"Selected: {self.selected}"]
+    if self.opened:
+        parts.append(f"opened {self.opened} (Enter or double-click)")
+    return "; ".join(parts)
+</code>
+
+<style>
+.box {
+  max-height: 20rem; overflow: auto; padding: 6px;
+  border: 1px solid var(--ui-border, #d1d9e0); border-radius: var(--ui-radius, 8px);
+}
+.title { font-size: 0.9rem; font-weight: 550; }
+.note { margin: 0; color: var(--ui-muted, #59636e); font-size: 0.85rem; }
+</style>

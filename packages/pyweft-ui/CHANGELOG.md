@@ -14,6 +14,10 @@ releasing moves them under the new version (see
   `query`) and the empty state with `<Fill name="empty">`. For server
   results: `@search`, `match="none"` and `loading`. `free="true"` keeps
   whatever was typed.
+- **`Tree`**: nested nodes that open and close, with selection,
+  checkboxes (partly checked parents), loading children on demand, a
+  filter that keeps the parents of matches, and the full tree keyboard.
+- Icons: `folder`, `folder-open`, `file`.
 - **`ButtonToggle`**: a joined row of buttons, one choice (a radio group)
   or several, with icon-only buttons, a check mark, sizes, full width and
   a vertical layout.

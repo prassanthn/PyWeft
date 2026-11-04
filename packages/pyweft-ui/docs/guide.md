@@ -33,7 +33,8 @@ fields; this guide is the how-to.
    - [Sheets from the bottom: BottomSheet](#sheets-from-the-bottom-bottomsheet)
 8. [Tabs](#8-tabs)
    - [A task in steps: Stepper](#a-task-in-steps-stepper)
-9. [Tables](#9-tables)
+9. [Tables and trees](#9-tables-and-trees)
+   - [Trees: Tree](#trees-tree)
 10. [Calendars of events](#10-calendars-of-events)
 11. [Toasts](#11-toasts)
 12. [Icons](#12-icons)
@@ -1164,7 +1165,7 @@ def check(self, step):          # False keeps the stepper on this step
 - `back_label`, `next_label`, `finish_label` and `optional_label` change
   the words.
 
-## 9. Tables
+## 9. Tables and trees
 
 `Table` shows a list of dicts (or objects) as rows. Name the fields to show
 as columns:
@@ -1250,6 +1251,71 @@ tightens the spacing, `caption` adds a title above the table, and `empty`
 is the text shown when there are no rows ("Nothing to show"; the `empty`
 fill replaces it with anything). On a narrow screen the table scrolls
 sideways inside its frame.
+
+### Trees: Tree
+
+A tree shows nested items that open and close: folders and files,
+categories, an org chart, permissions.
+
+```xml
+<ui.TextField label="Files" placeholder="Search" @bind="query" />
+<ui.Tree label="Files" :nodes="files" @bind="selected" :filter="query"
+         :expanded="['src']" @load="load_folder(event)" @activate="open_file(event)" />
+```
+
+```python
+files = [
+    {"value": "src", "label": "src", "icon": "folder", "children": [
+        {"value": "app", "label": "app.weft", "icon": "file"},
+    ]},
+    {"value": "docs", "label": "docs", "icon": "folder", "children": None},  # loads on open
+]
+
+async def load_folder(self, value):
+    children = await fetch_folder(value)      # your own code
+    for node in self.files:
+        if node["value"] == value:
+            node["children"] = children
+```
+
+- **`nodes`** are dicts with `value` and `label` and optionally `icon`,
+  `children`, `disabled` and keys of your own (`node['data']` in a fill);
+  text and `(value, label)` or `(value, label, children)` tuples work too.
+  Values must be unique across the tree. A `folder` icon shows as
+  `folder-open` while its node is open.
+- **Opening:** the arrow opens and closes a node; `expanded` lists the
+  values open at the start and `expand_all="true"` opens everything.
+  `@toggle` gets `{"value": ..., "open": True/False}`.
+- **Choosing:** a click (or Space) selects a node and `@bind` gets its
+  value; Enter or a double-click on a leaf emits **`activate`** (on a
+  parent, they open or close it).
+- **Loading on demand:** `"children": None` means "has children, not
+  loaded yet". The first time such a node opens, the tree emits **`load`**
+  with its value and shows a spinner until you put its children in. An
+  `async` handler is fine.
+- **`filter`** shows only the nodes whose label contains the text, with
+  the parents leading to them opened and the match marked. Nodes not
+  loaded yet aren't searched.
+- `<Fill name="node">` lays out a node (it gets `node`, `level`,
+  `expanded` and `selected`); `lines="true"` draws guide lines;
+  `empty` and `no_matches` change the text shown when there's nothing.
+
+#### Checkboxes
+
+```xml
+<ui.Tree :nodes="permissions" checkable="true" expand_all="true" @bind="granted" />
+```
+
+With `checkable="true"` every node has a checkbox and `@bind` is the list
+of checked **leaves**. Checking a parent checks everything under it (and
+unchecks it all when it was all checked); a parent with only some of its
+leaves checked shows a dash. Disabled nodes keep their state. Values in
+the list that aren't in the tree (yet) are kept.
+
+**Keyboard:** the tree is one Tab stop. Up and Down move, Right opens a
+node or moves to its first child, Left closes it or moves to its parent,
+Home and End jump to the ends, `*` opens all the siblings, and typing a
+letter jumps to the next node starting with it.
 
 ## 10. Calendars of events
 
@@ -1374,7 +1440,7 @@ Available names: `check`, `x`, `plus`, `minus`, `search`, `info`, `alert`,
 `trash`, `edit`, `send`, `user`, `home`, `star`, `heart`, `download`,
 `upload`, `external`, `copy`, `settings`, `sun`, `moon`, `calendar`,
 `more`, `bold`, `italic`, `underline`, `align-left`, `align-center`,
-`align-right`, `list`, `grid`.
+`align-right`, `list`, `grid`, `folder`, `folder-open`, `file`.
 
 ## 13. Themes
 
@@ -1582,6 +1648,9 @@ readers and mobile devices work the way people expect:
 - **Steppers** read each header as "Step 2 of 4: Delivery", with done,
   optional and error states; the headers are one Tab stop moved with the
   arrow keys, and Next or Back moves focus to the new step's content.
+- **Trees** read each node's level, its place among its siblings, and
+  whether it is open, selected or checked (or partly checked); a folder
+  that is loading says it is busy.
 - **Tables** use real table headings, and tell screen readers which column
   is sorted and which way.
 - **Menus** are announced as menus, with the button saying whether it's

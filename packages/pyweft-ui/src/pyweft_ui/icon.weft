@@ -48,6 +48,9 @@ _PATHS = {
     "align-right": "M4 6h16M10 10h10M4 14h16M10 18h10",
     "list": "M9 6h11M9 12h11M9 18h11M4.5 6h.5M4.5 12h.5M4.5 18h.5",
     "grid": "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+    "folder": "M3.5 6.5V18.5h17V8.5h-8.5l-2-2.5h-6.5z",
+    "folder-open": "M3.5 18.5V6h6.5l2 2.5h7v2.5M3.5 18.5l2.5-8h15.5l-2.5 8z",
+    "file": "M6 3.5h8l4.5 4.5v12.5H6zM14 3.5V8h4.5",
 }
 
 @property

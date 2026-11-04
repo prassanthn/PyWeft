@@ -352,6 +352,11 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['table'] }}</pre>
         </ui.Card>
 
+        <ui.Card title="Tree" id="tree" subtitle="Folders load as they open; search; checkboxes with partly checked parents">
+          <Trees />
+          <pre class="code">{{ CODE['tree'] }}</pre>
+        </ui.Card>
+
         <ui.Card title="Toasts" id="toasts" subtitle="Messages that go away by themselves">
           <ui.Row>
             <ui.Button variant="primary" icon="check" @click="toast('Changes saved.', 'success')">Save</ui.Button>
@@ -380,7 +385,7 @@ import asyncio
 import datetime
 from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Dialog", "Bottom sheet", "Tabs", "Table", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Dialog", "Bottom sheet", "Tabs", "Table", "Tree", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -712,6 +717,21 @@ def submit(self):
 ]" />
 
 <ui.ButtonToggle label="Plan" options="Monthly, Yearly" full_width="true" @bind="plan" />""",
+    "tree": """<ui.Tree :nodes="files" @bind="selected" :filter="query"
+         @load="load_folder(event)" @activate="open_file(event)" />
+
+<ui.Tree :nodes="permissions" checkable="true" expand_all="true" @bind="granted" />
+
+files = [
+    {"value": "src", "label": "src", "icon": "folder", "children": [
+        {"value": "app", "label": "app.weft", "icon": "file"},
+    ]},
+    {"value": "docs", "label": "docs", "icon": "folder", "children": None},  # loads on open
+]
+
+async def load_folder(self, value):
+    children = await fetch_folder(value)
+    ...  # put them in that node's children list""",
     "sliders": """<ui.Slider label="Volume" @bind="volume" format="{}%" />
 <ui.Slider label="Price" :min="0" :max="500" :step="10" range="true"
            @bind="price" format="${}" value_label="side" />
