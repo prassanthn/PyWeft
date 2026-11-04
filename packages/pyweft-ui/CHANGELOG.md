@@ -8,6 +8,11 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+## 0.3.0
+
+For `pyweft` 0.4 (the date controls need its fix for `date.today()` in a
+component, and the menus and calendars its `keep_in_view`).
+
 - **Form validation**: `Form` and `rules`. Name each field's rules
   (`required`, `email`, `min_length`, `same_as`, `check`, your own
   functions...), show `form.error("field")` under it, and call

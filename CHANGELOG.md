@@ -8,6 +8,8 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+## 0.4.0
+
 - **Input masks:** `<input data-mask="(999) 999-9999">` shapes what's typed
   (`9` digit, `a` letter, `*` either), in the page so the cursor stays put.
   `pyweft.masks` has the same rules in Python (`apply`, `complete`,
