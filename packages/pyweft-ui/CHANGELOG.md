@@ -8,6 +8,8 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+## 0.4.0
+
 - **`CascadeSelect`**: choose from nested options one level at a time,
   with children loaded on demand, the chosen path shown, groups
   choosable, and a drill-down layout on narrow screens.

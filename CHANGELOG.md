@@ -8,6 +8,8 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+## 0.5.0
+
 - **`pyweft check` checks dependencies for the browser:** it follows the
   app's dependencies through their own requirements, as micropip would,
   against the packages the Pyodide in use has built (a snapshot ships with
