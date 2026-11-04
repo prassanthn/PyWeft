@@ -45,16 +45,19 @@ def classes(self):
   padding: 5px 9px; border-radius: 6px;
   background: var(--ui-text, #1f2328); color: var(--ui-surface, #fff);
   font-size: 0.8rem; font-weight: 500; line-height: 1.35; text-align: center; white-space: normal;
-  visibility: hidden; opacity: 0;
-  transition: opacity 0.1s ease, visibility 0s linear 0.1s;
+  /* Hidden with display: an invisible tip near the window's edge would
+     still widen the page (phones then zoom out to fit it). */
+  display: none;
 }
-.tip-host:hover > .tip { visibility: visible; opacity: 1; transition: opacity 0.12s ease 0.4s, visibility 0s linear 0.4s; }
+/* Hover shows it after a short wait (the animation's delay, faded in). */
+.tip-host:hover > .tip { display: block; animation: ui-tooltip-in 0.12s ease 0.4s backwards; }
 /* Keyboard focus shows it at once. */
-.tip-host:has(:focus-visible) > .tip { visibility: visible; opacity: 1; transition: opacity 0.12s ease; }
-.tip-host.dismissed > .tip { visibility: hidden; opacity: 0; transition: none; }
+.tip-host:has(:focus-visible) > .tip { display: block; animation: ui-tooltip-in 0.12s ease; }
+.tip-host.dismissed > .tip { display: none; }
 .pos-above > .tip { bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); }
 .pos-below > .tip { top: calc(100% + 6px); left: 50%; transform: translateX(-50%); }
 .pos-start > .tip { right: calc(100% + 6px); top: 50%; transform: translateY(-50%); }
 .pos-end > .tip { left: calc(100% + 6px); top: 50%; transform: translateY(-50%); }
-@media (prefers-reduced-motion: reduce) { .tip, .tip-host:hover > .tip { transition: none; } }
+@keyframes ui-tooltip-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .tip-host:hover > .tip, .tip-host:has(:focus-visible) > .tip { animation-duration: 0s; } }
 </style>

@@ -8,6 +8,8 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- Fixed: a hidden `Tooltip`, or `Popover` hover card, near the window's
+  edge widened the page (phones zoomed out to fit it).
 - **`Autocomplete`**: a text field with suggestions that narrow as you type
   (matched text in bold), picked with the keyboard or a click. Lay out each
   suggestion yourself with `<Fill name="option">` (`option`, `active`,

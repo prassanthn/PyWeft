@@ -197,15 +197,11 @@ def settle_hover(self):
 .pos-start.align-center .arrow, .pos-end.align-center .arrow { top: calc(50% - 5px); }
 /* Hover cards: always on the page, shown by CSS after a short delay;
    the ::before bridge keeps :hover alive across the gap to the card. */
-.hover > .panel {
-  visibility: hidden; opacity: 0; animation: none;
-  transition: opacity 0.12s ease 0.15s, visibility 0s linear 0.27s;
-}
+.hover > .panel { display: none; }   /* hidden, it must not widen the page */
 .hover:hover > .panel, .hover:has(:focus-visible) > .panel {
-  visibility: visible; opacity: 1;
-  transition: opacity 0.12s ease 0.35s, visibility 0s linear 0.35s;
+  display: block; animation: ui-popover-in 0.12s ease 0.35s backwards;
 }
-.hover.dismissed > .panel { visibility: hidden; opacity: 0; transition: none; }
+.hover.dismissed > .panel { display: none; }
 .hover > .panel::before { content: ""; position: absolute; }
 .hover.pos-below > .panel::before { left: 0; right: 0; top: -12px; height: 12px; }
 .hover.pos-above > .panel::before { left: 0; right: 0; bottom: -12px; height: 12px; }
@@ -214,6 +210,6 @@ def settle_hover(self):
 @keyframes ui-popover-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .panel { animation: none; }
-  .hover > .panel, .hover:hover > .panel, .hover:has(:focus-visible) > .panel { transition: none; }
+  .hover:hover > .panel, .hover:has(:focus-visible) > .panel { animation-duration: 0s; }
 }
 </style>
