@@ -19,6 +19,14 @@ releasing moves them under the new version (see
   `blur` when left.
 - The gallery has a Validation section, and the guide's sign-up recipe uses
   `Form`.
+- **`DatePicker`**: a field with a calendar that binds a `datetime.date`,
+  with `min`/`max`, Monday- or Sunday-first weeks, Today and Clear, and the
+  full keyboard (arrows, Page Up/Down, Home/End, Esc).
+- **`Menu`**: a button that opens a list of actions (icons, dividers,
+  disabled and danger items) and emits `select`; arrow keys, Esc, and a
+  click outside to close.
+- Icons `calendar` and `more`. `Card` no longer clips what's inside it, so
+  a menu or calendar can open past its edge.
 
 ## 0.2.0
 

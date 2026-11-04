@@ -108,8 +108,9 @@ height = 800
 ## Ready-made controls (no HTML or CSS needed)
 
 [`pyweft-ui`](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/README.md) gives you styled, accessible
-controls as components: buttons, text fields, selects, checkboxes, switches,
-cards, tabs, sortable tables, dialogs, alerts, toasts, layout and light/dark
+controls as components: buttons, menus, text fields, selects, date pickers,
+checkboxes, switches, cards, tabs, sortable tables, dialogs, alerts, toasts,
+layout and light/dark
 themes, plus form validation that shows what to fix next to each field.
 
 ```bash
@@ -302,12 +303,13 @@ handlers and Web Worker background work; file and confirmation dialogs on
 both targets; the app's title and icon, and window settings; scoped styles
 and CSS framework support; the `pyweft` CLI with hot reload, static builds
 and pre-rendered first screens; calling web APIs and saving data between
-visits (`pyweft.http`, `pyweft.storage`); `pyweft-ui` with 22
-keyboard-accessible controls, form validation and a gallery; both released
+visits (`pyweft.http`, `pyweft.storage`); `pyweft-ui` with 24
+keyboard-accessible controls (a date picker and a menu among them), form
+validation and a gallery; both released
 on PyPI.
 
-**Next:** more controls (a date picker, a dropdown menu); a faster first
-start that also works offline; installers (`.msi`, `.dmg`) and code signing
+**Next:** a faster first start that also works offline; `pyweft check` for
+errors without running the app; installers (`.msi`, `.dmg`) and code signing
 for desktop apps.
 
 **Later:** mobile packaging with Briefcase, developer tools.

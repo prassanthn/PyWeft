@@ -1,0 +1,320 @@
+<template>
+  <div class="field">
+    <If cond="label">
+      <span class="label" :id="_id + '-label'">{{ label }}<If cond="required"><span class="req" aria-hidden="true"> *</span></If></span>
+    </If>
+    <div :class="'picker align-' + align">
+      <button type="button" ref="trigger" class="control" :id="_id + '-button'"
+              aria-haspopup="dialog" :aria-expanded="'true' if _open else 'false'"
+              :aria-labelledby="(_id + '-label ' if label else '') + _id + '-button'"
+              :aria-invalid="'true' if error else None" :disabled="disabled"
+              @click="toggle" @keydown.down.prevent="open">
+        <span :class="'text' if chosen else 'text placeholder'">{{ shown }}</span>
+        <Icon name="calendar" size="1.1em" />
+      </button>
+      <If cond="name"><input type="hidden" :name="name" :value="chosen.isoformat() if chosen else ''" /></If>
+      <If cond="_open">
+        <div class="backdrop" @click="close(False)"></div>
+        <div class="popup" role="dialog" :aria-label="'Choose a date' + (', ' + label if label else '')"
+             @keydown.esc.stop="close(True)">
+          <div class="head">
+            <button type="button" class="nav" aria-label="Previous month" :disabled="not can_prev"
+                    @click="shift_month(-1)"><Icon name="chevron-left" size="1.1em" /></button>
+            <span class="month" aria-live="polite">{{ month_title }}</span>
+            <button type="button" class="nav" aria-label="Next month" :disabled="not can_next"
+                    @click="shift_month(1)"><Icon name="chevron-right" size="1.1em" /></button>
+          </div>
+          <table class="grid" role="grid" :aria-label="month_title"
+                 @keydown.left.prevent="step(-1)" @keydown.right.prevent="step(1)"
+                 @keydown.up.prevent="step(-7)" @keydown.down.prevent="step(7)"
+                 @keydown.page-up.prevent="step_month(-1)" @keydown.page-down.prevent="step_month(1)"
+                 @keydown.home.prevent="week_edge(0)" @keydown.end.prevent="week_edge(6)">
+            <thead>
+              <tr><For each="day in weekday_names" key="day[1]"><th scope="col" :abbr="day[1]">{{ day[0] }}</th></For></tr>
+            </thead>
+            <tbody>
+              <For each="week in weeks" key="week[0]['iso']">
+                <tr>
+                  <For each="cell in week" key="cell['iso']">
+                    <td>
+                      <button type="button" :ref="'d-' + cell['iso']" :class="cell['classes']"
+                              :tabindex="'0' if cell['focus'] else '-1'"
+                              :aria-pressed="'true' if cell['selected'] else 'false'"
+                              :aria-current="'date' if cell['today'] else None"
+                              :aria-label="cell['long']" :disabled="cell['disabled']"
+                              @click="pick(cell['date'])">{{ cell['day'] }}</button>
+                    </td>
+                  </For>
+                </tr>
+              </For>
+            </tbody>
+          </table>
+          <div class="foot">
+            <button type="button" class="link" :disabled="not allowed(today)" @click="pick(today)">Today</button>
+            <If cond="chosen and not required">
+              <button type="button" class="link" @click="clear">Clear</button>
+            </If>
+          </div>
+        </div>
+      </If>
+    </div>
+    <If cond="error"><span class="error">{{ error }}</span></If>
+    <ElseIf cond="hint"><span class="hint">{{ hint }}</span></ElseIf>
+  </div>
+</template>
+
+<code>
+# <ui.DatePicker label="Check-in" @bind="check_in" :min="today" />
+# Binds a datetime.date (None until one is chosen). min and max take a date
+# or text like "2026-12-31"; days outside them can't be chosen. Emits
+# "update" (what @bind uses) and "blur" when the calendar closes.
+# Keyboard: Enter, Space or Down opens the calendar on the chosen day (or
+# today); arrows move by day and week, Page Up/Down by month, Home and End
+# to the week's ends; Enter picks; Esc closes.
+import datetime
+import itertools
+
+label: str = ""
+value = None              # a datetime.date, or None
+min = None                # earliest day that can be chosen
+max = None                # latest day
+placeholder: str = "Choose a date"
+format: str = ""          # strftime for the field, e.g. "%d/%m/%Y"; else "3 Nov 2026"
+week_start: str = "monday"  # or "sunday"
+align: str = "start"      # the calendar lines up with the start or end of the field
+hint: str = ""
+error: str = ""
+name: str = ""            # sends the date as YYYY-MM-DD in a <form>
+required: bool = False    # also hides Clear
+disabled: bool = False
+
+_MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+           "August", "September", "October", "November", "December"]
+_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+_ids = itertools.count(1)
+_open = False
+_view = None              # the first day of the month showing
+_focus = None             # the day that takes Tab and the arrow keys
+
+def on_init(self):
+    self._id = f"ui-date-{next(_ids)}"
+
+def _as_date(self, value):
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime.datetime):
+        return value.date()
+    if isinstance(value, datetime.date):
+        return value
+    return datetime.date.fromisoformat(str(value).strip()[:10])
+
+@property
+def chosen(self):
+    return self._as_date(self.value)
+
+@property
+def today(self):
+    return datetime.date.today()
+
+@property
+def shown(self):
+    day = self.chosen
+    if day is None:
+        return self.placeholder
+    if self.format:
+        return day.strftime(self.format)
+    return f"{day.day} {self._MONTHS[day.month - 1][:3]} {day.year}"
+
+def allowed(self, day):
+    low, high = self._as_date(self.min), self._as_date(self.max)
+    return (low is None or day >= low) and (high is None or day <= high)
+
+def _clamp(self, day):
+    low, high = self._as_date(self.min), self._as_date(self.max)
+    if low is not None and day < low:
+        return low
+    if high is not None and day > high:
+        return high
+    return day
+
+def _add_months(self, day, delta):
+    month = day.month - 1 + delta
+    year, month = day.year + month // 12, month % 12 + 1
+    last = (datetime.date(year + month // 12, month % 12 + 1, 1) - datetime.timedelta(days=1)).day
+    # Not min(): the min field above hides the builtin in this code block.
+    return day.replace(year=year, month=month, day=day.day if day.day <= last else last)
+
+def _show(self, day, focus=True):
+    self._focus = day
+    self._view = day.replace(day=1)
+    if focus:
+        self.focus("d-" + day.isoformat())
+
+def toggle(self):
+    if self._open:
+        self.close(True)
+    else:
+        self.open()
+
+def open(self):
+    if self.disabled:
+        return
+    self._open = True
+    self._show(self._clamp(self.chosen or self.today))
+
+def close(self, refocus, *chosen):
+    # chosen: the value just picked, which reaches `value` only on the next
+    # render, so "blur" reports what the field now holds.
+    if not self._open:
+        return
+    self._open = False
+    if refocus:
+        self.focus("trigger")
+    self.emit("blur", chosen[0] if chosen else self.chosen)
+
+def pick(self, day):
+    if self.allowed(day):
+        self.emit("update", day)
+        self.close(True, day)
+
+def clear(self):
+    self.emit("update", None)
+    self.close(True, None)
+
+def shift_month(self, delta):
+    # The arrow buttons: show another month, keeping focus on the button.
+    self._show(self._clamp(self._add_months(self._focus, delta)), focus=False)
+
+def step(self, days):
+    day = self._focus + datetime.timedelta(days=days)
+    if self.allowed(day):
+        self._show(day)
+
+def step_month(self, delta):
+    self._show(self._clamp(self._add_months(self._focus, delta)))
+
+def week_edge(self, column):
+    day = self._focus + datetime.timedelta(days=column - self._column(self._focus))
+    if self.allowed(day):
+        self._show(day)
+
+def _column(self, day):
+    return (day.weekday() + (1 if self.week_start == "sunday" else 0)) % 7
+
+@property
+def weekday_names(self):
+    order = self._DAYS[6:] + self._DAYS[:6] if self.week_start == "sunday" else self._DAYS
+    return [(name[:2], name) for name in order]
+
+@property
+def month_title(self):
+    return f"{self._MONTHS[self._view.month - 1]} {self._view.year}"
+
+@property
+def can_prev(self):
+    low = self._as_date(self.min)
+    return low is None or self._view - datetime.timedelta(days=1) >= low
+
+@property
+def can_next(self):
+    high = self._as_date(self.max)
+    return high is None or self._add_months(self._view, 1) <= high
+
+@property
+def weeks(self):
+    first = self._view - datetime.timedelta(days=self._column(self._view))
+    chosen, today = self.chosen, self.today
+    rows = []
+    for week in range(6):
+        row = []
+        for column in range(7):
+            day = first + datetime.timedelta(days=week * 7 + column)
+            classes = ["day"]
+            if day.month != self._view.month:
+                classes.append("outside")
+            if day == today:
+                classes.append("today")
+            if day == chosen:
+                classes.append("selected")
+            row.append({
+                "date": day, "iso": day.isoformat(), "day": day.day,
+                "today": day == today, "selected": day == chosen,
+                "focus": day == self._focus, "disabled": not self.allowed(day),
+                "classes": " ".join(classes),
+                "long": f"{self._DAYS[day.weekday()]} {day.day} {self._MONTHS[day.month - 1]} {day.year}",
+            })
+        rows.append(row)
+    return rows
+</code>
+
+<style>
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.label { font-size: 0.9rem; font-weight: 550; }
+.req { color: var(--ui-danger, #d1242f); }
+.picker { position: relative; }
+.control {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  font: inherit; text-align: left; color: var(--ui-text, #1f2328);
+  background: var(--ui-surface, #fff);
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: var(--ui-radius, 8px);
+  padding: 0.5em 0.75em; cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.control:focus-visible, .control[aria-expanded="true"] {
+  outline: none;
+  border-color: var(--ui-primary, #4f46e5);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 25%, transparent);
+}
+.control:disabled { opacity: 0.6; cursor: not-allowed; }
+.control[aria-invalid="true"] { border-color: var(--ui-danger, #d1242f); }
+.control .icon { color: var(--ui-muted, #59636e); }
+.placeholder { color: var(--ui-muted, #59636e); }
+.hint { font-size: 0.82rem; color: var(--ui-muted, #59636e); }
+.error { font-size: 0.82rem; color: var(--ui-danger, #d1242f); }
+.backdrop { position: fixed; inset: 0; z-index: 999; }
+.popup {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 1000;
+  width: max-content; padding: 10px;
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: calc(var(--ui-radius, 8px) * 1.5);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  animation: ui-date-in 0.1s ease-out;
+}
+.align-end .popup { left: auto; right: 0; }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.month { font-weight: 650; font-size: 0.95rem; }
+.nav, .link {
+  font: inherit; border: 0; background: transparent; color: var(--ui-text, #1f2328);
+  border-radius: calc(var(--ui-radius, 8px) - 2px); cursor: pointer;
+}
+.nav { padding: 6px; line-height: 0; }
+.nav:hover:not(:disabled), .link:hover:not(:disabled) { background: var(--ui-subtle, #f6f8fa); }
+.nav:disabled, .link:disabled { opacity: 0.35; cursor: not-allowed; }
+.grid { border-collapse: collapse; }
+th { font-size: 0.75rem; font-weight: 600; color: var(--ui-muted, #59636e); padding: 4px 0 6px; }
+td { padding: 1px; }
+.day {
+  width: 2.25rem; height: 2.25rem; font: inherit; font-size: 0.88rem;
+  border: 0; border-radius: calc(var(--ui-radius, 8px) - 2px);
+  background: transparent; color: var(--ui-text, #1f2328); cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.day:hover:not(:disabled) { background: var(--ui-subtle, #f6f8fa); }
+.day:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-primary, #4f46e5) 55%, transparent);
+}
+.day.outside { color: var(--ui-muted, #59636e); opacity: 0.6; }
+.day.today { font-weight: 700; color: var(--ui-primary, #4f46e5); }
+.day.selected, .day.selected:hover { background: var(--ui-primary, #4f46e5); color: var(--ui-on-primary, #fff); opacity: 1; }
+.day:disabled { opacity: 0.3; cursor: not-allowed; text-decoration: line-through; }
+.foot {
+  display: flex; justify-content: space-between; margin-top: 6px; padding-top: 6px;
+  border-top: 1px solid var(--ui-border, #d1d9e0);
+}
+.link { padding: 4px 8px; font-size: 0.85rem; font-weight: 550; color: var(--ui-primary, #4f46e5); }
+@keyframes ui-date-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .popup { animation: none; } }
+</style>

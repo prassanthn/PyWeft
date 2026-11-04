@@ -1732,9 +1732,9 @@ accessible controls as components:
 
 with `from pyweft_ui import ui` in the code block. It covers layout
 (`AppShell`, `Row`, `Column`, `Grid`, `Card`), form fields (`TextField`,
-`TextArea`, `NumberField`, `Select`, `RadioGroup`, `Checkbox`, `Switch`),
-data and navigation (`Table` with sorting, `Tabs`), actions and feedback
-(`Button`, `Dialog`, `Alert`, `Toaster` with `toast()`, `Badge`, `Spinner`,
+`TextArea`, `NumberField`, `Select`, `RadioGroup`, `Checkbox`, `Switch`,
+`DatePicker`), data and navigation (`Table` with sorting, `Tabs`), actions
+and feedback (`Button`, `Menu`, `Dialog`, `Alert`, `Toaster` with `toast()`, `Badge`, `Spinner`,
 `Icon`) and a `Theme` with light, dark and system modes and your own
 colours.
 
@@ -2301,12 +2301,12 @@ Working today:
 - **Data in and out:** `pyweft.http` calls web APIs and loads the app's
   data files; `pyweft.storage` keeps data between visits. Same code on
   both targets.
-- **Controls:** `pyweft-ui`, 22 ready-made, themeable controls and form
+- **Controls:** `pyweft-ui`, 24 ready-made, themeable controls and form
   validation (see "Ready-made controls" in section 5), with a live
   gallery.
 - **Releases:** `pyweft` and `pyweft-ui` on PyPI.
 
-Coming next: more controls (a date picker, a dropdown menu), a faster first
-start that also works offline, and installers (`.msi`, `.dmg`) and code
+Coming next: a faster first start that also works offline, `pyweft check`
+for errors without running the app, and installers (`.msi`, `.dmg`) and code
 signing for desktop apps.
 

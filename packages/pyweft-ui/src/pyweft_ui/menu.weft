@@ -1,0 +1,177 @@
+<template>
+  <div :class="'menu align-' + align">
+    <button type="button" ref="trigger" :id="_id + '-button'"
+            :class="'trigger btn-' + variant + (' icon-only' if icon_only else '')"
+            aria-haspopup="menu" :aria-expanded="'true' if _open else 'false'"
+            :aria-controls="_id + '-list' if _open else None"
+            :aria-label="label if icon_only else None" :disabled="disabled"
+            @click="toggle" @keydown.down.prevent="open_at(0)" @keydown.up.prevent="open_at(-1)">
+      <If cond="icon"><Icon :name="icon" size="1.15em" /></If>
+      <If cond="not icon_only"><span class="text"><Slot>{{ label }}</Slot></span></If>
+      <If cond="caret and not icon_only"><Icon name="chevron-down" size="1em" /></If>
+    </button>
+    <If cond="_open">
+      <div class="backdrop" @click="close(False)"></div>
+      <div class="list" role="menu" :id="_id + '-list'" :aria-labelledby="_id + '-button'"
+           @keydown.down.prevent="move(1)" @keydown.up.prevent="move(-1)"
+           @keydown.home.prevent="move_to(0)" @keydown.end.prevent="move_to(-1)"
+           @keydown.tab="close(False)" @keydown.esc.stop="close(True)">
+        <For each="entry in entries" key="entry['key']">
+          <If cond="entry['separator']"><div class="sep" role="separator"></div></If>
+          <Else>
+            <button type="button" role="menuitem" tabindex="-1" :ref="'item-' + str(entry['index'])"
+                    :class="'item danger' if entry['danger'] else 'item'"
+                    :disabled="entry['disabled']" @click="choose(entry)">
+              <If cond="entry['icon']"><Icon :name="entry['icon']" size="1.1em" /></If>
+              <span>{{ entry['label'] }}</span>
+            </button>
+          </Else>
+        </For>
+      </div>
+    </If>
+  </div>
+</template>
+
+<code>
+# <ui.Menu label="Actions" :items="['Edit', 'Duplicate', '-', ('delete', 'Delete')]"
+#          @select="act(event)" />
+# A button that opens a list of actions, and emits "select" with the chosen
+# item's value. items: text, (value, label) pairs, or dicts with value,
+# label, and optionally icon, danger (red) and disabled; "-" is a divider.
+# Keyboard: Enter, Space or Down opens it on the first item, Up on the last;
+# arrows, Home and End move; Enter picks; Esc closes and returns to the
+# button; Tab closes and moves on.
+import itertools
+
+label: str = "Menu"       # the button's text (and its name for screen readers)
+items: list = []
+icon: str = ""            # an icon on the button, such as "more" or "settings"
+icon_only: bool = False   # just the icon; label still names it
+variant: str = "secondary"  # the button's look: primary, secondary, ghost
+align: str = "start"      # where the list lines up: start or end of the button
+caret: bool = True        # the small arrow after the text
+disabled: bool = False
+
+_ids = itertools.count(1)
+_open = False
+_active = 0
+
+def on_init(self):
+    self._id = f"ui-menu-{next(_ids)}"
+
+@property
+def entries(self):
+    out, index = [], 0
+    for position, item in enumerate(self.items):
+        if item in ("-", None):
+            out.append({"key": f"sep-{position}", "separator": True})
+            continue
+        if isinstance(item, dict):
+            value = item.get("value", item.get("label"))
+            text = item.get("label", value)
+            extra = item
+        elif isinstance(item, (tuple, list)) and len(item) == 2:
+            value, text = item
+            extra = {}
+        else:
+            value, text, extra = item, item, {}
+        out.append({
+            "key": f"item-{position}", "separator": False, "index": index,
+            "value": value, "label": str(text), "icon": extra.get("icon", ""),
+            "danger": bool(extra.get("danger")), "disabled": bool(extra.get("disabled")),
+        })
+        index += 1
+    return out
+
+@property
+def enabled(self):
+    """Indexes of the items the keyboard can land on."""
+    return [e["index"] for e in self.entries if not e["separator"] and not e["disabled"]]
+
+def toggle(self):
+    if self._open:
+        self.close(True)
+    else:
+        self.open_at(0)
+
+def open_at(self, which):
+    stops = self.enabled
+    if self.disabled or not stops:
+        return
+    self._open = True
+    self._active = stops[which]
+    self.focus(f"item-{self._active}")
+
+def move(self, delta):
+    stops = self.enabled
+    if not stops:
+        return
+    at = stops.index(self._active) if self._active in stops else 0
+    self.move_to((at + delta) % len(stops))
+
+def move_to(self, position):
+    stops = self.enabled
+    if stops:
+        self._active = stops[position]
+        self.focus(f"item-{self._active}")
+
+def close(self, refocus):
+    if not self._open:
+        return
+    self._open = False
+    if refocus:
+        self.focus("trigger")
+
+def choose(self, entry):
+    self.close(True)
+    self.emit("select", entry["value"])
+</code>
+
+<style>
+.menu { position: relative; display: inline-block; }
+.trigger {
+  display: inline-flex; align-items: center; gap: 0.45em;
+  font: inherit; font-size: 0.95rem; font-weight: 550; line-height: 1.2;
+  padding: 0.5em 0.85em; border-radius: var(--ui-radius, 8px);
+  border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+  transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.trigger.icon-only { padding: 0.5em; }
+.trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 35%, transparent);
+}
+.trigger:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-primary { background: var(--ui-primary, #4f46e5); color: var(--ui-on-primary, #fff); }
+.btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-primary, #4f46e5) 88%, black); }
+.btn-secondary {
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+  border-color: var(--ui-border, #d1d9e0);
+}
+.btn-secondary:hover:not(:disabled), .btn-ghost:hover:not(:disabled) { background: var(--ui-subtle, #f6f8fa); }
+.btn-ghost { background: transparent; color: var(--ui-text, #1f2328); }
+.backdrop { position: fixed; inset: 0; z-index: 999; }
+.list {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 1000;
+  min-width: max(100%, 11rem); padding: 4px;
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: var(--ui-radius, 8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  animation: ui-menu-in 0.1s ease-out;
+}
+.align-end .list { left: auto; right: 0; }
+.item {
+  display: flex; align-items: center; gap: 0.6em; width: 100%;
+  font: inherit; font-size: 0.93rem; text-align: left;
+  padding: 0.5em 0.7em; border: 0; border-radius: calc(var(--ui-radius, 8px) - 2px);
+  background: transparent; color: inherit; cursor: pointer;
+}
+.item:hover:not(:disabled), .item:focus { outline: none; background: var(--ui-subtle, #f6f8fa); }
+.item:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ui-primary, #4f46e5) 40%, transparent); }
+.item:disabled { opacity: 0.5; cursor: not-allowed; }
+.item.danger { color: var(--ui-danger, #d1242f); }
+.sep { height: 1px; margin: 4px 2px; background: var(--ui-border, #d1d9e0); }
+@keyframes ui-menu-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .list { animation: none; } }
+</style>

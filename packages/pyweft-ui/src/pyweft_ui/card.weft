@@ -26,7 +26,6 @@ subtitle: str = ""
   background: var(--ui-surface, #fff);
   border: 1px solid var(--ui-border, #d1d9e0);
   border-radius: calc(var(--ui-radius, 8px) * 1.5);
-  overflow: hidden;
 }
 .head {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
@@ -41,5 +40,8 @@ subtitle: str = ""
   padding: 12px 20px;
   border-top: 1px solid var(--ui-border, #d1d9e0);
   background: var(--ui-subtle, #f6f8fa);
+  /* Rounded here rather than clipped by the card, so a menu or calendar
+     inside the card can open past its edge. */
+  border-radius: 0 0 calc(var(--ui-radius, 8px) * 1.5 - 1px) calc(var(--ui-radius, 8px) * 1.5 - 1px);
 }
 </style>

@@ -8,7 +8,7 @@
       </Fill>
       <Fill name="nav">
         <For each="section in SECTIONS" key="section">
-          <a class="nav-link" :href="'#' + section.lower()">{{ section }}</a>
+          <a class="nav-link" :href="'#' + section.lower().replace(' ', '-')">{{ section }}</a>
         </For>
       </Fill>
 
@@ -66,6 +66,25 @@
           </ui.Grid>
           <p class="note">plan = {{ repr(plan) }}, updates = {{ updates }}, agreed = {{ agreed }}</p>
           <pre class="code">{{ CODE['choices'] }}</pre>
+        </ui.Card>
+
+        <ui.Card title="Dates and menus" id="dates-and-menus">
+          <ui.Column gap="lg">
+            <ui.Grid min_width="16rem" gap="lg">
+              <ui.DatePicker label="Check-in" @bind="check_in" :min="today" hint="From today on" />
+              <ui.DatePicker label="Check-out" @bind="check_out" :min="check_in or today"
+                             week_start="sunday" required="true" />
+            </ui.Grid>
+            <ui.Row>
+              <ui.Menu label="Actions" :items="MENU" @select="last_action = event" />
+              <ui.Menu label="More" icon="more" icon_only="true" variant="ghost"
+                       :items="['Copy link', 'Rename', '-', {'value': 'Delete', 'label': 'Delete', 'icon': 'trash', 'danger': True}]"
+                       @select="last_action = event" />
+              <span class="note">{{ 'You chose: ' + last_action if last_action else 'Nothing chosen yet.' }}</span>
+            </ui.Row>
+            <pre class="state">{{ dates_state }}</pre>
+            <pre class="code">{{ CODE['dates'] }}</pre>
+          </ui.Column>
         </ui.Card>
 
         <ui.Card title="Feedback" id="feedback">
@@ -157,9 +176,10 @@
 
 <code>
 import asyncio
+import datetime
 from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Dates and menus", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -195,6 +215,24 @@ verdict: str = ""
 tab: str = "Overview"
 picked = None
 items: int = 3
+check_in = None
+check_out = None
+last_action: str = ""
+MENU = [
+    {"value": "Edit", "label": "Edit", "icon": "edit"},
+    {"value": "Duplicate", "label": "Duplicate", "icon": "copy"},
+    {"value": "Archive", "label": "Archive", "disabled": True},
+    "-",
+    {"value": "Delete", "label": "Delete", "icon": "trash", "danger": True},
+]
+
+@property
+def today(self):
+    return datetime.date.today()
+
+@property
+def dates_state(self):
+    return f"check_in={self.check_in!r}  check_out={self.check_out!r}"
 
 def delete_item(self):
     if self.items:
@@ -243,6 +281,13 @@ def submit(self):
     "choices": """<ui.RadioGroup label="Plan" :options="[('free', 'Free'), ('pro', 'Pro')]" @bind="plan" />
 <ui.Checkbox label="Send me updates" @bind="updates" />
 <ui.Switch label="Dark mode" @bind="dark" />""",
+    "dates": """<ui.DatePicker label="Check-in" @bind="check_in" :min="today" />
+
+<ui.Menu label="Actions" @select="act(event)" :items="[
+    {'value': 'edit', 'label': 'Edit', 'icon': 'edit'},
+    '-',
+    {'value': 'delete', 'label': 'Delete', 'icon': 'trash', 'danger': True},
+]" />""",
     "feedback": """<ui.Alert kind="success">Saved.</ui.Alert>
 <ui.Alert kind="danger" title="Failed" dismissible="true" @close="hide()">...</ui.Alert>
 <ui.Badge kind="success">active</ui.Badge>  <ui.Spinner />  <ui.Icon name="star" />""",

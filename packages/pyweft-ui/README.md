@@ -102,14 +102,15 @@ All have `label`, `hint`, `error`, `required`, `disabled`, `name`, and take
 | `RadioGroup` | the chosen option's value | `options`, `inline` |
 | `Checkbox` | `bool` | |
 | `Switch` | `bool` | |
+| `DatePicker` | `datetime.date` or `None` | `min`, `max` (a date or `"YYYY-MM-DD"`), `placeholder`, `format` (strftime), `week_start` (monday, sunday), `align` |
 
 `options` can be a comma-separated string (`"Small, Medium, Large"`), a list
 of values, a list of `(value, label)` pairs or a list of
 `{"value": ..., "label": ...}` dicts. The bound field gets the value itself,
 so `[(1, "One"), (2, "Two")]` binds an `int`.
 
-`TextField`, `TextArea`, `NumberField` and `Select` emit `blur` when the
-user leaves them, which is when a [form](#checking-forms) starts showing
+`TextField`, `TextArea`, `NumberField`, `Select` and `DatePicker` emit
+`blur` when the user leaves them, which is when a [form](#checking-forms) starts showing
 that field's message.
 
 ### Data and navigation
@@ -129,12 +130,13 @@ function), `align` and `sortable`. Left out, they come from the first row.
 | Control | Fields | Notes |
 |---|---|---|
 | `Button` | `variant` (primary, secondary, ghost, danger), `size` (sm, md, lg), `icon`, `loading`, `disabled`, `block`, `type` | Emits `click`. |
+| `Menu` | `label`, `items`, `icon`, `icon_only`, `variant`, `align` (start, end), `caret`, `disabled` | A button that opens a list of actions; emits `select` with the chosen item's value. `items`: text, `(value, label)` pairs, or dicts with `value`, `label`, `icon`, `danger`, `disabled`; `"-"` is a divider. |
 | `Dialog` | `title`, `width`, `dismissible` | `@bind` to a `bool`: open while it is `True`. Esc, a click outside or the X close it. Keeps Tab inside while open and gives focus back when closed. Fill: `footer`. |
 | `Toaster` | `position` (bottom-right, bottom-left, bottom-center, top-left, top-center, top-right), `limit` | Put one on the page; it shows what `toast()` raises. |
 | `Alert` | `kind` (info, success, warning, danger), `title`, `dismissible` | Emits `close`. |
 | `Badge` | `kind` (neutral, primary, info, success, warning, danger) | |
 | `Spinner` | `size`, `label` | |
-| `Icon` | `name`, `size` | check, x, plus, minus, search, info, alert, chevron-up/down/left/right, menu, trash, edit, send, user, home, star, heart, download, upload, external, copy, settings, sun, moon |
+| `Icon` | `name`, `size` | check, x, plus, minus, search, info, alert, chevron-up/down/left/right, menu, trash, edit, send, user, home, star, heart, download, upload, external, copy, settings, sun, moon, calendar, more |
 
 ## Checking forms
 

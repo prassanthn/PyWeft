@@ -206,16 +206,18 @@ and `name` (the field's name inside a `<form>`), and all work with `@bind`.
 <ui.RadioGroup label="Breakfast" options="None, Continental, Full" inline="true" @bind="breakfast" />
 <ui.Checkbox label="Airport pickup" @bind="pickup" />
 <ui.Switch label="Email me offers" @bind="offers" />
+<ui.DatePicker label="Arrival" @bind="arrival" />
 ```
 
 What each one gives your field:
 
 | Control | Your field gets |
 |---|---|
-| `TextField`, `TextArea` | a `str`. `TextField`'s `type` can be `text`, `email`, `password`, `search`, `url`, `tel`, `date`, `time`; dates and times arrive as text such as `"2026-10-29"` |
+| `TextField`, `TextArea` | a `str`. `TextField`'s `type` can be `text`, `email`, `password`, `search`, `url`, `tel`, `date`, `time`; dates and times arrive as text such as `"2026-10-29"` (for a real `date`, use `DatePicker`) |
 | `NumberField` | an `int` while your field is an `int` (or `None`), otherwise a `float`. While the box is empty or holds something that isn't a number yet, your field keeps its last value |
 | `Select`, `RadioGroup` | the chosen option's value |
 | `Checkbox`, `Switch` | a `bool` |
+| `DatePicker` | a `datetime.date`, or `None` until one is chosen |
 
 ### Options for Select and RadioGroup
 
@@ -240,6 +242,45 @@ Put the label between the tags when it needs more than text:
 ```xml
 <ui.Checkbox @bind="agreed">I agree to the <a href="/terms">terms</a></ui.Checkbox>
 ```
+
+### Dates: DatePicker
+
+A field that opens a calendar, and gives your field a `datetime.date`:
+
+```xml
+<ui.DatePicker label="Check-in" @bind="check_in" :min="today" />
+<ui.DatePicker label="Check-out" @bind="check_out" :min="check_in or today" required="true" />
+<ui.DatePicker label="Birthday" @bind="birthday" max="2010-12-31" format="%d/%m/%Y" week_start="sunday" />
+```
+
+```python
+import datetime
+
+check_in = None           # a datetime.date once chosen
+check_out = None
+
+@property
+def today(self):
+    return datetime.date.today()
+```
+
+- **`min` and `max`** take a `date` or text such as `"2026-12-31"`. Days
+  outside them are crossed out and can't be chosen, and the month arrows
+  stop at them.
+- **The field shows** the date as "3 Nov 2026", or `placeholder` ("Choose
+  a date") before one is chosen; `format` takes a `strftime` pattern
+  instead.
+- **`week_start="sunday"`** starts the weeks on Sunday (Monday by default).
+- **Today and Clear** buttons sit under the calendar. `required="true"`
+  hides Clear, so a chosen date can only be changed, not removed.
+- **`name`** sends the date as `YYYY-MM-DD` inside a `<form>`.
+- **With a form**, it works like any field:
+  `:error="form.error('check_in')" @blur="form.touch('check_in')"`. It emits
+  `blur` when the calendar closes.
+- **Keyboard:** Enter, Space or the down arrow opens the calendar on the
+  chosen day (or today). The arrows move by day and week, Page Up and Page
+  Down by month, Home and End to the ends of the week, Enter picks, and Esc
+  closes it.
 
 ### A complete form: validation and submitting
 
@@ -407,6 +448,43 @@ field of the component; a `ref` of the same name is optional, and is what
   **`disabled`** greys it out.
 - An icon-only button needs a text alternative for screen readers:
   `<ui.Button icon="x" aria-label="Close" />`.
+
+### A menu of actions: Menu
+
+A button that opens a list of actions, and tells you which was chosen:
+
+```xml
+<ui.Menu label="Actions" @select="act(event)" :items="[
+    {'value': 'edit', 'label': 'Edit', 'icon': 'edit'},
+    {'value': 'copy', 'label': 'Duplicate', 'icon': 'copy'},
+    {'value': 'archive', 'label': 'Archive', 'disabled': True},
+    '-',
+    {'value': 'delete', 'label': 'Delete', 'icon': 'trash', 'danger': True},
+]" />
+
+<ui.Menu label="More actions" icon="more" icon_only="true" variant="ghost" align="end"
+         :items="['Rename', 'Move']" @select="act(event)" />
+```
+
+```python
+def act(self, action):
+    if action == "delete":
+        self.confirming = True      # ask first, with a Dialog
+    ...
+```
+
+- **`items`** are text (`"Rename"`, which is also its value), `(value,
+  label)` pairs, or dicts with `value` and `label` and optionally `icon`,
+  `danger` (red) and `disabled`. `"-"` draws a divider.
+- **`@select`** gets the chosen item's value as `event`.
+- **The button** takes `label`, `icon`, `variant` (`primary`, `secondary`,
+  `ghost`) and `disabled`. With `icon_only="true"` it shows just the icon,
+  and `label` becomes its name for screen readers. `align="end"` lines the
+  list up with the button's right edge, for a button at the end of a row.
+- **Keyboard:** Enter, Space or the down arrow opens it on the first item,
+  the up arrow on the last. The arrows, Home and End move (skipping
+  disabled items), Enter picks, Esc closes it and returns to the button,
+  and Tab closes it and moves on. A click anywhere else closes it too.
 
 ## 6. Messages, badges and loading
 
@@ -754,7 +832,8 @@ match the text size. Buttons and alerts use them for you (`icon="send"`).
 Available names: `check`, `x`, `plus`, `minus`, `search`, `info`, `alert`,
 `chevron-up`, `chevron-down`, `chevron-left`, `chevron-right`, `menu`,
 `trash`, `edit`, `send`, `user`, `home`, `star`, `heart`, `download`,
-`upload`, `external`, `copy`, `settings`, `sun`, `moon`.
+`upload`, `external`, `copy`, `settings`, `sun`, `moon`, `calendar`,
+`more`.
 
 ## 12. Themes
 
@@ -955,6 +1034,12 @@ readers and mobile devices work the way people expect:
   keys move between tabs, and Home and End jump to the first and last.
 - **Tables** use real table headings, and tell screen readers which column
   is sorted and which way.
+- **Menus** are announced as menus, with the button saying whether it's
+  open. Focus moves into the list when it opens and back to the button
+  when an item is chosen or Esc is pressed.
+- **The date picker's** calendar is a grid of days, each read out in full
+  ("Tuesday 3 November 2026"), with today and the chosen day marked. It is
+  one Tab stop, moved with the arrow keys.
 - **Toasts** are read out politely when they appear (`danger` ones
   interrupt), and pause while someone is reading them.
 - **Motion is reduced** for visitors who ask their system for it: spinners
@@ -969,8 +1054,11 @@ What you should add yourself:
 - Don't put the only copy of something important in a toast: it goes away.
   Show errors that need fixing next to what needs fixing.
 - After a failed submit, move focus to the first field with a problem, so
-  keyboard and screen reader users land on it. Give the control a `ref` and
-  call `focus()` (see [moving focus](../../../docs/getting-started.md#moving-focus-and-scrolling-ref)):
+  keyboard and screen reader users land on it. `form.check()` does this
+  for you when each field has a `ref` named like the field (see [the
+  form](#a-complete-form-validation-and-submitting)); without a `Form`,
+  give the control a `ref` and call `focus()` (see [moving
+  focus](../../../docs/getting-started.md#moving-focus-and-scrolling-ref)):
 
   ```xml
   <ui.TextField ref="email" label="Email" @bind="email" :error="errors.get('email', '')" />
