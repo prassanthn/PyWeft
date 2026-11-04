@@ -1373,7 +1373,22 @@ myapp/
   styles.css        # global CSS; component styles go in <style> blocks
   head.html         # extra <head> tags: CDN stylesheets, scripts, fonts
   loading.html      # what visitors see while Python starts (see below)
+  AGENTS.md         # how to write this app, for AI coding assistants
+  CLAUDE.md         # "@AGENTS.md": Claude Code reads AGENTS.md through it
 ```
+
+`AGENTS.md` is for AI coding assistants (Claude Code, Codex, Cursor,
+Copilot and others read it): PyWeft is too new for them to know, so it
+spells out the file format, the directives, components, async, routing,
+`pyweft-ui`, and the mistakes generated code usually makes. It is written
+for the PyWeft version you have; after upgrading, refresh it with
+`uv run pyweft agents myapp` (which also adds the two files to an app made
+before they existed, and leaves an existing `CLAUDE.md` alone). The same
+text is on the website as
+[agents.md](https://prassanthn.github.io/PyWeft/agents.md), and all the
+documentation as one plain-text file for AI tools at
+[llms-full.txt](https://prassanthn.github.io/PyWeft/llms-full.txt) (indexed
+by [llms.txt](https://prassanthn.github.io/PyWeft/llms.txt)).
 
 Add more components as sibling `.weft` files — `<TodoItem>` in a template
 finds `todo_item.weft` automatically — or group them in folders and use

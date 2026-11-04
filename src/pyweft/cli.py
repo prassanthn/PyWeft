@@ -630,6 +630,41 @@ _SCAFFOLD_HEAD = """\
 """
 
 
+_AGENTS_GUIDE = Path(__file__).parent / "agents_guide.md"
+AGENTS_FILE = "AGENTS.md"
+# Claude Code reads CLAUDE.md, which can import another file with @path;
+# Codex, Cursor, Copilot and others read AGENTS.md itself.
+_CLAUDE_MD = "@AGENTS.md\n"
+
+
+def agents_guide() -> str:
+    """The guide for AI coding assistants, for this version of PyWeft."""
+    from . import __version__
+
+    # str.replace, not format: the guide is full of {{ }} and {}.
+    return _AGENTS_GUIDE.read_text(encoding="utf-8").replace("{version}", __version__)
+
+
+def write_agents_files(app_dir: Path) -> list[str]:
+    """Write AGENTS.md (replacing an older one) and, if the app has none, a
+    CLAUDE.md that imports it. Returns the names written."""
+    written = []
+    (app_dir / AGENTS_FILE).write_text(agents_guide(), encoding="utf-8")
+    written.append(AGENTS_FILE)
+    claude = app_dir / "CLAUDE.md"
+    if not claude.exists():
+        claude.write_text(_CLAUDE_MD, encoding="utf-8")
+        written.append("CLAUDE.md")
+    return written
+
+
+def cmd_agents(app_dir: Path) -> None:
+    if not (app_dir / "app.weft").is_file():
+        raise CliError(f"{app_dir} has no app.weft: point at a pyweft app folder")
+    written = write_agents_files(app_dir)
+    print(f"wrote {', '.join(written)} in {app_dir}/ (a guide for AI coding assistants)")
+
+
 def cmd_new(target: Path) -> None:
     if target.exists() and any(target.iterdir()):
         raise CliError(f"{target} already exists and is not empty")
@@ -645,6 +680,7 @@ def cmd_new(target: Path) -> None:
     (target / "styles.css").write_text(_SCAFFOLD_CSS, encoding="utf-8")
     (target / HEAD_FILE).write_text(_SCAFFOLD_HEAD, encoding="utf-8")
     shutil.copy(_STATIC / LOADING_FILE, target / LOADING_FILE)
+    write_agents_files(target)
     print(f"created {target}/")
     print(f"  run it:  pyweft run {target}")
     print(f"  add browser-usable packages with:  uv add <pkg>  (inside {target}/)")
@@ -972,6 +1008,12 @@ def main(argv: list[str] | None = None) -> int:
     p_new = sub.add_parser("new", help="scaffold a new app directory")
     p_new.add_argument("path", type=Path)
 
+    p_agents = sub.add_parser(
+        "agents",
+        help="write AGENTS.md (and CLAUDE.md if missing): how to write this app, for AI coding assistants",
+    )
+    p_agents.add_argument("app_dir", type=Path)
+
     p_run = sub.add_parser("run", help="serve an app directory for the browser")
     p_run.add_argument("app_dir", type=Path)
     p_run.add_argument("--port", type=int, default=8642)
@@ -1003,6 +1045,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "new":
             cmd_new(args.path)
+        elif args.command == "agents":
+            cmd_agents(args.app_dir)
         elif args.command == "run" and args.desktop:
             from .desktop import run_desktop
 

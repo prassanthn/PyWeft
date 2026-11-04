@@ -71,7 +71,15 @@ myapp/
   pyproject.toml   your app's dependencies, installed in the browser
   head.html        extra <head> tags: fonts, CDN stylesheets (optional)
   loading.html     what visitors see while Python starts (optional)
+  AGENTS.md        how to write this app, for AI coding assistants
 ```
+
+**Using an AI coding assistant?** PyWeft is too new for it to know, so
+`AGENTS.md` (read by Claude Code, Codex, Cursor, Copilot and others) teaches
+it the file format, the directives and the usual mistakes;
+`uv run pyweft agents myapp` refreshes it after an upgrade. All the docs as
+one text file, to paste or point a tool at:
+<https://prassanthn.github.io/PyWeft/llms-full.txt>.
 
 When you're ready to publish, `uv run pyweft build myapp` writes a static site
 to `myapp/dist/` that any web host can serve, such as GitHub Pages or Netlify.

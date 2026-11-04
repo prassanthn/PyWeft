@@ -8,6 +8,13 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **AI-friendly apps:** `pyweft new` writes an `AGENTS.md` (and a
+  `CLAUDE.md` importing it) that teaches AI coding assistants how to write
+  a PyWeft app: the file format, directives, components, async, routing,
+  pyweft-ui and the usual mistakes. `pyweft agents APP` refreshes it after
+  an upgrade, or adds it to an existing app. The website publishes it as
+  `agents.md`, with `llms.txt` and `llms-full.txt` (all the docs as one
+  plain-text file).
 - `scroll_to(ref, align="start")` brings the element to the top of the
   window (also `"center"`, `"end"`), instead of scrolling just enough to
   show it.
