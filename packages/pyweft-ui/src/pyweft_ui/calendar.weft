@@ -1,0 +1,534 @@
+<template>
+  <div :class="'calendar' + (' many' if months > 1 else '')" @keydown.esc.stop="escape">
+    <If cond="_mode == 'days'">
+      <div class="pages">
+        <For each="page in pages" key="page['key']">
+          <div class="page">
+            <div class="head">
+              <If cond="page['offset'] == 0">
+                <button type="button" class="nav" aria-label="Previous month" :disabled="not can_prev"
+                        @click="shift(-1)"><Icon name="chevron-left" size="1.1em" /></button>
+              </If>
+              <Else><span class="nav-gap"></span></Else>
+              <span class="month" aria-live="polite">
+                <button type="button" class="title-btn" :aria-label="'Choose a month, ' + page['month_name']"
+                        @click="show_months(page['offset'])">{{ page['month_name'] }}</button>
+                <button type="button" class="title-btn" :aria-label="'Choose a year, ' + str(page['year'])"
+                        @click="show_years(page['offset'])">{{ page['year'] }}</button>
+              </span>
+              <If cond="page['offset'] == months - 1">
+                <button type="button" class="nav" aria-label="Next month" :disabled="not can_next"
+                        @click="shift(1)"><Icon name="chevron-right" size="1.1em" /></button>
+              </If>
+              <Else><span class="nav-gap"></span></Else>
+            </div>
+            <table class="grid" role="grid" :aria-label="page['title']"
+                   @keydown.left.prevent="step(-1)" @keydown.right.prevent="step(1)"
+                   @keydown.up.prevent="step(-7)" @keydown.down.prevent="step(7)"
+                   @keydown.page-up.prevent="step_month(-1)" @keydown.page-down.prevent="step_month(1)"
+                   @keydown.home.prevent="week_edge(0)" @keydown.end.prevent="week_edge(6)">
+              <thead>
+                <tr><For each="day in weekday_names" key="day[1]"><th scope="col" :abbr="day[1]">{{ day[0] }}</th></For></tr>
+              </thead>
+              <tbody>
+                <For each="week in page['weeks']" key="week[0]['iso']">
+                  <tr>
+                    <For each="cell in week" key="cell['iso']">
+                      <td :class="cell['band']">
+                        <If cond="cell['blank']"><span class="day blank" aria-hidden="true"></span></If>
+                        <Else>
+                          <button type="button" :ref="'d-' + cell['iso']" :class="cell['classes']"
+                                  :tabindex="'0' if cell['focus'] else '-1'"
+                                  :aria-pressed="'true' if cell['selected'] else 'false'"
+                                  :aria-current="'date' if cell['today'] else None"
+                                  :aria-label="cell['long']" :disabled="cell['disabled']"
+                                  @click="pick(cell['date'])" @mouseenter="hover(cell['date'])">{{ cell['day'] }}</button>
+                        </Else>
+                      </td>
+                    </For>
+                  </tr>
+                </For>
+              </tbody>
+            </table>
+          </div>
+        </For>
+      </div>
+      <If cond="range">
+        <p class="status" aria-live="polite">{{ 'Now choose the last day' if _anchor is not None else 'Choose the first day' }}</p>
+      </If>
+    </If>
+    <Else>
+      <div class="head">
+        <button type="button" class="nav" :aria-label="'Previous ' + step_name" :disabled="not can_prev"
+                @click="shift(-1)"><Icon name="chevron-left" size="1.1em" /></button>
+        <span class="month" aria-live="polite">
+          <If cond="_mode == 'months'">
+            <button type="button" class="title-btn" :aria-label="'Choose a year, ' + str(_page_first.year)"
+                    @click="show_years(_page)">{{ _page_first.year }}</button>
+          </If>
+          <Else><span class="title-text">{{ years_title }}</span></Else>
+        </span>
+        <button type="button" class="nav" :aria-label="'Next ' + step_name" :disabled="not can_next"
+                @click="shift(1)"><Icon name="chevron-right" size="1.1em" /></button>
+      </div>
+      <If cond="_mode == 'months'">
+        <div class="pick-grid" role="grid" :aria-label="'Months of ' + str(_page_first.year)"
+             @keydown.left.prevent="move_month(-1)" @keydown.right.prevent="move_month(1)"
+             @keydown.up.prevent="move_month(-3)" @keydown.down.prevent="move_month(3)"
+             @keydown.home.prevent="move_month(1 - _month_focus)" @keydown.end.prevent="move_month(12 - _month_focus)">
+          <For each="cell in month_cells" key="cell['n']">
+            <button type="button" :ref="'m-' + str(cell['n'])" :class="cell['classes']"
+                    :tabindex="'0' if cell['focus'] else '-1'"
+                    :aria-pressed="'true' if cell['selected'] else 'false'"
+                    :aria-label="cell['long']" :disabled="cell['disabled']"
+                    @click="choose_month(cell['n'])">{{ cell['short'] }}</button>
+          </For>
+        </div>
+      </If>
+      <Else>
+        <div class="pick-grid" role="grid" :aria-label="'Years ' + years_title"
+             @keydown.left.prevent="move_year(-1)" @keydown.right.prevent="move_year(1)"
+             @keydown.up.prevent="move_year(-3)" @keydown.down.prevent="move_year(3)"
+             @keydown.page-up.prevent="move_year(-12)" @keydown.page-down.prevent="move_year(12)">
+          <For each="cell in year_cells" key="cell['year']">
+            <button type="button" :ref="'y-' + str(cell['year'])" :class="cell['classes']"
+                    :tabindex="'0' if cell['focus'] else '-1'"
+                    :aria-pressed="'true' if cell['selected'] else 'false'"
+                    :disabled="cell['disabled']"
+                    @click="choose_year(cell['year'])">{{ cell['year'] }}</button>
+          </For>
+        </div>
+      </Else>
+    </Else>
+  </div>
+</template>
+
+<code>
+# <ui.Calendar @bind="day" />: a calendar on the page. Binds a
+# datetime.date; with range="true", a (start, end) pair of dates, chosen by
+# clicking the first day and then the last. months="2" shows two months
+# side by side. DatePicker and DateRangePicker open one of these.
+#
+# Emits "update" (what @bind uses) when a date or a whole range is chosen,
+# and "escape" for Esc in the days (DatePicker closes on it).
+# Keyboard: arrows move by day and week, Page Up/Down by month, Home and End
+# to the week's ends, Enter picks. The month and year in the header open a
+# choice of months and of years; Esc there goes back a step.
+import datetime
+import itertools
+
+_builtin_range = range    # the range field below hides the builtin in this block
+
+value = None              # a date; with range, a (start, end) pair
+range: bool = False       # choose a range of days instead of one
+min = None                # earliest day that can be chosen: a date or "YYYY-MM-DD"
+max = None                # latest day
+months: int = 1           # how many months show side by side
+min_days: int = 0         # with range: at least this many days from first to last
+max_days: int = 0         # with range: at most this many (0: no limit)
+week_start: str = "monday"  # or "sunday"
+autofocus: bool = False   # put the keyboard on the chosen day (or today) at once
+
+_MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+           "August", "September", "October", "November", "December"]
+_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+_view = None              # the first day of the first month showing
+_focus = None             # the day that takes Tab and the arrow keys
+_mode = "days"            # or "months" or "years"
+_page = 0                 # which of the months the months/years view is for
+_month_focus = 1
+_year_focus = 2000
+_anchor = None            # with range: the first day, while the last is chosen
+_hover = None             # with range: the day the pointer or keyboard is on
+
+def on_init(self):
+    start = self._clamp(self._first_chosen() or self.today)
+    self._view = start.replace(day=1)
+    self._focus = start
+    if self.autofocus:
+        self.focus("d-" + start.isoformat())
+
+# ------------------------------------------------------------- values
+
+def _as_date(self, value):
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime.datetime):
+        return value.date()
+    if isinstance(value, datetime.date):
+        return value
+    return datetime.date.fromisoformat(str(value).strip()[:10])
+
+@property
+def chosen(self):
+    """The chosen day; None in range mode or before one is chosen."""
+    return None if self.range else self._as_date(self.value)
+
+@property
+def chosen_range(self):
+    """The chosen (start, end), or None."""
+    if not self.range or not self.value:
+        return None
+    start, end = (self._as_date(v) for v in self.value)
+    return (start, end) if start and end else None
+
+def _first_chosen(self):
+    return self.chosen_range[0] if self.chosen_range else self.chosen
+
+@property
+def today(self):
+    return datetime.date.today()
+
+def allowed(self, day):
+    low, high = self._as_date(self.min), self._as_date(self.max)
+    if (low is not None and day < low) or (high is not None and day > high):
+        return False
+    if self.range and self._anchor is not None and day != self._anchor:
+        length = abs((day - self._anchor).days)
+        if length < self.min_days or (self.max_days and length > self.max_days):
+            return False
+    return True
+
+def _clamp(self, day):
+    low, high = self._as_date(self.min), self._as_date(self.max)
+    if low is not None and day < low:
+        return low
+    if high is not None and day > high:
+        return high
+    return day
+
+def _add_months(self, day, delta):
+    month = day.month - 1 + delta
+    year, month = day.year + month // 12, month % 12 + 1
+    last = (datetime.date(year + month // 12, month % 12 + 1, 1) - datetime.timedelta(days=1)).day
+    # Not min(): the min field above hides the builtin in this code block.
+    return day.replace(year=year, month=month, day=day.day if day.day <= last else last)
+
+def _months_between(self, earlier, later):
+    return (later.year - earlier.year) * 12 + later.month - earlier.month
+
+def _column(self, day):
+    return (day.weekday() + (1 if self.week_start == "sunday" else 0)) % 7
+
+# ------------------------------------------------------------- picking
+
+def pick(self, day):
+    if not self.allowed(day):
+        return
+    if not self.range:
+        self.emit("update", day)
+        return
+    if self._anchor is None:
+        self._anchor = self._hover = day
+        return
+    if day == self._anchor and self.min_days:
+        self._anchor = self._hover = None   # clicked again: start over
+        return
+    start, end = sorted([self._anchor, day])
+    self._anchor = self._hover = None
+    self.emit("update", (start, end))
+
+def hover(self, day):
+    if self.range and self._anchor is not None:
+        self._hover = day
+
+def escape(self):
+    # Back a step: years -> months -> days; a half-chosen range is dropped;
+    # then the parent hears it (a DatePicker closes).
+    if self._mode == "years":
+        self.show_months(self._page)
+    elif self._mode == "months":
+        self._mode = "days"
+        self._show(self._focus)
+    elif self._anchor is not None:
+        self._anchor = self._hover = None
+    else:
+        self.emit("escape")
+
+# ------------------------------------------------------------- moving
+
+def _show(self, day, focus=True):
+    self._focus = day
+    if self._anchor is not None:
+        self._hover = day
+    last_page = self._add_months(self._view, self.months - 1)
+    if day < self._view:
+        self._view = day.replace(day=1)
+    elif day >= self._add_months(last_page, 1):
+        self._view = self._add_months(day.replace(day=1), 1 - self.months)
+    if focus:
+        self.focus("d-" + day.isoformat())
+
+def step(self, days):
+    day = self._focus + datetime.timedelta(days=days)
+    if self.allowed(day):
+        self._show(day)
+
+def step_month(self, delta):
+    self._show(self._clamp(self._add_months(self._focus, delta)))
+
+def week_edge(self, column):
+    day = self._focus + datetime.timedelta(days=column - self._column(self._focus))
+    if self.allowed(day):
+        self._show(day)
+
+def shift(self, delta):
+    # The header's arrows: a month, a year or twelve years; focus stays put.
+    if self._mode == "days":
+        self._view = self._add_months(self._view, delta)
+        self._focus = self._clamp(self._add_months(self._focus, delta))
+    elif self._mode == "months":
+        self._view = self._add_months(self._view, 12 * delta)
+        self._focus = self._clamp(self._add_months(self._focus, 12 * delta))
+    else:
+        self._year_focus += 12 * delta
+
+@property
+def step_name(self):
+    return {"days": "month", "months": "year"}.get(self._mode, "twelve years")
+
+@property
+def _page_first(self):
+    return self._add_months(self._view, self._page)
+
+def show_months(self, page):
+    self._mode, self._page = "months", page
+    self._month_focus = self._page_first.month
+    self.focus(f"m-{self._month_focus}")
+
+def show_years(self, page):
+    self._mode, self._page = "years", page
+    self._year_focus = self._page_first.year
+    self.focus(f"y-{self._year_focus}")
+
+def _month_open(self, year, month):
+    first = datetime.date(year, month, 1)
+    last = self._add_months(first, 1) - datetime.timedelta(days=1)
+    low, high = self._as_date(self.min), self._as_date(self.max)
+    return (low is None or last >= low) and (high is None or first <= high)
+
+def _year_open(self, year):
+    low, high = self._as_date(self.min), self._as_date(self.max)
+    return (low is None or year >= low.year) and (high is None or year <= high.year)
+
+def choose_month(self, month):
+    year = self._page_first.year
+    if not self._month_open(year, month):
+        return
+    self._mode = "days"
+    first = datetime.date(year, month, 1)
+    self._view = self._add_months(first, -self._page)
+    last = (self._add_months(first, 1) - datetime.timedelta(days=1)).day
+    day = self._focus.day
+    self._show(self._clamp(first.replace(day=day if day <= last else last)))
+
+def choose_year(self, year):
+    if not self._year_open(year):
+        return
+    self._view = self._add_months(self._view, 12 * (year - self._page_first.year))
+    self._focus = self._clamp(self._add_months(self._focus, 12 * (year - self._focus.year)))
+    self.show_months(self._page)
+
+def move_month(self, delta):
+    month = self._month_focus + delta
+    if 1 <= month <= 12 and self._month_open(self._page_first.year, month):
+        self._month_focus = month
+        self.focus(f"m-{month}")
+
+def move_year(self, delta):
+    year = self._year_focus + delta
+    if self._year_open(year):
+        self._year_focus = year
+        self.focus(f"y-{year}")
+
+@property
+def can_prev(self):
+    low = self._as_date(self.min)
+    if low is None:
+        return True
+    if self._mode == "months":
+        return self._page_first.year - 1 >= low.year
+    if self._mode == "years":
+        return self._year_page - 1 >= low.year
+    return self._view - datetime.timedelta(days=1) >= low
+
+@property
+def can_next(self):
+    high = self._as_date(self.max)
+    if high is None:
+        return True
+    if self._mode == "months":
+        return self._page_first.year + 1 <= high.year
+    if self._mode == "years":
+        return self._year_page + 12 <= high.year
+    return self._add_months(self._view, self.months) <= high
+
+# ------------------------------------------------------------- what shows
+
+@property
+def weekday_names(self):
+    order = self._DAYS[6:] + self._DAYS[:6] if self.week_start == "sunday" else self._DAYS
+    return [(name[:2], name) for name in order]
+
+@property
+def pages(self):
+    out = []
+    for offset in _builtin_range(self.months):
+        first = self._add_months(self._view, offset)
+        name = self._MONTHS[first.month - 1]
+        out.append({
+            "offset": offset, "key": first.isoformat(), "month_name": name,
+            "year": first.year, "title": f"{name} {first.year}", "weeks": self._weeks(first),
+        })
+    return out
+
+def _band(self, day):
+    """Where a day sits in the chosen range, or in the one being chosen."""
+    if self._anchor is not None:
+        span, kind = sorted([self._anchor, self._hover or self._anchor]), "preview"
+    elif self.chosen_range:
+        span, kind = self.chosen_range, "range"
+    else:
+        return []
+    start, end = span
+    if not start <= day <= end:
+        return []
+    names = [kind]
+    if day == start:
+        names.append("start")
+    if day == end:
+        names.append("end")
+    return names
+
+def _weeks(self, first):
+    corner = first - datetime.timedelta(days=self._column(first))
+    chosen, today = self.chosen, self.today
+    rows = []
+    for week in _builtin_range(6):
+        row = []
+        for column in _builtin_range(7):
+            day = corner + datetime.timedelta(days=week * 7 + column)
+            outside = day.month != first.month
+            band = [] if outside else self._band(day)
+            ends = "start" in band or "end" in band
+            classes = ["day"] + band
+            if outside:
+                classes.append("outside")
+            if day == today:
+                classes.append("today")
+            if day == chosen or (ends and "range" in band):
+                classes.append("selected")
+            row.append({
+                "date": day, "iso": day.isoformat(), "day": day.day,
+                # With several months showing, a neighbour's days are left
+                # blank: they're in the next page already.
+                "blank": outside and self.months > 1,
+                "today": day == today, "selected": day == chosen or bool(band and "range" in band),
+                "focus": day == self._focus, "disabled": not self.allowed(day),
+                "classes": " ".join(classes), "band": " ".join("band-" + b for b in band),
+                "long": f"{self._DAYS[day.weekday()]} {day.day} {self._MONTHS[day.month - 1]} {day.year}",
+            })
+        rows.append(row)
+    return rows
+
+@property
+def _year_page(self):
+    return self._year_focus - self._year_focus % 12
+
+@property
+def years_title(self):
+    return f"{self._year_page} – {self._year_page + 11}"
+
+@property
+def month_cells(self):
+    first_day = self._first_chosen()
+    year = self._page_first.year
+    cells = []
+    for n in _builtin_range(1, 13):
+        selected = first_day is not None and first_day.year == year and first_day.month == n
+        classes = ["pick"]
+        if selected:
+            classes.append("selected")
+        if self.today.year == year and self.today.month == n:
+            classes.append("today")
+        cells.append({
+            "n": n, "short": self._MONTHS[n - 1][:3], "long": f"{self._MONTHS[n - 1]} {year}",
+            "selected": selected, "focus": n == self._month_focus,
+            "disabled": not self._month_open(year, n), "classes": " ".join(classes),
+        })
+    return cells
+
+@property
+def year_cells(self):
+    first_day = self._first_chosen()
+    cells = []
+    for year in _builtin_range(self._year_page, self._year_page + 12):
+        selected = first_day is not None and first_day.year == year
+        classes = ["pick"]
+        if selected:
+            classes.append("selected")
+        if self.today.year == year:
+            classes.append("today")
+        cells.append({
+            "year": year, "selected": selected, "focus": year == self._year_focus,
+            "disabled": not self._year_open(year), "classes": " ".join(classes),
+        })
+    return cells
+</code>
+
+<style>
+.calendar { display: inline-block; color: var(--ui-text, #1f2328); }
+.pages { display: flex; flex-wrap: wrap; gap: 20px; }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-bottom: 6px; }
+.month { display: inline-flex; gap: 2px; font-weight: 650; font-size: 0.95rem; }
+.nav, .title-btn {
+  font: inherit; border: 0; background: transparent; color: var(--ui-text, #1f2328);
+  border-radius: calc(var(--ui-radius, 8px) - 2px); cursor: pointer;
+}
+.nav { padding: 6px; line-height: 0; }
+.nav-gap { width: calc(1.1em + 12px); }
+.title-btn { font-weight: 650; padding: 4px 8px; }
+.nav:hover:not(:disabled), .title-btn:hover { background: var(--ui-subtle, #f6f8fa); }
+.nav:disabled { opacity: 0.35; cursor: not-allowed; }
+.title-text { padding: 4px 8px; }
+.grid { border-collapse: collapse; }
+th { font-size: 0.75rem; font-weight: 600; color: var(--ui-muted, #59636e); padding: 4px 0 6px; }
+td { padding: 1px 0; }
+.day {
+  display: block; width: 2.3rem; height: 2.25rem; font: inherit; font-size: 0.88rem;
+  border: 0; border-radius: calc(var(--ui-radius, 8px) - 2px);
+  background: transparent; color: var(--ui-text, #1f2328); cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.day:hover:not(:disabled) { background: var(--ui-subtle, #f6f8fa); }
+.day:focus-visible, .title-btn:focus-visible, .pick:focus-visible, .nav:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-primary, #4f46e5) 55%, transparent);
+}
+.day.outside { color: var(--ui-muted, #59636e); opacity: 0.6; }
+.day.blank { cursor: default; }
+.day.today { font-weight: 700; color: var(--ui-primary, #4f46e5); }
+.day.selected, .day.selected:hover, .day.preview.start, .day.preview.end {
+  background: var(--ui-primary, #4f46e5); color: var(--ui-on-primary, #fff); opacity: 1;
+}
+.day:disabled { opacity: 0.3; cursor: not-allowed; text-decoration: line-through; }
+/* A range is a band across its days, rounded at its ends. */
+td.band-range, td.band-preview { background: color-mix(in srgb, var(--ui-primary, #4f46e5) 14%, transparent); }
+td.band-preview { background: color-mix(in srgb, var(--ui-primary, #4f46e5) 8%, transparent); }
+td.band-start { border-radius: calc(var(--ui-radius, 8px) - 2px) 0 0 calc(var(--ui-radius, 8px) - 2px); }
+td.band-end { border-radius: 0 calc(var(--ui-radius, 8px) - 2px) calc(var(--ui-radius, 8px) - 2px) 0; }
+td.band-start.band-end { border-radius: calc(var(--ui-radius, 8px) - 2px); }
+.day.range:not(.selected):hover, .day.preview:not(.start):not(.end):hover { background: transparent; }
+.status { margin: 8px 0 0; font-size: 0.82rem; color: var(--ui-muted, #59636e); }
+.pick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 16.2rem; padding: 4px 0; }
+.pick {
+  height: 2.6rem; font: inherit; font-size: 0.9rem;
+  border: 0; border-radius: calc(var(--ui-radius, 8px) - 2px);
+  background: transparent; color: var(--ui-text, #1f2328); cursor: pointer;
+}
+.pick:hover:not(:disabled) { background: var(--ui-subtle, #f6f8fa); }
+.pick.today { font-weight: 700; color: var(--ui-primary, #4f46e5); }
+.pick.selected, .pick.selected:hover { background: var(--ui-primary, #4f46e5); color: var(--ui-on-primary, #fff); }
+.pick:disabled { opacity: 0.3; cursor: not-allowed; text-decoration: line-through; }
+</style>

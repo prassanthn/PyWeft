@@ -26,6 +26,12 @@ releasing moves them under the new version (see
 - **`Menu`**: a button that opens a list of actions (icons, dividers,
   disabled and danger items) and emits `select`; arrow keys, Esc, and a
   click outside to close.
+- **`DateRangePicker`**: two months side by side; click the first day, then
+  the last, with the range previewed as you go. Binds `(start, end)`;
+  `min_days`/`max_days` limit its length.
+- **`Calendar`**: the calendar on its own, always open, for a date or a
+  range. `DatePicker` and `DateRangePicker` are built on it.
+- Menus and calendars shift sideways to stay inside the window.
 - Icons `calendar` and `more`. `Card` no longer clips what's inside it, so
   a menu or calendar can open past its edge.
 

@@ -1,0 +1,189 @@
+<template>
+  <div class="field">
+    <If cond="label">
+      <span class="label" :id="_id + '-label'">{{ label }}<If cond="required"><span class="req" aria-hidden="true"> *</span></If></span>
+    </If>
+    <div :class="'picker align-' + align">
+      <button type="button" ref="trigger" class="control" :id="_id + '-button'"
+              aria-haspopup="dialog" :aria-expanded="'true' if _open else 'false'"
+              :aria-labelledby="(_id + '-label ' if label else '') + _id + '-button'"
+              :aria-invalid="'true' if error else None" :disabled="disabled"
+              @click="toggle" @keydown.down.prevent="open">
+        <span :class="'text' if chosen else 'text placeholder'">{{ shown }}</span>
+        <Icon name="calendar" size="1.1em" />
+      </button>
+      <If cond="name">
+        <input type="hidden" :name="name + '_start'" :value="chosen[0].isoformat() if chosen else ''" />
+        <input type="hidden" :name="name + '_end'" :value="chosen[1].isoformat() if chosen else ''" />
+      </If>
+      <If cond="_open">
+        <div class="backdrop" @click="close(False)"></div>
+        <div class="popup" ref="popup" role="dialog" :aria-label="'Choose dates' + (', ' + label if label else '')"
+             @keydown.esc.stop="close(True)">
+          <Calendar range="true" :value="chosen" :min="min" :max="max" :months="months"
+                    :min_days="min_days" :max_days="max_days" :week_start="week_start"
+                    autofocus="true" @update="pick(event)" @escape="close(True)" />
+          <div class="foot">
+            <span class="length">{{ length_text }}</span>
+            <If cond="chosen and not required">
+              <button type="button" class="link" @click="clear">Clear</button>
+            </If>
+          </div>
+        </div>
+      </If>
+    </div>
+    <If cond="error"><span class="error">{{ error }}</span></If>
+    <ElseIf cond="hint"><span class="hint">{{ hint }}</span></ElseIf>
+  </div>
+</template>
+
+<code>
+# <ui.DateRangePicker label="Stay" @bind="stay" :min="today" min_days="1" />
+# A field that opens a two-month Calendar: click the first day, then the
+# last. Binds a (start, end) pair of datetime.dates, or None until both are
+# chosen. min_days and max_days limit how long the range can be (counted
+# from the first day to the last, so a weekend Saturday to Sunday is 1).
+# Emits "update" (what @bind uses) and "blur" when the calendar closes.
+import datetime
+import itertools
+
+label: str = ""
+value = None              # (start, end) dates, or None
+min = None                # earliest day that can be chosen
+max = None                # latest day
+min_days: int = 0
+max_days: int = 0         # 0: no limit
+months: int = 2           # months side by side in the calendar
+placeholder: str = "Choose dates"
+format: str = ""          # strftime for each date; else "3 – 10 Nov 2026"
+week_start: str = "monday"  # or "sunday"
+align: str = "start"      # the calendar lines up with the start or end of the field
+hint: str = ""
+error: str = ""
+name: str = ""            # sends <name>_start and <name>_end as YYYY-MM-DD in a <form>
+required: bool = False    # also hides Clear
+disabled: bool = False
+
+_ids = itertools.count(1)
+_open = False
+
+def on_init(self):
+    self._id = f"ui-range-{next(_ids)}"
+
+def _as_date(self, value):
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime.datetime):
+        return value.date()
+    if isinstance(value, datetime.date):
+        return value
+    return datetime.date.fromisoformat(str(value).strip()[:10])
+
+@property
+def chosen(self):
+    if not self.value:
+        return None
+    start, end = (self._as_date(v) for v in self.value)
+    return (start, end) if start and end else None
+
+@property
+def shown(self):
+    if self.chosen is None:
+        return self.placeholder
+    start, end = self.chosen
+    if self.format:
+        return f"{start.strftime(self.format)} – {end.strftime(self.format)}"
+    if start.year != end.year:
+        return f"{start.day} {start.strftime('%b')} {start.year} – {end.day} {end.strftime('%b')} {end.year}"
+    if start.month != end.month:
+        return f"{start.day} {start.strftime('%b')} – {end.day} {end.strftime('%b')} {end.year}"
+    if start == end:
+        return f"{start.day} {start.strftime('%b')} {start.year}"
+    return f"{start.day} – {end.day} {end.strftime('%b')} {end.year}"
+
+@property
+def length_text(self):
+    if self.chosen is None:
+        return ""
+    days = (self.chosen[1] - self.chosen[0]).days + 1
+    return f"{days} day" + ("" if days == 1 else "s")
+
+def toggle(self):
+    if self._open:
+        self.close(True)
+    else:
+        self.open()
+
+def open(self):
+    if not self.disabled:
+        self._open = True
+        self.keep_in_view("popup")   # a field near the window's edge
+
+def close(self, refocus, *chosen):
+    if not self._open:
+        return
+    self._open = False
+    if refocus:
+        self.focus("trigger")
+    self.emit("blur", chosen[0] if chosen else self.chosen)
+
+def pick(self, span):
+    self.emit("update", span)
+    self.close(True, span)
+
+def clear(self):
+    self.emit("update", None)
+    self.close(True, None)
+</code>
+
+<style>
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.label { font-size: 0.9rem; font-weight: 550; }
+.req { color: var(--ui-danger, #d1242f); }
+.picker { position: relative; }
+.control {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  font: inherit; text-align: left; color: var(--ui-text, #1f2328);
+  background: var(--ui-surface, #fff);
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: var(--ui-radius, 8px);
+  padding: 0.5em 0.75em; cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.control:focus-visible, .control[aria-expanded="true"] {
+  outline: none;
+  border-color: var(--ui-primary, #4f46e5);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 25%, transparent);
+}
+.control:disabled { opacity: 0.6; cursor: not-allowed; }
+.control[aria-invalid="true"] { border-color: var(--ui-danger, #d1242f); }
+.control .icon { color: var(--ui-muted, #59636e); }
+.placeholder { color: var(--ui-muted, #59636e); }
+.hint { font-size: 0.82rem; color: var(--ui-muted, #59636e); }
+.error { font-size: 0.82rem; color: var(--ui-danger, #d1242f); }
+.backdrop { position: fixed; inset: 0; z-index: 999; }
+.popup {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 1000;
+  width: max-content; max-width: calc(100vw - 24px); padding: 12px;
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: calc(var(--ui-radius, 8px) * 1.5);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  animation: ui-range-in 0.1s ease-out;
+}
+.align-end .popup { left: auto; right: 0; }
+.foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid var(--ui-border, #d1d9e0);
+}
+.length { font-size: 0.85rem; color: var(--ui-muted, #59636e); }
+.link {
+  font: inherit; font-size: 0.85rem; font-weight: 550; padding: 4px 8px;
+  border: 0; background: transparent; color: var(--ui-primary, #4f46e5);
+  border-radius: calc(var(--ui-radius, 8px) - 2px); cursor: pointer;
+}
+.link:hover { background: var(--ui-subtle, #f6f8fa); }
+@keyframes ui-range-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .popup { animation: none; } }
+</style>

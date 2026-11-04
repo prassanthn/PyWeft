@@ -288,6 +288,51 @@ def today(self):
   closes it. In the months and years, the arrows move between them, and Esc
   goes back a step.
 
+### Date ranges: DateRangePicker
+
+For a stay, a booking or a report period: two months side by side, the
+first day clicked and then the last, with the range shown as a band while
+the pointer (or the keyboard) moves.
+
+```xml
+<ui.DateRangePicker label="Stay" @bind="stay" :min="today" min_days="1" max_days="28" />
+```
+
+```python
+stay = None               # (start, end) once both are chosen
+
+def nights(self):
+    return (self.stay[1] - self.stay[0]).days if self.stay else 0
+```
+
+- **Your field gets a `(start, end)` pair** of `datetime.date`s, start
+  first whichever was clicked first, or `None` until both are chosen.
+  Nothing changes until the last day is clicked.
+- **`min_days` and `max_days`** limit the length, counted from the first
+  day to the last (Saturday to Sunday is 1): once the first day is chosen,
+  days that would make it too short or too long are crossed out.
+- **The field shows** "3 – 10 Nov 2026" (or "28 Dec 2026 – 3 Jan 2027"), and
+  the calendar's footer the number of days. `months="1"` shows one month;
+  on a narrow screen two months stack.
+- **Esc** while choosing drops the first day; again, it closes. `name`
+  sends `<name>_start` and `<name>_end` in a `<form>`. The rest (`min`,
+  `max`, `format`, `week_start`, `align`, `required`, `error`, `@blur`)
+  work as for `DatePicker`.
+
+### A calendar on the page: Calendar
+
+`DatePicker` and `DateRangePicker` open a `Calendar`; it can also sit on the
+page itself, always open:
+
+```xml
+<ui.Calendar @bind="day" :min="today" />
+<ui.Calendar range="true" months="2" @bind="period" />
+```
+
+It takes the same `min`, `max`, `week_start`, `min_days` and `max_days`,
+binds a `date` (or with `range="true"` a `(start, end)` pair), and has the
+same keyboard and the month and year views.
+
 ### A complete form: validation and submitting
 
 `Form` checks a component's fields against rules and says what needs
@@ -1043,9 +1088,11 @@ readers and mobile devices work the way people expect:
 - **Menus** are announced as menus, with the button saying whether it's
   open. Focus moves into the list when it opens and back to the button
   when an item is chosen or Esc is pressed.
-- **The date picker's** calendar is a grid of days, each read out in full
-  ("Tuesday 3 November 2026"), with today and the chosen day marked. It is
+- **The date pickers'** calendar is a grid of days, each read out in full
+  ("Tuesday 3 November 2026"), with today and the chosen days marked. It is
   one Tab stop, moved with the arrow keys.
+- **Menus and calendars stay on screen:** opened next to something near
+  the window's edge, they shift sideways to fit.
 - **Toasts** are read out politely when they appear (`danger` ones
   interrupt), and pause while someone is reading them.
 - **Motion is reduced** for visitors who ask their system for it: spinners

@@ -102,6 +102,8 @@ All have `label`, `hint`, `error`, `required`, `disabled`, `name`, and take
 | `RadioGroup` | the chosen option's value | `options`, `inline` |
 | `Checkbox` | `bool` | |
 | `Switch` | `bool` | |
+| `DateRangePicker` | `(start, end)` dates or `None` | `min`, `max`, `min_days`, `max_days`, `months`, `placeholder`, `format`, `week_start`, `align`; `name` sends `<name>_start` and `<name>_end` |
+| `Calendar` | `datetime.date`, or with `range="true"` `(start, end)` | always open on the page: `range`, `months`, `min`, `max`, `min_days`, `max_days`, `week_start` |
 | `DatePicker` | `datetime.date` or `None` | `min`, `max` (a date or `"YYYY-MM-DD"`), `placeholder`, `format` (strftime), `week_start` (monday, sunday), `align` |
 
 `options` can be a comma-separated string (`"Small, Medium, Large"`), a list

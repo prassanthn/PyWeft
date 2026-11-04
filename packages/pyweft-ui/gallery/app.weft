@@ -72,8 +72,8 @@
           <ui.Column gap="lg">
             <ui.Grid min_width="16rem" gap="lg">
               <ui.DatePicker label="Check-in" @bind="check_in" :min="today" hint="From today on" />
-              <ui.DatePicker label="Check-out" @bind="check_out" :min="check_in or today"
-                             week_start="sunday" required="true" />
+              <ui.DateRangePicker label="Stay" @bind="stay" :min="today" min_days="1"
+                                  hint="At least one night" />
             </ui.Grid>
             <ui.Row>
               <ui.Menu label="Actions" :items="MENU" @select="last_action = event" />
@@ -216,7 +216,7 @@ tab: str = "Overview"
 picked = None
 items: int = 3
 check_in = None
-check_out = None
+stay = None
 last_action: str = ""
 MENU = [
     {"value": "Edit", "label": "Edit", "icon": "edit"},
@@ -232,7 +232,7 @@ def today(self):
 
 @property
 def dates_state(self):
-    return f"check_in={self.check_in!r}  check_out={self.check_out!r}"
+    return f"check_in={self.check_in!r}\nstay={self.stay!r}"
 
 def delete_item(self):
     if self.items:
@@ -282,6 +282,7 @@ def submit(self):
 <ui.Checkbox label="Send me updates" @bind="updates" />
 <ui.Switch label="Dark mode" @bind="dark" />""",
     "dates": """<ui.DatePicker label="Check-in" @bind="check_in" :min="today" />
+<ui.DateRangePicker label="Stay" @bind="stay" :min="today" min_days="1" />
 
 <ui.Menu label="Actions" @select="act(event)" :items="[
     {'value': 'edit', 'label': 'Edit', 'icon': 'edit'},

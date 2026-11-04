@@ -178,6 +178,7 @@ def test_date_picker_opens_on_the_chosen_day_and_picks(tmp_path):
     tree = cycle(r, tree)
     assert find(tree, attr("role", "grid")).attrs["aria-label"] == "December 2026"
     assert focused(r, tree).attrs["aria-label"] == "Thursday 10 December 2026"
+    grid = find(tree, attr("role", "grid"))  # December's grid: a new element
     r.dispatch(grid.events["keydown.home.prevent"], {"key": "Home"})
     tree = cycle(r, tree)
     assert focused(r, tree).attrs["aria-label"] == "Monday 7 December 2026"
@@ -324,11 +325,11 @@ def test_months_and_years_views(tmp_path):
     assert find(tree, attr("role", "grid")).attrs["aria-label"] == "Months of 2030"
 
     # Esc goes back a step: months -> days; then it closes.
-    dialog = find(tree, attr("role", "dialog"))
-    r.dispatch(dialog.events["keydown.esc.stop"], {"key": "Escape"})
+    calendar = find(tree, cls("calendar"))
+    r.dispatch(calendar.events["keydown.esc.stop"], {"key": "Escape"})
     tree = cycle(r, tree)
     assert find(tree, attr("role", "grid")).attrs["aria-label"] == "February 2030"
-    r.dispatch(dialog.events["keydown.esc.stop"], {"key": "Escape"})
+    r.dispatch(find(tree, cls("calendar")).events["keydown.esc.stop"], {"key": "Escape"})
     tree = cycle(r, tree)
     assert find(tree, attr("role", "dialog")) is None
     assert a.day == D(2026, 11, 3)  # browsing never changes the value
@@ -351,3 +352,161 @@ def test_months_outside_the_limits(tmp_path):
     r.dispatch(months[2].events["click"], {})  # March: the 20th is fine
     tree = cycle(r, tree)
     assert focused(r, tree).attrs["aria-label"] == "Friday 20 March 2026"
+
+
+# ------------------------------------------------------------------ Calendar and ranges
+
+
+def days_by_label(tree):
+    return {b.attrs["aria-label"]: b for b in day_buttons_all(tree)}
+
+
+def day_buttons_all(tree):
+    out = []
+
+    def walk_all(nodes):
+        for node in nodes:
+            if getattr(node, "tag", None):
+                if node.tag == "button" and "day" in node.attrs.get("class", "").split():
+                    out.append(node)
+                walk_all(node.children)
+
+    walk_all(tree)
+    return out
+
+
+def test_calendar_on_a_page(tmp_path):
+    _, a, r, tree = app(
+        tmp_path, '<div><ui.Calendar @bind="day" min="2030-01-01" max="2030-12-31" /></div>',
+        "day = None",
+    )
+    r.after_render()
+    assert r.take_commands() == []  # on a page it doesn't take the keyboard
+    assert find(tree, attr("role", "grid")).attrs["aria-label"] == "January 2030"
+    r.dispatch(days_by_label(tree)["Friday 4 January 2030"].events["click"], {})
+    tree = cycle(r, tree)
+    assert a.day == D(2030, 1, 4)
+    assert days_by_label(tree)["Friday 4 January 2030"].attrs["aria-pressed"] == "true"
+
+
+RANGE = """<div><ui.DateRangePicker label="Stay" @bind="stay" min="2030-01-10" max="2030-06-30"
+                 @blur="left.append(event)" /></div>"""
+
+
+def ranged(tmp_path, extra="", stay="None"):
+    return app(tmp_path, RANGE.replace("/>", f"{extra} />") if extra else RANGE,
+               f"import datetime\nstay = {stay}\nleft: list = []")
+
+
+def test_a_range_is_chosen_first_day_then_last(tmp_path):
+    _, a, r, tree = ranged(tmp_path)
+    assert text([find(tree, cls("text"))]) == "Choose dates"
+    r.dispatch(find(tree, cls("control")).events["click"], {})
+    tree = cycle(r, tree)
+    titles = [g.attrs["aria-label"] for g in [n for n in walk_tree(tree) if n.attrs.get("role") == "grid"]]
+    assert titles == ["January 2030", "February 2030"]  # two months, from min
+    assert find(tree, cls("blank")) is not None  # the neighbour's days are left out
+    assert focused(r, tree).attrs["aria-label"] == "Thursday 10 January 2030"
+
+    days = days_by_label(tree)
+    r.dispatch(days["Saturday 12 January 2030"].events["click"], {})
+    tree = cycle(r, tree)
+    assert text([find(tree, cls("status"))]) == "Now choose the last day"
+    r.dispatch(days_by_label(tree)["Tuesday 15 January 2030"].events["mouseenter"], {})
+    tree = cycle(r, tree)
+    preview = [b.attrs["aria-label"].split()[1] for b in day_buttons_all(tree)
+               if "preview" in b.attrs["class"].split()]
+    assert preview == ["12", "13", "14", "15"]
+    assert a.stay is None  # nothing is chosen until the last day is
+
+    r.dispatch(days_by_label(tree)["Tuesday 15 January 2030"].events["click"], {})
+    tree = cycle(r, tree)
+    assert a.stay == (D(2030, 1, 12), D(2030, 1, 15)) and type(a.stay) is tuple
+    assert find(tree, attr("role", "dialog")) is None and a.left == [a.stay]
+    assert text([find(tree, cls("text"))]) == "12 – 15 Jan 2030"
+    assert focused(r, tree).attrs["aria-haspopup"] == "dialog"
+
+
+def test_a_range_backwards_across_months_and_reopened(tmp_path):
+    _, a, r, tree = ranged(tmp_path)
+    r.dispatch(find(tree, cls("control")).events["click"], {})
+    tree = cycle(r, tree)
+    r.dispatch(days_by_label(tree)["Sunday 3 February 2030"].events["click"], {})
+    tree = cycle(r, tree)
+    r.dispatch(days_by_label(tree)["Monday 28 January 2030"].events["click"], {})
+    tree = cycle(r, tree)
+    assert a.stay == (D(2030, 1, 28), D(2030, 2, 3))
+    assert text([find(tree, cls("text"))]) == "28 Jan – 3 Feb 2030"
+
+    # Open again: the range shows as a band, its ends chosen.
+    r.dispatch(find(tree, cls("control")).events["click"], {})
+    tree = cycle(r, tree)
+    days = days_by_label(tree)
+    assert "start" in days["Monday 28 January 2030"].attrs["class"]
+    assert "end" in days["Sunday 3 February 2030"].attrs["class"]
+    assert days["Wednesday 30 January 2030"].attrs["aria-pressed"] == "true"
+    assert text([find(tree, cls("length"))]) == "7 days"
+
+
+def test_range_length_limits_and_escape(tmp_path):
+    _, a, r, tree = ranged(tmp_path, extra=' min_days="2" max_days="5"')
+    r.dispatch(find(tree, cls("control")).events["click"], {})
+    tree = cycle(r, tree)
+    r.dispatch(days_by_label(tree)["Saturday 12 January 2030"].events["click"], {})
+    tree = cycle(r, tree)
+    days = days_by_label(tree)
+    assert "disabled" in days["Sunday 13 January 2030"].attrs     # 1 day: too short
+    assert "disabled" not in days["Monday 14 January 2030"].attrs
+    assert "disabled" not in days["Thursday 17 January 2030"].attrs
+    assert "disabled" in days["Friday 18 January 2030"].attrs     # 6 days: too long
+
+    # Esc drops the half-chosen range first, then closes.
+    r.dispatch(find(tree, cls("calendar")).events["keydown.esc.stop"], {"key": "Escape"})
+    tree = cycle(r, tree)
+    assert text([find(tree, cls("status"))]) == "Choose the first day"
+    assert find(tree, attr("role", "dialog")) is not None
+    assert "disabled" not in days_by_label(tree)["Friday 18 January 2030"].attrs
+    r.dispatch(find(tree, cls("calendar")).events["keydown.esc.stop"], {"key": "Escape"})
+    tree = cycle(r, tree)
+    assert find(tree, attr("role", "dialog")) is None and a.stay is None
+
+
+def test_keyboard_moves_the_range_preview(tmp_path):
+    _, a, r, tree = ranged(tmp_path, stay="(datetime.date(2030, 3, 4), datetime.date(2030, 3, 6))")
+    assert text([find(tree, cls("text"))]) == "4 – 6 Mar 2030"
+    r.dispatch(find(tree, cls("control")).events["click"], {})
+    tree = cycle(r, tree)
+    assert focused(r, tree).attrs["aria-label"] == "Monday 4 March 2030"
+    focus_day = days_by_label(tree)["Monday 4 March 2030"]
+    r.dispatch(focus_day.events["click"], {})  # Enter on the focused day: the first day
+    tree = cycle(r, tree)
+    grid = [n for n in walk_tree(tree) if n.attrs.get("role") == "grid"][0]
+    r.dispatch(grid.events["keydown.right.prevent"], {"key": "ArrowRight"})
+    r.dispatch(grid.events["keydown.right.prevent"], {"key": "ArrowRight"})
+    tree = cycle(r, tree)
+    preview = [b.attrs["aria-label"].split()[1] for b in day_buttons_all(tree)
+               if "preview" in b.attrs["class"].split()]
+    assert preview == ["4", "5", "6"]
+    r.dispatch(days_by_label(tree)["Wednesday 6 March 2030"].events["click"], {})
+    assert a.stay == (D(2030, 3, 4), D(2030, 3, 6))
+
+
+def walk_tree(nodes):
+    for node in nodes:
+        if getattr(node, "tag", None):
+            yield node
+            yield from walk_tree(node.children)
+
+
+def test_a_range_with_a_form(tmp_path):
+    _, a, r, tree = app(
+        tmp_path,
+        """<div><ui.DateRangePicker label="Stay" @bind="stay" required="true"
+                 :error="form.error('stay')" @blur="form.touch('stay')" /></div>""",
+        "from pyweft_ui import Form, rules\nstay = None\nform = Form(stay=rules.required('Choose your dates'))",
+    )
+    r.dispatch(find(tree, cls("control")).events["click"], {})
+    tree = cycle(r, tree)
+    r.dispatch(find(tree, cls("backdrop")).events["click"], {})
+    tree = cycle(r, tree)
+    assert text([find(tree, cls("error"))]) == "Choose your dates"

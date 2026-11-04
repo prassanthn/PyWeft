@@ -12,7 +12,7 @@
     </button>
     <If cond="_open">
       <div class="backdrop" @click="close(False)"></div>
-      <div class="list" role="menu" :id="_id + '-list'" :aria-labelledby="_id + '-button'"
+      <div class="list" ref="list" role="menu" :id="_id + '-list'" :aria-labelledby="_id + '-button'"
            @keydown.down.prevent="move(1)" @keydown.up.prevent="move(-1)"
            @keydown.home.prevent="move_to(0)" @keydown.end.prevent="move_to(-1)"
            @keydown.tab="close(False)" @keydown.esc.stop="close(True)">
@@ -100,6 +100,7 @@ def open_at(self, which):
         return
     self._open = True
     self._active = stops[which]
+    self.keep_in_view("list")   # a button near the window's edge
     self.focus(f"item-{self._active}")
 
 def move(self, delta):

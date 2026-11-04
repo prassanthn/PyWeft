@@ -303,8 +303,9 @@ handlers and Web Worker background work; file and confirmation dialogs on
 both targets; the app's title and icon, and window settings; scoped styles
 and CSS framework support; the `pyweft` CLI with hot reload, static builds
 and pre-rendered first screens; calling web APIs and saving data between
-visits (`pyweft.http`, `pyweft.storage`); `pyweft-ui` with 24
-keyboard-accessible controls (a date picker and a menu among them), form
+visits (`pyweft.http`, `pyweft.storage`); `pyweft-ui` with 26
+keyboard-accessible controls (date and date-range pickers and a menu among
+them), form
 validation and a gallery; both released
 on PyPI.
 
