@@ -7,8 +7,10 @@
         <ui.Select :options="RADII" @bind="radius" aria-label="Corners" />
       </Fill>
       <Fill name="nav">
-        <input class="nav-search" type="search" placeholder="Search controls" aria-label="Search controls"
-               aria-controls="gallery-nav" @bind="nav_query" @keydown.enter.prevent="jump_to_first" />
+        <div class="nav-top">
+          <input class="nav-search" type="search" placeholder="Search controls" aria-label="Search controls"
+                 aria-controls="gallery-nav" @bind="nav_query" @keydown.enter.prevent="jump_to_first" />
+        </div>
         <div class="nav-list" id="gallery-nav">
           <For each="item in nav_items" key="item['slug']">
             <a class="nav-link" :href="'#' + item['slug']">
@@ -1026,8 +1028,16 @@ toast("Item deleted.", action="Undo", on_action=self.undo)""",
 .panel-text { margin: 0; }
 /* Sections jumped to (a link, or Enter in the search) keep a little room above. */
 [id] { scroll-margin-top: 16px; }
+/* The search stays at the top while the list scrolls under it: a band in
+   the page colour over the sidebar's padding, stuck to its scroller. */
+.nav-top {
+  /* top: -16px: the scroller's 16px padding counts, so 0 would stop short. */
+  position: sticky; top: -16px; z-index: 1; flex-basis: 100%;
+  margin: -16px -16px 0; padding: 16px 16px 8px;
+  background: var(--ui-bg);
+}
 .nav-search {
-  width: 100%; box-sizing: border-box; margin-bottom: 8px; padding: 7px 10px;
+  display: block; width: 100%; box-sizing: border-box; padding: 7px 10px;
   font: inherit; font-size: 0.9rem; color: var(--ui-text);
   background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius, 8px);
 }
