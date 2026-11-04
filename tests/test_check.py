@@ -1,5 +1,6 @@
 """pyweft check: what it finds, where, and that a good app is clean."""
 
+import importlib.util
 import json
 import textwrap
 
@@ -254,8 +255,12 @@ def test_the_examples_and_gallery_are_clean():
     from pathlib import Path
 
     root = Path(__file__).parent.parent
+    # The todo example's own dependency comes with the website group, which
+    # CI's test run doesn't install; check reports that as an import error.
+    absent = [] if importlib.util.find_spec("humanize") else ["no module named 'humanize'"]
     for app in ("examples/todo", "examples/shop", "packages/pyweft-ui/gallery"):
         problems, files = check_app(root / app, deps=False)   # (PyPI is off in tests)
+        problems = [p for p in problems if not (p.code == "import" and any(a in p.message for a in absent))]
         assert files and [str(p) for p in problems] == [], app
 
 
