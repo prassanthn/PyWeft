@@ -14,6 +14,11 @@ releasing moves them under the new version (see
   `query`) and the empty state with `<Fill name="empty">`. For server
   results: `@search`, `match="none"` and `loading`. `free="true"` keeps
   whatever was typed.
+- **`Chips`**: a row of chips to choose one or several from, with icons,
+  removable chips (`@remove`) and a keyboard row (arrows, Space, Delete).
+- **`ChipInput`**: type and press Enter or a comma to add a chip, × or
+  Backspace to remove one; suggestions from `options`, `free`, `max`,
+  custom chips and suggestions.
 - `AppShell`'s content area can shrink beside the sidebar, so wide content
   (a long line of code) no longer widens the page.
 

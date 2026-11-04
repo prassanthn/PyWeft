@@ -1,7 +1,7 @@
 # Using pyweft-ui
 
 This guide shows how to build screens with the ready-made controls: forms,
-autocomplete and validation, dates and calendars, layouts, menus, dialogs, tables
+autocomplete, chips and validation, dates and calendars, layouts, menus, dialogs, tables
 and themes, with complete examples you can paste into an app. The [README](../README.md) has the compact reference of every control's
 fields; this guide is the how-to.
 
@@ -15,6 +15,7 @@ fields; this guide is the how-to.
    - [Shaped input: mask](#shaped-input-mask)
    - [Options for Select and RadioGroup](#options-for-select-and-radiogroup)
    - [Suggestions as you type: Autocomplete](#suggestions-as-you-type-autocomplete)
+   - [Chips: Chips and ChipInput](#chips-chips-and-chipinput)
    - [Checkbox and Switch labels with links](#checkbox-and-switch-labels-with-links)
    - [Dates: DatePicker](#dates-datepicker)
    - [Date ranges: DateRangePicker](#date-ranges-daterangepicker)
@@ -234,6 +235,8 @@ What each one gives your field:
 | `Checkbox`, `Switch` | a `bool` |
 | `DatePicker` | a `datetime.date`, or `None` until one is chosen |
 | `Autocomplete` | the chosen option's value (with `free="true"`, the typed text) |
+| `Chips` | the chosen chip's value; with `multiple="true"`, a list |
+| `ChipInput` | a list: the typed texts, or the chosen options' values |
 
 ### Shaped input: mask
 
@@ -341,6 +344,54 @@ async def find_cities(self, query):
   its value); `min_chars` waits for that many characters; `placeholder`,
   `hint`, `error`, `required`, `disabled` and `@blur` work as on the other
   fields, so `Form` checks it like any other.
+
+### Chips: Chips and ChipInput
+
+**`Chips`** is a row of chips to choose from, a compact alternative to radio
+buttons and checkboxes:
+
+```xml
+<ui.Chips label="Size" options="Small, Medium, Large" @bind="size" />
+<ui.Chips label="Interests" :options="interests" multiple="true" @bind="chosen" />
+<ui.Chips label="Filters" :options="filters" removable="true" selectable="false"
+          @remove="drop_filter(event)" />
+```
+
+- One choice binds the chosen value (click it again to un-choose, unless
+  `required="true"`); `multiple="true"` binds a list, in the options' order.
+- `options` take `Select`'s forms; a dict can add `icon` and `disabled`. A
+  chosen chip shows a check mark.
+- **`removable="true"`** adds an × that emits `remove` with the chip's value:
+  remove it from `options` yourself. With `selectable="false"` the chips are
+  only labels, like a list of applied filters.
+- `<Fill name="option">` lays out a chip's text (it gets `option` and
+  `selected`).
+- **Keyboard:** the row is one Tab stop; Left and Right move, Home and End
+  jump, Space or Enter chooses, Delete or Backspace removes.
+
+**`ChipInput`** turns what's typed into chips, for tags, recipients or
+keywords. It binds a list:
+
+```xml
+<ui.ChipInput label="Tags" @bind="tags" />
+<ui.ChipInput label="Invite" :options="people" free="false" @bind="invitees">
+  <Fill name="chip">{{ chip['data']['initials'] }} {{ chip['label'] }}</Fill>
+</ui.ChipInput>
+```
+
+- **Enter or a comma** adds what's typed (`separators=",;"` for more), and a
+  pasted `"a, b, c"` adds three. **×** removes a chip, and so does
+  **Backspace** in the empty box. Leaving the field adds what's left in it
+  (`add_on_blur="false"` to drop it instead).
+- **With `options`** it suggests as you type, leaving out the ones already
+  added; the list holds the options' values, and text typed in full ("grace
+  hopper") counts as that option. `free="false"` allows only the options.
+- Duplicates are skipped (ignoring case for text); **`max`** limits how many
+  chips. `<Fill name="chip">` lays out a chip (it gets `chip`: `label`,
+  `value`, `data`), `<Fill name="option">` a suggestion, as in
+  `Autocomplete`. It emits `add` and `remove` with the value, and works
+  with `Form`: `rules.required()` asks for at least one, `rules.min_length(2)`
+  for two.
 
 ### Checkbox and Switch labels with links
 

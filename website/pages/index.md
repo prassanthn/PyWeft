@@ -95,8 +95,8 @@ then `pyweft new myapp` and `pyweft run myapp`.
 
     ---
 
-    `pyweft-ui`: buttons, menus, form fields with validation, autocomplete
-    and input masks, date and range pickers, an event calendar, tabs, sortable
+    `pyweft-ui`: buttons, menus, chips, form fields with validation,
+    autocomplete and input masks, date and range pickers, an event calendar, tabs, sortable
     tables, dialogs, toasts, layout, and light and dark themes. No HTML or
     CSS needed.
 

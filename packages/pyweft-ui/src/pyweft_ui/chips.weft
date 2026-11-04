@@ -1,0 +1,178 @@
+<template>
+  <div class="chips-field">
+    <If cond="label">
+      <span class="label" :id="_id + '-label'">{{ label }}<If cond="required"><span class="req" aria-hidden="true"> *</span></If></span>
+    </If>
+    <div class="chips" role="group" :aria-labelledby="_id + '-label' if label else None"
+         @keydown.left.prevent="step(-1)" @keydown.right.prevent="step(1)"
+         @keydown.home.prevent="step_to(0)" @keydown.end.prevent="step_to(-1)"
+         @keydown.delete.prevent="remove_focused">
+      <For each="c in chips" key="c['key']">
+        <span :class="c['classes']">
+          <button type="button" class="main" :ref="'c-' + str(c['index'])"
+                  :tabindex="'0' if c['index'] == tab_stop else '-1'"
+                  :aria-pressed="('true' if c['selected'] else 'false') if selectable else None"
+                  :disabled="disabled or c['disabled']" @click="toggle(c['index'])">
+            <If cond="selectable and c['selected']"><Icon name="check" size="1em" /></If>
+            <ElseIf cond="c['icon']"><Icon :name="c['icon']" size="1em" /></ElseIf>
+            <span class="text"><Slot name="option" :option="c" :selected="c['selected']">{{ c['label'] }}</Slot></span>
+          </button>
+          <If cond="removable">
+            <button type="button" class="x" tabindex="-1" :aria-label="'Remove ' + c['label']"
+                    :disabled="disabled or c['disabled']" @click="remove(c['index'])"><Icon name="x" size="0.85em" /></button>
+          </If>
+        </span>
+      </For>
+    </div>
+    <If cond="error"><span class="error">{{ error }}</span></If>
+    <ElseIf cond="hint"><span class="hint">{{ hint }}</span></ElseIf>
+  </div>
+</template>
+
+<code>
+# <ui.Chips :options="['Python', 'Rust', 'Go']" @bind="lang" />
+# A row of chips to choose from. Binds the chosen option's value, or with
+# multiple="true" a list of them. options take Select's forms; a dict may
+# add an icon and disabled. Clicking the chosen one again un-chooses it,
+# unless required="true" (single choice).
+#
+# removable="true" adds an x to each chip that emits "remove" with its value
+# (a list of applied filters: drop it from options). selectable="false"
+# makes them plain labels. <Fill name="option"> lays out a chip's text; it
+# gets option and selected.
+#
+# Keyboard: the row is one Tab stop; Left and Right move between chips,
+# Home and End to the ends, Space or Enter chooses, Delete or Backspace
+# removes (when removable).
+from pyweft_ui.options import normalize
+import itertools
+
+label: str = ""
+value = None              # the chosen value; with multiple, a list
+options: list = []
+multiple: bool = False
+selectable: bool = True
+removable: bool = False
+required: bool = False    # single choice: one must stay chosen
+disabled: bool = False
+hint: str = ""
+error: str = ""
+
+_ids = itertools.count(1)
+_focus = 0
+
+def on_init(self):
+    self._id = f"ui-chips-{next(_ids)}"
+
+@property
+def chosen(self):
+    if self.multiple:
+        return list(self.value or [])
+    return [] if self.value is None else [self.value]
+
+@property
+def chips(self):
+    chosen = self.chosen
+    out = []
+    for index, c in enumerate(normalize(self.options)):
+        selected = self.selectable and c["value"] in chosen
+        classes = ["chip"]
+        if selected:
+            classes.append("on")
+        if self.removable:
+            classes.append("removable")
+        out.append({**c, "index": index, "key": f"{index}-{c['value']}", "selected": selected,
+                    "classes": " ".join(classes)})
+    return out
+
+@property
+def tab_stop(self):
+    count = len(self.chips)
+    return self._focus if self._focus < count else 0
+
+def toggle(self, index):
+    self._focus = index
+    if not self.selectable:
+        return
+    chip = self.chips[index]
+    if chip["disabled"] or self.disabled:
+        return
+    if self.multiple:
+        chosen = self.chosen
+        wanted = [c["value"] for c in self.chips
+                  if (c["value"] in chosen) != (c["index"] == index)]
+        self.emit("update", wanted)
+    elif chip["selected"]:
+        if not self.required:
+            self.emit("update", None)
+    else:
+        self.emit("update", chip["value"])
+
+def remove(self, index):
+    chips = self.chips
+    if not 0 <= index < len(chips) or chips[index]["disabled"] or self.disabled:
+        return
+    gone = chips[index]["value"]
+    if self.multiple and gone in self.chosen:
+        self.emit("update", [v for v in self.chosen if v != gone])
+    elif not self.multiple and self.value == gone:
+        self.emit("update", None)
+    self.emit("remove", gone)
+    # Focus stays in the row: on the chip that takes this one's place.
+    self._focus = index - 1 if index == len(chips) - 1 and index else index
+    if len(chips) > 1:
+        self.focus(f"c-{self._focus}")
+
+def remove_focused(self):
+    if self.removable:
+        self.remove(self.tab_stop)
+
+def step(self, delta):
+    count = len(self.chips)
+    if count:
+        self.step_to((self.tab_stop + delta) % count)
+
+def step_to(self, index):
+    count = len(self.chips)
+    if count:
+        self._focus = index % count
+        self.focus(f"c-{self._focus}")
+</code>
+
+<style>
+.chips-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.label { font-size: 0.9rem; font-weight: 550; }
+.req { color: var(--ui-danger, #d1242f); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--ui-border, #d1d9e0); border-radius: 999px;
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.chip:hover { background: var(--ui-subtle, #f6f8fa); }
+.chip.on {
+  border-color: color-mix(in srgb, var(--ui-primary, #4f46e5) 45%, transparent);
+  background: color-mix(in srgb, var(--ui-primary, #4f46e5) 13%, var(--ui-surface, #fff));
+  color: color-mix(in srgb, var(--ui-primary, #4f46e5) 80%, var(--ui-text, #1f2328));
+}
+.main, .x {
+  font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer;
+  border-radius: 999px;
+}
+.main {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0.32em 0.85em; font-size: 0.88rem; font-weight: 550; line-height: 1.3;
+}
+.removable .main { padding-right: 0.35em; }
+.x { display: inline-flex; padding: 4px; margin-right: 4px; line-height: 0; color: var(--ui-muted, #59636e); }
+.x:hover { background: color-mix(in srgb, var(--ui-text, #1f2328) 10%, transparent); color: var(--ui-text, #1f2328); }
+.main:focus-visible, .x:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-primary, #4f46e5) 55%, transparent);
+}
+.main:disabled, .x:disabled { cursor: not-allowed; opacity: 0.5; }
+.text { display: inline-flex; align-items: center; gap: 6px; }
+.hint { font-size: 0.82rem; color: var(--ui-muted, #59636e); }
+.error { font-size: 0.82rem; color: var(--ui-danger, #d1242f); }
+</style>

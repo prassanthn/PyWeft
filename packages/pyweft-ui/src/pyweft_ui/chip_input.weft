@@ -1,0 +1,278 @@
+<template>
+  <div class="field">
+    <If cond="label">
+      <label class="label" :for="_id">{{ label }}<If cond="required"><span class="req" aria-hidden="true"> *</span></If></label>
+    </If>
+    <div class="combo">
+      <div :class="'box' + (' invalid' if error else '') + (' off' if disabled else '')" @click="focus('input')">
+        <!-- The chips get a wrapper of their own, so the input keeps its place
+             among the box's children: as one of them, a chip added before it
+             would make it a new element and lose the typing focus. -->
+        <span class="chip-list">
+        <For each="c in chips" key="c['key']">
+          <span class="chip">
+            <span class="text"><Slot name="chip" :chip="c">{{ c['label'] }}</Slot></span>
+            <button type="button" class="x" :aria-label="'Remove ' + c['label']" :disabled="disabled"
+                    @click="remove(c['index'])"><Icon name="x" size="0.85em" /></button>
+          </span>
+        </For>
+        </span>
+        <input class="entry" :id="_id" ref="input" autocomplete="off" :value="_text"
+               :placeholder="placeholder if not chips else None" :disabled="disabled or full"
+               :role="'combobox' if options else None" :aria-autocomplete="'list' if options else None"
+               :aria-expanded="('true' if _open else 'false') if options else None"
+               :aria-controls="_id + '-list' if options else None" :aria-activedescendant="active_id"
+               :aria-invalid="'true' if error else None"
+               @input="typed(event.value)" @blur="left"
+               @keydown.enter.prevent="enter" @keydown.down.prevent="move(1)" @keydown.up.prevent="move(-1)"
+               @keydown.esc="escape" @keydown.backspace="backspace" />
+      </div>
+      <If cond="name"><input type="hidden" :name="name" :value="','.join(str(v) for v in chosen)" /></If>
+      <If cond="_open and suggestions">
+        <ul class="list" ref="list" role="listbox" :id="_id + '-list'" @mousedown.prevent="">
+          <For each="m in suggestions" key="m['key']">
+            <li role="option" :id="_id + '-o-' + str(m['index'])" :ref="'o-' + str(m['index'])"
+                :class="'option active' if m['index'] == _active else 'option'"
+                :aria-selected="'true' if m['index'] == _active else 'false'"
+                @click="add_suggestion(m['index'])" @mouseenter="hover(m['index'])">
+              <Slot name="option" :option="m" :active="m['index'] == _active" :query="_text">
+                <span>{{ m['before'] }}<mark>{{ m['match'] }}</mark>{{ m['after'] }}</span>
+              </Slot>
+            </li>
+          </For>
+        </ul>
+      </If>
+    </div>
+    <If cond="error"><span class="error">{{ error }}</span></If>
+    <ElseIf cond="hint"><span class="hint">{{ hint }}</span></ElseIf>
+  </div>
+</template>
+
+<code>
+# <ui.ChipInput label="Tags" @bind="tags" />
+# A field where what's typed becomes chips: Enter or a comma adds one,
+# x or Backspace (in the empty box) removes one. Binds a list.
+#
+# options="..." (Select's forms) suggests as you type; the list then holds
+# the chosen options' values. free="false" allows only those; by default
+# anything typed is kept, as text (or as an option's value when it matches
+# its label). Duplicates are skipped; max limits how many. Leaving the
+# field adds what's typed (add_on_blur). <Fill name="chip"> lays out a
+# chip (gets chip: label, value, data); <Fill name="option"> a suggestion
+# (option, active, query). Emits update, add, remove and blur.
+from pyweft_ui.options import label_of, find, matches, normalize
+import itertools
+
+label: str = ""
+value: list = []
+options: list = []
+free: bool = True
+separators: str = ","     # typed characters that end a chip, besides Enter
+max: int = 0              # at most this many chips (0: no limit)
+add_on_blur: bool = True
+match: str = "contains"
+placeholder: str = ""
+hint: str = ""
+error: str = ""
+name: str = ""            # the values joined with commas, in a <form>
+required: bool = False
+disabled: bool = False
+
+_ids = itertools.count(1)
+_text = ""
+_open = False
+_active = 0
+
+def on_init(self):
+    self._id = f"ui-chipin-{next(_ids)}"
+
+@property
+def choices(self):
+    return normalize(self.options)
+
+@property
+def chosen(self):
+    return list(self.value or [])
+
+@property
+def chips(self):
+    choices = self.choices
+    out = []
+    for index, value in enumerate(self.chosen):
+        option = next((c for c in choices if c["value"] == value), None)
+        out.append({"index": index, "key": f"{index}-{value}", "value": value,
+                    "label": label_of(choices, value), "data": option["data"] if option else value})
+    return out
+
+@property
+def full(self):
+    # Not min()/max(): the max field above hides the builtin here.
+    return bool(self.max) and len(self.chosen) >= self.max
+
+@property
+def suggestions(self):
+    if not self.options:
+        return []
+    return matches(self.choices, self._text, self.match, 8, exclude=self.chosen)
+
+@property
+def active_id(self):
+    if not self._open or not self.suggestions:
+        return None
+    return f"{self._id}-o-{self._active}"
+
+def _value_of(self, text):
+    """What typed text adds: a matching option's value, else the text when
+    free; None for nothing."""
+    text = text.strip()
+    if not text:
+        return None
+    option = find(self.choices, text) if self.options else None
+    if option is not None:
+        return option["value"]
+    return text if self.free else None
+
+def _add(self, values):
+    # One update for everything added, however many: the bound list only
+    # catches up on the next render, so adding one at a time would lose all
+    # but the last.
+    def same(a, b):
+        return a.lower() == b.lower() if isinstance(a, str) and isinstance(b, str) else a == b
+    new = self.chosen
+    added = []
+    for value in values:
+        if value is None or (self.max and len(new) >= self.max):
+            continue
+        if any(same(v, value) for v in new):
+            continue
+        new.append(value)
+        added.append(value)
+    if added:
+        self.emit("update", new)
+        for value in added:
+            self.emit("add", value)
+    return new
+
+def typed(self, text):
+    # A separator typed (or pasted) ends one chip, or several.
+    done = []
+    for sep in self.separators:
+        if sep and sep in text:
+            *parts, text = text.split(sep)
+            done += parts
+            text = text.lstrip()   # "a, b" leaves "b", not " b"
+    self._add([self._value_of(part) for part in done])
+    self._text = text
+    self._active = 0
+    self._open = bool(text.strip()) or bool(self.options)
+    if self._open and self.suggestions:
+        self.keep_in_view("list")
+
+def add_suggestion(self, index):
+    found = self.suggestions
+    if 0 <= index < len(found):
+        self._add([found[index]["value"]])
+        self._text = ""
+        self._active = 0
+        self.focus("input")
+
+def enter(self):
+    if self._open and self.suggestions and (self._text.strip() or not self.free):
+        self.add_suggestion(self._active)
+    else:
+        self._add([self._value_of(self._text)])
+        self._text = ""
+
+def move(self, delta):
+    if not self._open:
+        self._open = True
+        return
+    count = len(self.suggestions)
+    if count:
+        self._active = (self._active + delta) % count
+        self.scroll_to(f"o-{self._active}")
+
+def hover(self, index):
+    self._active = index
+
+def escape(self):
+    if self._open:
+        self._open = False
+    else:
+        self._text = ""
+
+def backspace(self):
+    # Backspace in the empty box takes the last chip; the text it holds
+    # before this key is what decides (the input event comes after).
+    if not self._text and self.chosen:
+        self.remove(len(self.chosen) - 1)
+
+def remove(self, index):
+    values = self.chosen
+    if self.disabled or not 0 <= index < len(values):
+        return
+    gone = values[index]
+    self.emit("update", values[:index] + values[index + 1:])
+    self.emit("remove", gone)
+    self.focus("input")
+
+def left(self):
+    self._open = False
+    now = self.chosen
+    if self.add_on_blur and self._text.strip():
+        now = self._add([self._value_of(self._text)])
+        self._text = ""
+    self.emit("blur", now)   # with what was just added
+</code>
+
+<style>
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.label { font-size: 0.9rem; font-weight: 550; }
+.req { color: var(--ui-danger, #d1242f); }
+.combo { position: relative; }
+.box {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  min-height: 2.6em; box-sizing: border-box; padding: 0.3em 0.45em;
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+  border: 1px solid var(--ui-border, #d1d9e0); border-radius: var(--ui-radius, 8px);
+  cursor: text; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.box:focus-within {
+  border-color: var(--ui-primary, #4f46e5);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 25%, transparent);
+}
+.box.invalid { border-color: var(--ui-danger, #d1242f); }
+.box.off { opacity: 0.6; cursor: not-allowed; }
+.chip-list { display: contents; }
+.chip {
+  display: inline-flex; align-items: center; gap: 2px; max-width: 100%;
+  padding: 0.15em 0.2em 0.15em 0.7em; font-size: 0.86rem; font-weight: 550;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-primary, #4f46e5) 13%, var(--ui-surface, #fff));
+  color: color-mix(in srgb, var(--ui-primary, #4f46e5) 80%, var(--ui-text, #1f2328));
+}
+.text { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.x {
+  display: inline-flex; padding: 3px; border: 0; border-radius: 999px; line-height: 0;
+  background: transparent; color: inherit; cursor: pointer;
+}
+.x:hover { background: color-mix(in srgb, var(--ui-primary, #4f46e5) 22%, transparent); }
+.x:focus-visible { outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-primary, #4f46e5) 55%, transparent); }
+.entry {
+  flex: 1; min-width: 6rem; padding: 0.25em 0.3em;
+  font: inherit; color: inherit; background: transparent; border: 0; outline: none;
+}
+.hint { font-size: 0.82rem; color: var(--ui-muted, #59636e); }
+.error { font-size: 0.82rem; color: var(--ui-danger, #d1242f); }
+.list {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 1000;
+  box-sizing: border-box; max-height: 16rem; overflow-y: auto;
+  margin: 0; padding: 4px; list-style: none;
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+  border: 1px solid var(--ui-border, #d1d9e0); border-radius: var(--ui-radius, 8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+.option { display: flex; align-items: center; gap: 0.6em; padding: 0.45em 0.6em; border-radius: calc(var(--ui-radius, 8px) - 2px); cursor: pointer; font-size: 0.93rem; }
+.option.active { background: color-mix(in srgb, var(--ui-primary, #4f46e5) 12%, var(--ui-surface, #fff)); }
+mark { background: transparent; color: inherit; font-weight: 700; }
+</style>

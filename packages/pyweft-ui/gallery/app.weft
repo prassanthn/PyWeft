@@ -96,6 +96,42 @@
           </ui.Column>
         </ui.Card>
 
+        <ui.Card title="Chips" id="chips" subtitle="Choose from a row, or type to add">
+          <ui.Column gap="lg">
+            <ui.Chips label="Size" options="Small, Medium, Large" @bind="chip_size" required="true" />
+            <ui.Chips label="Interests" multiple="true" @bind="interests"
+                      :options="[{'value': 'music', 'label': 'Music', 'icon': 'heart'},
+                                 {'value': 'travel', 'label': 'Travel', 'icon': 'send'},
+                                 {'value': 'books', 'label': 'Books', 'icon': 'star'},
+                                 {'value': 'games', 'label': 'Games', 'disabled': True}]" />
+            <ui.Row align="center">
+              <ui.Chips label="Filters" :options="filters" removable="true" selectable="false"
+                        @remove="drop_filter(event)" />
+              <If cond="len(filters) &lt; 3">
+                <ui.Button size="sm" variant="ghost" @click="filters = ['Open', 'Assigned to me', 'This week']">Reset</ui.Button>
+              </If>
+            </ui.Row>
+            <ui.Grid min_width="16rem" gap="lg">
+              <ui.ChipInput label="Tags" placeholder="Type, then Enter or a comma" @bind="tags"
+                            hint="Backspace in the empty box removes the last" />
+              <ui.ChipInput label="Invite" placeholder="Name or email" :options="PEOPLE" free="false"
+                            @bind="invitees">
+                <Fill name="chip"><span class="avatar small">{{ chip['data']['initials'] }}</span>{{ chip['label'] }}</Fill>
+                <Fill name="option">
+                  <span class="avatar">{{ option['data']['initials'] }}</span>
+                  <span class="person">
+                    <span class="person-name">{{ option['label'] }}</span>
+                    <span class="person-mail">{{ option['data']['email'] }}</span>
+                  </span>
+                </Fill>
+              </ui.ChipInput>
+            </ui.Grid>
+            <pre class="state">size={{ repr(chip_size) }}  interests={{ repr(interests) }}
+tags={{ repr(tags) }}  invitees={{ repr(invitees) }}</pre>
+            <pre class="code">{{ CODE['chips'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
         <ui.Card title="Dates and menus" id="dates-and-menus">
           <ui.Column gap="lg">
             <ui.Grid min_width="16rem" gap="lg">
@@ -225,7 +261,7 @@ import asyncio
 import datetime
 from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Autocomplete", "Dates and menus", "Calendars", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Autocomplete", "Chips", "Dates and menus", "Calendars", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -272,6 +308,14 @@ picked_day = None
 picked_event: str = ""
 two_months: bool = False
 country = None
+chip_size: str = "Medium"
+interests: list = ["travel"]
+filters: list = ["Open", "Assigned to me", "This week"]
+tags: list = ["python", "ui"]
+invitees: list = []
+
+def drop_filter(self, name):
+    self.filters = [f for f in self.filters if f != name]
 assignee = None
 city = None
 cities: list = []
@@ -411,6 +455,15 @@ def submit(self):
 
 <ui.Autocomplete label="City" :options="cities" match="none" :loading="searching"
                  @search="find_cities(event)" @bind="city" />""",
+    "chips": """<ui.Chips options="Small, Medium, Large" @bind="size" />
+<ui.Chips :options="interests" multiple="true" @bind="chosen" />
+<ui.Chips :options="filters" removable="true" selectable="false"
+          @remove="drop_filter(event)" />
+
+<ui.ChipInput label="Tags" @bind="tags" />
+<ui.ChipInput label="Invite" :options="people" free="false" @bind="invitees">
+  <Fill name="chip">{{ chip['data']['initials'] }} {{ chip['label'] }}</Fill>
+</ui.ChipInput>""",
     "calendars": """<ui.Calendar @bind="day" />
 
 <ui.EventCalendar :events="events" @select="open(event)" @day="add(event)" />
@@ -463,6 +516,7 @@ toast("Item deleted.", action="Undo", on_action=self.undo)""",
   font-size: 0.72rem; font-weight: 700;
   background: color-mix(in srgb, var(--ui-primary) 15%, transparent); color: var(--ui-primary);
 }
+.avatar.small { width: 1.35rem; height: 1.35rem; font-size: 0.6rem; margin-left: -0.45em; }
 .person { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .person-name { font-weight: 600; }
 .person-mail { font-size: 0.8rem; color: var(--ui-muted); overflow: hidden; text-overflow: ellipsis; }
