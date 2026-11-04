@@ -401,15 +401,22 @@ const PyWeftRuntime = (() => {
         case "keep_in_view": {
           // Measured where its CSS put it, then nudged back inside the
           // window with `translate`, which leaves `transform` (and any
-          // animation using it) alone. 8px of margin from either edge.
+          // animation using it) alone. 8px of margin from either edge;
+          // up and down too only when asked (cmd.vertical).
           if (!el) break;
           el.style.translate = "";
           const box = el.getBoundingClientRect();
           const width = document.documentElement.clientWidth;
+          const height = document.documentElement.clientHeight;
           let dx = 0;
+          let dy = 0;
           if (box.right > width - 8) dx = width - 8 - box.right;
           if (box.left + dx < 8) dx = 8 - box.left;
-          if (dx) el.style.translate = `${Math.round(dx)}px 0`;
+          if (cmd.vertical) {
+            if (box.bottom > height - 8) dy = height - 8 - box.bottom;
+            if (box.top + dy < 8) dy = 8 - box.top;
+          }
+          if (dx || dy) el.style.translate = `${Math.round(dx)}px ${Math.round(dy)}px`;
           break;
         }
         case "save_focus":

@@ -105,3 +105,12 @@ def test_keep_in_view_names_the_element():
     commands = renderer.take_commands()
     assert [c["op"] for c in commands] == ["keep_in_view", "scroll_to"]
     assert _node_at(to_dicts(tree), commands[0]["path"])["attrs"]["class"] == "field"
+
+
+def test_keep_in_view_vertically_on_request():
+    app, renderer, tree = mount()
+    app.keep_in_view("city", vertical=True)
+    app.keep_in_view("city")
+    first, second = renderer.take_commands()
+    assert first["vertical"] is True and "vertical" not in second
+    assert first["path"] == second["path"]

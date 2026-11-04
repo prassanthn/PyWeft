@@ -123,12 +123,17 @@ class Component:
         """Scroll the page so the element marked ``ref`` is in view."""
         self._pw_request("scroll_to", ref)
 
-    def keep_in_view(self, ref: str) -> None:
+    def keep_in_view(self, ref: str, vertical: bool = False) -> None:
         """Shift the element marked ``ref`` sideways just enough to keep it
         inside the window, for a popup that opens next to something near
         the edge: a menu, a calendar. It is measured once it is on the
-        page, so call this as it opens."""
-        self._pw_request("keep_in_view", ref)
+        page, so call this as it opens. ``vertical=True`` shifts it up or
+        down too, for a popup placed at a point (a context menu at the
+        pointer) rather than under something the page can scroll to."""
+        if vertical:
+            self._pw_request("keep_in_view", ref, vertical=True)
+        else:
+            self._pw_request("keep_in_view", ref)
 
     def save_focus(self) -> None:
         """Remember what has focus now, for ``restore_focus()``: a popup
@@ -140,14 +145,14 @@ class Component:
         still on the page."""
         self._pw_request("restore_focus")
 
-    def _pw_request(self, op: str, ref: str | None = None) -> None:
+    def _pw_request(self, op: str, ref: str | None = None, **options: Any) -> None:
         command = self.__dict__.get("_pw_command")
         if command is None:
             raise RuntimeError(
                 f"{type(self).__name__}.{op}() needs the component to be rendered "
                 "(call it from on_init or later), and not yet removed"
             )
-        command(op, ref)
+        command(op, ref, **options)
         # Even when nothing else changed, the host must render and settle to
         # reach the point where it carries requests out.
         self.state_has_changed()

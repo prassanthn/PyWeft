@@ -8,6 +8,9 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- `keep_in_view(ref, vertical=True)` also shifts the element up or down
+  to keep it inside the window, for popups placed at a point (a context
+  menu at the pointer). Without it, only sideways, as before.
 - Fixed: an apostrophe in an HTML comment in a template (`<!-- the box's
   -->`) left every later `@event` and `:attr` unrewritten, so the template
   failed to parse. Comments are now passed through untouched, and

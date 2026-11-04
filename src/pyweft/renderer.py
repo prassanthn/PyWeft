@@ -167,7 +167,7 @@ class Renderer:
         # and the focus/scroll requests waiting for take_commands().
         self._refs: dict[tuple[int, str], Element] = {}
         self._tree: list[Node] = []
-        self._commands: list[tuple[Any, str, str | None]] = []
+        self._commands: list[tuple[Any, str, str | None, dict[str, Any]]] = []
         self._watch(component)
         _live_renderers.add(self)  # a Store's changes and set_title() reach this host
 
@@ -178,12 +178,12 @@ class Renderer:
 
     # -------------------------------------------------------------- commands
 
-    def _command(self, component: Any, op: str, ref: str | None) -> None:
-        self._commands.append((component, op, ref))
+    def _command(self, component: Any, op: str, ref: str | None, **options: Any) -> None:
+        self._commands.append((component, op, ref, options))
 
     def set_title(self, text: str) -> None:
         """See the module-level set_title()."""
-        self._commands.append((None, "set_title", text))
+        self._commands.append((None, "set_title", text, {}))
 
     def take_commands(self) -> list[dict[str, Any]]:
         """Requests such as ``focus("email")`` made since the last call, as
@@ -197,7 +197,7 @@ class Renderer:
         request whose ``ref`` isn't on the page is dropped, like an event
         for a vanished handler."""
         out: list[dict[str, Any]] = []
-        for component, op, ref in self._commands:
+        for component, op, ref, options in self._commands:
             if op == "set_title":
                 out.append({"op": op, "text": ref})
                 continue
@@ -207,7 +207,7 @@ class Renderer:
             element = self._refs.get((id(component), ref))
             path = self._path_to(element) if element is not None else None
             if path is not None:
-                out.append({"op": op, "path": path})
+                out.append({"op": op, "path": path, **options})
         self._commands = []
         return out
 
