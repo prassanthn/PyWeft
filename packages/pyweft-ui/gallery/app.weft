@@ -57,6 +57,11 @@
           <pre class="code">{{ CODE['validation'] }}</pre>
         </ui.Card>
 
+        <ui.Card title="Stepper" id="stepper" subtitle="A checkout in steps; Next checks each one">
+          <OrderSteps />
+          <pre class="code">{{ CODE['stepper'] }}</pre>
+        </ui.Card>
+
         <ui.Card title="Choices" id="choices">
           <ui.Grid min_width="14rem" gap="lg">
             <ui.RadioGroup label="Plan" :options="PLANS" @bind="plan" />
@@ -333,7 +338,7 @@ import asyncio
 import datetime
 from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Autocomplete", "Chips", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -545,6 +550,19 @@ CODE = {
 <ui.Select label="Size" options="Small, Medium, Large" @bind="size" />
 <ui.TextArea label="Notes" rows="3" @bind="notes" />
 <ui.TextField label="Phone" mask="(999) 999-9999" @bind="phone" />""",
+    "stepper": """<ui.Stepper :steps="steps" @bind="step" linear="true"
+            @next="check(event)" @finish="place_order" finish_label="Place order">
+  <If cond="step == 'account'"> ... </If>
+  <ElseIf cond="step == 'delivery'"> ... </ElseIf>
+</ui.Stepper>
+
+steps = [("account", "Account"), ("delivery", "Delivery"),
+         {"value": "gift", "label": "Gift message", "optional": True},
+         ("review", "Review")]
+
+def check(self, step):          # False keeps the stepper on this step
+    form = {"account": self.account, "delivery": self.delivery}.get(step)
+    return form.check() if form is not None else True""",
     "validation": """form = Form(
     email=[rules.required(), rules.email()],
     password=[rules.required(), rules.min_length(8)],

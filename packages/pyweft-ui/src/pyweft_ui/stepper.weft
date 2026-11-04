@@ -1,0 +1,337 @@
+<template>
+  <div :class="classes">
+    <If cond="orientation == 'vertical'">
+      <ol class="v-steps" role="tablist" aria-orientation="vertical" :aria-label="label or None">
+        <For each="s in step_list" key="s['key']">
+          <li :class="'v-item ' + state(s)">
+            <button type="button" role="tab" :ref="'h-' + str(s['index'])" :class="'head ' + state(s)"
+                    :id="_id + '-h' + str(s['index'])" :aria-selected="'true' if s['current'] else 'false'"
+                    :aria-controls="_id + '-panel' if s['current'] else None" :aria-label="spoken(s)"
+                    :tabindex="'0' if s['index'] == focus_index else '-1'" :disabled="not s['reachable']"
+                    @click="pick(s['index'])" @keydown.down.prevent="roam(1)" @keydown.up.prevent="roam(-1)"
+                    @keydown.home.prevent="roam_to(0)" @keydown.end.prevent="roam_to(-1)">
+              <span class="dot">
+                <If cond="s['error']"><Icon name="alert" size="1em" /></If>
+                <ElseIf cond="s['done'] and not s['current']"><Icon name="check" size="1em" /></ElseIf>
+                <Else>{{ s['index'] + 1 }}</Else>
+              </span>
+              <span class="labels">
+                <span class="label">{{ s['label'] }}</span>
+                <If cond="s['error']"><span class="err">{{ s['error'] }}</span></If>
+                <ElseIf cond="s['description']"><span class="desc">{{ s['description'] }}</span></ElseIf>
+                <ElseIf cond="s['optional']"><span class="desc">{{ optional_label }}</span></ElseIf>
+              </span>
+            </button>
+            <div class="v-body">
+              <If cond="s['current']">
+                <div class="panel" role="tabpanel" ref="panel" tabindex="-1" :id="_id + '-panel'"
+                     :aria-labelledby="_id + '-h' + str(s['index'])">
+                  <Slot :step="s['value']" :index="s['index']" />
+                  <div class="actions">
+                    <Slot name="actions" :step="s['value']" :index="s['index']" :first="s['index'] == 0"
+                          :last="s['last']" :go_next="go_next" :go_back="go_back">
+                      <If cond="s['index'] &gt; 0"><Button variant="ghost" @click="go_back()">{{ back_label }}</Button></If>
+                      <Button variant="primary" @click="go_next()">{{ finish_label if s['last'] else next_label }}</Button>
+                    </Slot>
+                  </div>
+                </div>
+              </If>
+            </div>
+          </li>
+        </For>
+      </ol>
+    </If>
+    <Else>
+      <div class="h-steps" role="tablist" :aria-label="label or None">
+        <For each="s in step_list" key="s['key']">
+          <div :class="'h-item ' + state(s)">
+            <button type="button" role="tab" :ref="'h-' + str(s['index'])" :class="'head ' + state(s)"
+                    :id="_id + '-h' + str(s['index'])" :aria-selected="'true' if s['current'] else 'false'"
+                    :aria-controls="_id + '-panel' if s['current'] else None" :aria-label="spoken(s)"
+                    :tabindex="'0' if s['index'] == focus_index else '-1'" :disabled="not s['reachable']"
+                    @click="pick(s['index'])" @keydown.right.prevent="roam(1)" @keydown.left.prevent="roam(-1)"
+                    @keydown.home.prevent="roam_to(0)" @keydown.end.prevent="roam_to(-1)">
+              <span class="dot">
+                <If cond="s['error']"><Icon name="alert" size="1em" /></If>
+                <ElseIf cond="s['done'] and not s['current']"><Icon name="check" size="1em" /></ElseIf>
+                <Else>{{ s['index'] + 1 }}</Else>
+              </span>
+              <span class="labels">
+                <span class="label">{{ s['label'] }}</span>
+                <If cond="s['error']"><span class="err">{{ s['error'] }}</span></If>
+                <ElseIf cond="s['description']"><span class="desc">{{ s['description'] }}</span></ElseIf>
+                <ElseIf cond="s['optional']"><span class="desc">{{ optional_label }}</span></ElseIf>
+              </span>
+            </button>
+            <If cond="not s['last'] and label_position != 'bottom'"><span class="line" aria-hidden="true"></span></If>
+          </div>
+        </For>
+      </div>
+      <For each="s in current_only" key="s['key']">
+        <div :class="'panel ' + _direction" role="tabpanel" ref="panel" tabindex="-1" :id="_id + '-panel'"
+             :aria-labelledby="_id + '-h' + str(s['index'])">
+          <Slot :step="s['value']" :index="s['index']" />
+          <div class="actions">
+            <Slot name="actions" :step="s['value']" :index="s['index']" :first="s['index'] == 0"
+                  :last="s['last']" :go_next="go_next" :go_back="go_back">
+              <If cond="s['index'] &gt; 0"><Button variant="ghost" @click="go_back()">{{ back_label }}</Button></If>
+              <Button variant="primary" @click="go_next()">{{ finish_label if s['last'] else next_label }}</Button>
+            </Slot>
+          </div>
+        </div>
+      </For>
+    </Else>
+  </div>
+</template>
+
+<code>
+# <ui.Stepper :steps="[('account', 'Account'), ('address', 'Address'), ('review', 'Review')]"
+#             linear="true" @bind="step" @next="form.check()" @finish="submit">
+#   <If cond="step == 'account'"> ... </If>
+#   <ElseIf cond="step == 'address'"> ... </ElseIf>
+# </ui.Stepper>
+# A task in steps, one shown at a time, with Back and Next under it. The
+# content between the tags is the current step's body; `step` (its value)
+# and `index` are available in it, so it also works without @bind.
+# steps take Select's forms; a dict can add description, optional, error
+# (a message: the step is shown in red), done and disabled.
+# @next runs before moving on (Next, or Finish on the last step); if it
+# returns False the stepper stays: @next="form.check()" validates the
+# step. A step left with Next counts as done, unless its dict says
+# "done". linear="true": a step can't be opened until those before it
+# are done (optional ones excepted). Emits update (the step's value, for
+# @bind), next, back and finish.
+# <Fill name="actions"> replaces Back/Next; it gets step, index, first,
+# last, and go_next() / go_back() to call.
+import itertools
+
+from pyweft_ui.options import normalize
+
+label: str = ""           # names the step list for screen readers
+value = None              # the current step's value
+steps: list = []
+linear: bool = False
+orientation: str = "horizontal"   # or vertical
+label_position: str = "end"       # end (beside the number) or bottom
+back_label: str = "Back"
+next_label: str = "Next"
+finish_label: str = "Finish"
+optional_label: str = "Optional"
+
+_ids = itertools.count(1)
+_picked = None
+_focus = None             # the header that is the Tab stop, if moved
+_direction = "forward"    # which way the last move went (for the slide)
+
+def on_init(self):
+    self._id = f"ui-stepper-{next(_ids)}"
+    self._done = set()
+
+@property
+def raw(self):
+    out = []
+    for i, c in enumerate(normalize(self.steps)):
+        extra = c["data"] if isinstance(c["data"], dict) else {}
+        out.append({
+            "index": i, "key": str(c["value"]), "value": c["value"], "label": c["label"],
+            "description": str(extra.get("description") or ""),
+            "optional": bool(extra.get("optional")), "error": str(extra.get("error") or ""),
+            "disabled": c["disabled"], "set_done": extra.get("done"),
+        })
+    return out
+
+@property
+def current_index(self):
+    values = [s["value"] for s in self.raw]
+    for candidate in (self.value, self._picked):
+        if candidate is not None and candidate in values:
+            return values.index(candidate)
+    return 0
+
+@property
+def step_list(self):
+    items = self.raw
+    current = self.current_index
+    blocked = False           # linear: a step before this one isn't done
+    for s in items:
+        s["done"] = bool(s["set_done"]) if s["set_done"] is not None else s["key"] in self._done
+        s["current"] = s["index"] == current
+        s["last"] = s["index"] == len(items) - 1
+        s["reachable"] = not s["disabled"] and not (self.linear and blocked)
+        if not (s["done"] or s["optional"]):
+            blocked = True
+    return items
+
+@property
+def current_only(self):
+    return [s for s in self.step_list if s["current"]]
+
+@property
+def focus_index(self):
+    usable = [s["index"] for s in self.step_list if s["reachable"]]
+    if self._focus in usable:
+        return self._focus
+    return self.current_index
+
+@property
+def classes(self):
+    names = ["stepper", self.orientation, "labels-" + self.label_position]
+    return " ".join(names)
+
+def state(self, s):
+    names = []
+    if s["current"]:
+        names.append("current")
+    if s["done"]:
+        names.append("done")
+    if s["error"]:
+        names.append("error")
+    return " ".join(names)
+
+def spoken(self, s):
+    words = [f"Step {s['index'] + 1} of {len(self.raw)}: {s['label']}"]
+    if s["error"]:
+        words.append(f"error: {s['error']}")
+    elif s["done"]:
+        words.append("completed")
+    if s["optional"]:
+        words.append(self.optional_label.lower())
+    return ", ".join(words)
+
+# ------------------------------------------------------------- moving
+
+def _go(self, index, focus_panel):
+    items = self.raw
+    if not 0 <= index < len(items):
+        return
+    self._direction = "back" if index < self.current_index else "forward"
+    self._picked = items[index]["value"]
+    self._focus = None
+    self.emit("update", items[index]["value"])
+    if focus_panel:
+        self.focus("panel")
+
+def pick(self, index):
+    self._go(index, False)
+    self._focus = index
+
+def go_next(self):
+    items = self.step_list
+    if not items:
+        return
+    here = items[self.current_index]
+    # The owner's @next decides: False keeps us here (say, a form check).
+    if self.emit("next", here["value"]) is False:
+        return
+    self._done.add(here["key"])
+    if here["last"]:
+        self.emit("finish", here["value"])
+        return
+    later = [s["index"] for s in items if s["index"] > here["index"] and not s["disabled"]]
+    if later:
+        self._go(later[0], True)
+
+def go_back(self):
+    items = self.step_list
+    earlier = [s["index"] for s in items if s["index"] < self.current_index and not s["disabled"]]
+    if earlier:
+        self.emit("back", items[self.current_index]["value"])
+        self._go(earlier[-1], True)
+
+# The headers are one Tab stop; arrows move between the ones that can be
+# opened, Enter or Space opens one.
+def roam(self, delta):
+    usable = [s["index"] for s in self.step_list if s["reachable"]]
+    if not usable:
+        return
+    at = usable.index(self.focus_index) if self.focus_index in usable else 0
+    self.roam_to((at + delta) % len(usable))
+
+def roam_to(self, position):
+    usable = [s["index"] for s in self.step_list if s["reachable"]]
+    if usable:
+        self._focus = usable[position]
+        self.focus(f"h-{self._focus}")
+</code>
+
+<style>
+.stepper { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+/* ---- headers */
+.head {
+  display: flex; align-items: center; gap: 10px; padding: 6px 8px; margin: 0;
+  border: 0; border-radius: var(--ui-radius, 8px); background: transparent;
+  font: inherit; color: var(--ui-text, #1f2328); text-align: left; cursor: pointer;
+}
+.head:hover:not(:disabled) { background: var(--ui-subtle, #f6f8fa); }
+.head:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 35%, transparent);
+}
+.head:disabled { cursor: default; color: var(--ui-muted, #59636e); }
+.dot {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%; box-sizing: border-box;
+  font-size: 0.82rem; font-weight: 650; font-variant-numeric: tabular-nums;
+  border: 1.5px solid var(--ui-border, #d1d9e0); color: var(--ui-muted, #59636e);
+  background: var(--ui-surface, #fff);
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+.head.done .dot { border-color: var(--ui-primary, #4f46e5); color: var(--ui-primary, #4f46e5); }
+.head.current .dot {
+  background: var(--ui-primary, #4f46e5); border-color: var(--ui-primary, #4f46e5);
+  color: var(--ui-on-primary, #fff);
+}
+.head.error .dot { background: transparent; border-color: var(--ui-danger, #d1242f); color: var(--ui-danger, #d1242f); }
+.labels { display: flex; flex-direction: column; min-width: 0; }
+.label { font-size: 0.93rem; font-weight: 550; white-space: nowrap; }
+.head.current .label { font-weight: 650; }
+.desc { font-size: 0.78rem; color: var(--ui-muted, #59636e); white-space: nowrap; }
+.err { font-size: 0.78rem; color: var(--ui-danger, #d1242f); white-space: nowrap; }
+.head.error .label { color: var(--ui-danger, #d1242f); }
+/* ---- horizontal */
+.h-steps { display: flex; align-items: flex-start; overflow-x: auto; scrollbar-width: thin; padding: 3px; }
+.h-item { display: flex; align-items: center; flex: 1 1 auto; min-width: 0; }
+.h-item:last-child { flex: none; }
+.line {
+  flex: 1 1 24px; min-width: 24px; height: 1.5px; margin: 0 4px;
+  background: var(--ui-border, #d1d9e0); transition: background-color 0.2s;
+}
+.h-item.done .line { background: var(--ui-primary, #4f46e5); }
+.labels-end .h-item { align-self: center; }
+/* Labels under the numbers: equal columns, the line drawn between dots. */
+.labels-bottom .h-item { flex: 1 1 0; position: relative; justify-content: center; min-width: 88px; }
+.horizontal.labels-bottom .head { flex-direction: column; text-align: center; gap: 6px; }
+.horizontal.labels-bottom .labels { align-items: center; }
+.labels-bottom .h-item:not(:last-child)::after {
+  content: ""; position: absolute; top: 20px; height: 1.5px;
+  left: calc(50% + 22px); right: calc(-50% + 22px);
+  background: var(--ui-border, #d1d9e0);
+}
+.labels-bottom .h-item.done:not(:last-child)::after { background: var(--ui-primary, #4f46e5); }
+.panel { outline: none; display: flex; flex-direction: column; gap: 16px; }
+.panel:focus-visible {
+  border-radius: var(--ui-radius, 8px);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 30%, transparent);
+}
+.horizontal .panel.forward { animation: ui-stepper-from-right 0.22s ease-out; }
+.horizontal .panel.back { animation: ui-stepper-from-left 0.22s ease-out; }
+@keyframes ui-stepper-from-right { from { opacity: 0; transform: translateX(24px); } }
+@keyframes ui-stepper-from-left { from { opacity: 0; transform: translateX(-24px); } }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+/* ---- vertical */
+.v-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.v-item { display: flex; flex-direction: column; }
+.v-body {
+  margin-left: 22px; padding: 4px 0 4px 24px; min-height: 16px;
+  border-left: 1.5px solid var(--ui-border, #d1d9e0);
+}
+.v-item.done > .v-body { border-left-color: var(--ui-primary, #4f46e5); }
+.v-item:last-child > .v-body { border-left-color: transparent; }
+.vertical .panel { padding: 4px 0 16px; animation: ui-stepper-open 0.2s ease-out; }
+.vertical .head { align-self: flex-start; }
+@keyframes ui-stepper-open { from { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) {
+  .panel, .vertical .panel { animation: none; }
+  .dot, .line { transition: none; }
+}
+</style>

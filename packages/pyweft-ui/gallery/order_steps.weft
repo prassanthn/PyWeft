@@ -1,0 +1,105 @@
+<template>
+  <ui.Column gap="lg">
+    <ui.Row align="center">
+      <ui.Switch label="Vertical" @bind="vertical" />
+      <ui.Switch label="Linear" @bind="linear" />
+      <ui.Switch label="Labels below" @bind="below" />
+    </ui.Row>
+    <If cond="finished">
+      <ui.Alert kind="success" title="Order placed">
+        {{ name }} will get it at {{ street }}, {{ city }} ({{ speed.lower() }} delivery).
+      </ui.Alert>
+      <ui.Row><ui.Button variant="secondary" @click="start_over">Start over</ui.Button></ui.Row>
+    </If>
+    <Else>
+      <ui.Stepper label="Checkout" :steps="steps" @bind="step" :linear="linear"
+                  :orientation="'vertical' if vertical else 'horizontal'"
+                  :label_position="'bottom' if below else 'end'"
+                  @next="check(event)" @finish="finished = True" finish_label="Place order">
+        <If cond="step == 'account'">
+          <ui.Grid min_width="14rem">
+            <ui.TextField ref="email" label="Email" type="email" @bind="email"
+                          :error="account.error('email')" @blur="account.touch('email')" />
+            <ui.TextField ref="password" label="Password" type="password" @bind="password"
+                          :error="account.error('password')" @blur="account.touch('password')" />
+          </ui.Grid>
+        </If>
+        <ElseIf cond="step == 'delivery'">
+          <ui.Grid min_width="14rem">
+            <ui.TextField ref="name" label="Full name" @bind="name"
+                          :error="delivery.error('name')" @blur="delivery.touch('name')" />
+            <ui.TextField ref="street" label="Street" @bind="street"
+                          :error="delivery.error('street')" @blur="delivery.touch('street')" />
+            <ui.TextField ref="city" label="City" @bind="city"
+                          :error="delivery.error('city')" @blur="delivery.touch('city')" />
+            <ui.RadioGroup label="Speed" options="Standard, Express" @bind="speed" />
+          </ui.Grid>
+        </ElseIf>
+        <ElseIf cond="step == 'gift'">
+          <ui.TextArea label="Gift message" rows="3" @bind="note" hint="Leave it empty to skip" />
+        </ElseIf>
+        <Else>
+          <dl class="review">
+            <dt>Account</dt><dd>{{ email }}</dd>
+            <dt>Deliver to</dt><dd>{{ name }}, {{ street }}, {{ city }}</dd>
+            <dt>Speed</dt><dd>{{ speed }}</dd>
+            <dt>Gift message</dt><dd>{{ note or 'None' }}</dd>
+          </dl>
+        </Else>
+      </ui.Stepper>
+    </Else>
+  </ui.Column>
+</template>
+
+<code>
+# A checkout in steps: each step's fields are checked before Next moves on.
+from pyweft_ui import Form, rules, ui
+
+step = None
+vertical: bool = False
+linear: bool = True
+below: bool = False
+finished: bool = False
+email: str = ""
+password: str = ""
+name: str = ""
+street: str = ""
+city: str = ""
+speed: str = "Standard"
+note: str = ""
+
+account = Form(
+    email=[rules.required("Enter your email"), rules.email()],
+    password=[rules.required("Choose a password"), rules.min_length(8)],
+)
+delivery = Form(
+    name=rules.required("Who is it for?"),
+    street=rules.required("Enter the street"),
+    city=rules.required("Enter the city"),
+)
+
+@property
+def steps(self):
+    return [
+        {"value": "account", "label": "Account"},
+        {"value": "delivery", "label": "Delivery", "description": self.city or "Where to send it"},
+        {"value": "gift", "label": "Gift message", "optional": True},
+        {"value": "review", "label": "Review"},
+    ]
+
+def check(self, which):
+    form = {"account": self.account, "delivery": self.delivery}.get(which)
+    return form.check() if form is not None else True
+
+def start_over(self):
+    self.email = self.password = self.name = self.street = self.city = self.note = ""
+    self.speed, self.step, self.finished = "Standard", None, False
+    self.account.reset()
+    self.delivery.reset()
+</code>
+
+<style>
+.review { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+.review dt { color: var(--ui-muted, #59636e); }
+.review dd { margin: 0; }
+</style>

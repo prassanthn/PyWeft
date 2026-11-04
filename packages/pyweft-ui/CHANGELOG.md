@@ -14,6 +14,9 @@ releasing moves them under the new version (see
   `query`) and the empty state with `<Fill name="empty">`. For server
   results: `@search`, `match="none"` and `loading`. `free="true"` keeps
   whatever was typed.
+- **`Stepper`**: a task in steps with Back / Next, per-step checks
+  through `@next` (a `Form` per step), optional and error steps, `linear`
+  mode, vertical layout and labels under the numbers.
 - **`Menu`**: submenus (an item with `items`, opened on hover, click or
   the right arrow, flipping sides when there's no room), group headings,
   `hint` (a shortcut) and `description` on items, `position="above"`,

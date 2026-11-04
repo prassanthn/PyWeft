@@ -30,6 +30,7 @@ fields; this guide is the how-to.
 6. [Messages, badges and loading](#6-messages-badges-and-loading)
 7. [Dialogs](#7-dialogs)
 8. [Tabs](#8-tabs)
+   - [A task in steps: Stepper](#a-task-in-steps-stepper)
 9. [Tables](#9-tables)
 10. [Calendars of events](#10-calendars-of-events)
 11. [Toasts](#11-toasts)
@@ -1030,6 +1031,62 @@ two_step: bool = False
 Only the chosen tab's content exists on the page, so what's typed into a
 field on another tab lives in your fields, not in the hidden tab.
 
+### A task in steps: Stepper
+
+A stepper splits a long task (a checkout, a sign-up) into steps shown one
+at a time, with a numbered header and Back / Next under each step:
+
+```xml
+<ui.Stepper label="Checkout" :steps="steps" @bind="step" linear="true"
+            @next="check(event)" @finish="place_order" finish_label="Place order">
+  <If cond="step == 'account'"> ... </If>
+  <ElseIf cond="step == 'delivery'"> ... </ElseIf>
+  <ElseIf cond="step == 'gift'"> ... </ElseIf>
+  <Else> ... a summary ... </Else>
+</ui.Stepper>
+```
+
+```python
+steps = [("account", "Account"), ("delivery", "Delivery"),
+         {"value": "gift", "label": "Gift message", "optional": True},
+         ("review", "Review")]
+
+account = Form(email=[rules.required(), rules.email()])
+delivery = Form(street=rules.required(), city=rules.required())
+
+def check(self, step):          # False keeps the stepper on this step
+    form = {"account": self.account, "delivery": self.delivery}.get(step)
+    return form.check() if form is not None else True
+```
+
+- **`steps`** take `Select`'s forms; a dict can add `description` (a line
+  under the label), `optional`, `error` (a message: the step turns red),
+  `done` and `disabled`. The content between the tags is the current
+  step's body; `step` (its value) and `index` are available in it.
+- **`@next`** runs when Next is pressed, before moving on; if it returns
+  `False` the stepper stays. With a `Form` per step, `form.check()` shows
+  that step's messages and focuses the first field to fix. On the last
+  step the button says **Finish** (`finish_label`) and emits `finish`.
+- A step left with Next counts as done and shows a check mark (a step's
+  `done` key overrides that). With **`linear="true"`** a step can't be
+  opened from its header until the steps before it are done; optional
+  ones don't hold it up. Without it, any header opens its step.
+- **`orientation="vertical"`** puts each step's content under its header,
+  which suits narrow pages; **`label_position="bottom"`** puts the labels
+  under the numbers. On a narrow screen the header row scrolls sideways.
+- `<Fill name="actions">` replaces the Back / Next row. It gets `step`,
+  `index`, `first`, `last`, and `go_next()` / `go_back()` to call:
+
+  ```xml
+  <Fill name="actions">
+    <ui.Button variant="ghost" @click="go_back()">Previous</ui.Button>
+    <ui.Button variant="primary" @click="go_next()">{{ 'Pay now' if last else 'Continue' }}</ui.Button>
+  </Fill>
+  ```
+
+- `back_label`, `next_label`, `finish_label` and `optional_label` change
+  the words.
+
 ## 9. Tables
 
 `Table` shows a list of dicts (or objects) as rows. Name the fields to show
@@ -1441,6 +1498,9 @@ readers and mobile devices work the way people expect:
 - **Expansion panels** have a real button in a heading, saying whether
   it's open; closed content is out of reach. In an `Accordion`, Up and
   Down move between the headers.
+- **Steppers** read each header as "Step 2 of 4: Delivery", with done,
+  optional and error states; the headers are one Tab stop moved with the
+  arrow keys, and Next or Back moves focus to the new step's content.
 - **Tables** use real table headings, and tell screen readers which column
   is sorted and which way.
 - **Menus** are announced as menus, with the button saying whether it's

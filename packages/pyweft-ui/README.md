@@ -127,6 +127,7 @@ that field's message.
 | Control | Fields | Notes |
 |---|---|---|
 | `Tabs` | `options`, `label`, `variant` (line, pills) | `@bind` to the chosen option's value. The content between the tags is the panel; `tab` inside it is the chosen value. Arrow keys, Home and End move between tabs. |
+| `Stepper` | `steps` (dicts may add `description`, `optional`, `error`, `done`, `disabled`), `linear`, `orientation` (horizontal, vertical), `label_position` (end, bottom), `label`, `back_label`, `next_label`, `finish_label` | `@bind` to the current step's value; the content between the tags is its body (`step`, `index`). `@next` runs before moving on (returning `False` stays); emits `finish`, `back`. Fill: `actions` (with `go_next()`, `go_back()`, `first`, `last`). |
 | `EventCalendar` | `events`, `view` (month, week, agenda), `months`, `date`, `week_start`, `day_start`, `day_end`, `max_per_day`, `time_format`, `switcher`, `label` | Events (dicts or objects with `title`, `start`, `end`, `color`) by month, week or day; a `date` start is all day. Emits `select` (your event), `day` (the date or hour clicked), `navigate` (`(first, last)` showing). |
 | `Table` | `rows`, `columns`, `row_key`, `sortable`, `sort`, `striped`, `dense`, `caption`, `empty` | `rows` are dicts or objects. Emits `select` with the clicked row. Fills: `cell` (with `row`, `column`, `value`, `text`), `empty`. |
 
