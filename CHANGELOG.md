@@ -8,6 +8,11 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- Fixed: a function in a code block that ran C code importing through its
+  globals failed with `KeyError: '__builtins__'`; `datetime.date.today()`
+  did. The loader no longer removes `__builtins__` from the code block's
+  globals.
+
 ## 0.3.0
 
 - **`pyweft.http`**: call web APIs and load the app's data files, with the

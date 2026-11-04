@@ -58,6 +58,26 @@ def test_imported_functions_are_called_as_plain_functions(tmp_path, monkeypatch)
     assert comp.said == ["CLICK"]
 
 
+def test_code_block_functions_keep_their_builtins():
+    # C code that imports through the caller's globals (datetime.date.today
+    # loads `time` that way) needs __builtins__ in a method's globals, even
+    # when a field shadows a builtin's name.
+    App = component_from_source("""
+<template><p>{{ stamp() }}</p></template>
+<code>
+import datetime
+min = None
+
+def stamp(self):
+    return datetime.date.today().isoformat() + " " + str(len(__import__("json").dumps([1])))
+</code>""")
+    import datetime
+
+    _, tree = render(App())
+    assert tree[0].children[0].text == datetime.date.today().isoformat() + " 3"
+    assert "__builtins__" not in vars(App)
+
+
 def test_renders_interpolated_text():
     comp = component_from_source(COUNTER, "Counter")()
     _, tree = render(comp)

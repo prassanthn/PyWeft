@@ -213,9 +213,12 @@ def component_from_source(
     template_src, _, style_src = split_source(src)
     nodes = parse_template(template_src)
 
-    namespace: dict[str, Any] = {}
-    exec(compile_code_block(src, filename or f"<{name}.weft>"), namespace)
-    namespace.pop("__builtins__", None)
+    code_globals: dict[str, Any] = {}
+    exec(compile_code_block(src, filename or f"<{name}.weft>"), code_globals)
+    # The class gets a copy: code_globals stays the globals of every function
+    # in the block, and must keep __builtins__ (C code such as
+    # datetime.date.today() imports through the caller's globals).
+    namespace = {key: value for key, value in code_globals.items() if key != "__builtins__"}
     for key, value in namespace.items():
         if _imported_helper(value):
             namespace[key] = staticmethod(value)
