@@ -166,7 +166,11 @@ current: str = "Dashboard"
 - `title` is the text at the top left. `<Fill name="brand">` replaces it with
   anything, such as a logo and a name.
 - `<Fill name="actions">` sits at the top right.
-- `<Fill name="nav">` is the sidebar. Leave it out for no sidebar.
+- `<Fill name="nav">` is the sidebar. Leave it out for no sidebar. Its
+  contents stay in view while the page scrolls, scrolling on their own
+  when they're taller than the window; `sticky_nav="false"` lets them
+  scroll away with the page. (On narrow screens, above the content, they
+  scroll with the page.)
 - `width` is how wide the content may grow: `narrow` (40rem), `normal`
   (64rem, the default), `wide` (80rem), `full`, or any CSS width.
 

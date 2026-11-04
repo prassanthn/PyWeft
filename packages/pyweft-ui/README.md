@@ -81,7 +81,7 @@ number 3 and `disabled="true"` is `True`.
 | Control | Fields | Notes |
 |---|---|---|
 | `Theme` | `mode` (light, dark, auto), `primary`, `radius`, `font` | Wrap your app in it to set colours and corners for everything inside. Optional. |
-| `AppShell` | `title`, `width` (narrow, normal, wide, full) | Header, optional sidebar and content. Fills: `brand`, `actions`, `nav`. |
+| `AppShell` | `title`, `width` (narrow, normal, wide, full), `sticky_nav` | Header, optional sidebar and content; the sidebar stays in view while the page scrolls. Fills: `brand`, `actions`, `nav`. |
 | `Row` | `gap`, `align`, `justify` (start, center, end, between), `wrap` | Children side by side. |
 | `Column` | `gap`, `align` | Children stacked. |
 | `Grid` | `cols`, `min_width`, `gap` | Fixed columns, or as many as fit. |

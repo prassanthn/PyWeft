@@ -8,8 +8,13 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- **`AppShell`**: the sidebar's contents stay in view while the page
+  scrolls (scrolling on their own when taller than the window);
+  `sticky_nav="false"` turns it off.
 - Fixed: a hidden `Tooltip`, or `Popover` hover card, near the window's
   edge widened the page (phones zoomed out to fit it).
+- Gallery: search the controls from the sidebar (by section or control
+  name; Enter jumps to the first match).
 - **`Autocomplete`**: a text field with suggestions that narrow as you type
   (matched text in bold), picked with the keyboard or a click. Lay out each
   suggestion yourself with `<Fill name="option">` (`option`, `active`,

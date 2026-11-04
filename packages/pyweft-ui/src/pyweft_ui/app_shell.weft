@@ -6,7 +6,7 @@
     </header>
     <div class="frame">
       <If cond="has_slot('nav')">
-        <nav class="side"><Slot name="nav" /></nav>
+        <nav :class="'side sticky' if sticky_nav else 'side'"><div class="side-inner"><Slot name="nav" /></div></nav>
       </If>
       <main class="main" :style="f'max-width: {_WIDTHS.get(width, width)}'"><Slot /></main>
     </div>
@@ -15,9 +15,12 @@
 
 <code>
 # The page frame: a header bar, an optional sidebar (<Fill name="nav">) and
-# the content. The sidebar moves above the content on narrow screens.
+# the content. The sidebar's contents stay in view while the page scrolls
+# (sticky_nav="false" lets them scroll away), scrolling on their own when
+# taller than the window. It moves above the content on narrow screens.
 title: str = ""
 width: str = "normal"   # narrow, normal, wide, full, or any CSS width
+sticky_nav: bool = True
 
 _WIDTHS = {"narrow": "40rem", "normal": "64rem", "wide": "80rem", "full": "none"}
 </code>
@@ -35,17 +38,22 @@ _WIDTHS = {"narrow": "40rem", "normal": "64rem", "wide": "80rem", "full": "none"
 .brand { font-weight: 650; font-size: 1.1rem; min-width: 0; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .frame { display: flex; flex: 1; }
-.side {
-  width: 220px; flex-shrink: 0; padding: 16px;
-  border-right: 1px solid var(--ui-border, #d1d9e0);
-  display: flex; flex-direction: column; gap: 4px;
+/* The nav column runs the page's full height (its border with it); what's
+   inside sticks to the top of the window and scrolls on its own. */
+.side { width: 220px; flex-shrink: 0; border-right: 1px solid var(--ui-border, #d1d9e0); }
+.side-inner { box-sizing: border-box; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+.sticky > .side-inner {
+  position: sticky; top: 0; max-height: 100vh; overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 /* min-width: 0, or wide content (a long line of code, a table) would stop the
    content from shrinking beside the sidebar and widen the whole page. */
 .main { flex: 1; min-width: 0; width: 100%; margin: 0 auto; padding: 24px; box-sizing: border-box; }
 @media (max-width: 720px) {
   .frame { flex-direction: column; }
-  .side { width: auto; border-right: 0; border-bottom: 1px solid var(--ui-border, #d1d9e0); flex-direction: row; flex-wrap: wrap; }
+  .side { width: auto; border-right: 0; border-bottom: 1px solid var(--ui-border, #d1d9e0); }
+  /* Above the content, pinning it would cover the page. */
+  .side-inner, .sticky > .side-inner { position: static; max-height: none; overflow: visible; flex-direction: row; flex-wrap: wrap; }
   .top, .main { padding-left: 16px; padding-right: 16px; }
 }
 </style>

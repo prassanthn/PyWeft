@@ -7,16 +7,23 @@
         <ui.Select :options="RADII" @bind="radius" aria-label="Corners" />
       </Fill>
       <Fill name="nav">
-        <For each="section in SECTIONS" key="section">
-          <a class="nav-link" :href="'#' + section.lower().replace(' ', '-')">{{ section }}</a>
-        </For>
+        <input class="nav-search" type="search" placeholder="Search controls" aria-label="Search controls"
+               aria-controls="gallery-nav" @bind="nav_query" @keydown.enter.prevent="jump_to_first" />
+        <div class="nav-list" id="gallery-nav">
+          <For each="item in nav_items" key="item['slug']">
+            <a class="nav-link" :href="'#' + item['slug']">
+              {{ item['name'] }}<If cond="item['hits']"><span class="nav-hits">{{ ', '.join(item['hits']) }}</span></If>
+            </a>
+          </For>
+          <If cond="not nav_items"><p class="nav-empty">No controls match “{{ nav_query.strip() }}”</p></If>
+        </div>
       </Fill>
 
       <ui.Column gap="xl">
         <p class="intro">Every control from <b>pyweft-ui</b>, live. Change the theme at the
           top; the code under each section is what produced it.</p>
 
-        <ui.Card title="Buttons" id="buttons">
+        <ui.Card title="Buttons" id="buttons" ref="buttons">
           <ui.Column>
             <ui.Row>
               <ui.Button variant="primary" @click="clicks += 1">Primary</ui.Button>
@@ -35,7 +42,7 @@
           </ui.Column>
         </ui.Card>
 
-        <ui.Card title="Form fields" id="form" subtitle="Each one is bound with @bind">
+        <ui.Card title="Form fields" id="form" ref="form" subtitle="Each one is bound with @bind">
           <ui.Grid min_width="16rem" gap="lg">
             <ui.TextField label="Name" placeholder="Ada Lovelace" required="true" @bind="name"
                           :error="'' if len(name) != 1 else 'Too short'" hint="Your full name" />
@@ -52,17 +59,17 @@
           <pre class="code">{{ CODE['form'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Validation" id="validation" subtitle="Form and rules: try submitting it empty">
+        <ui.Card title="Validation" id="validation" ref="validation" subtitle="Form and rules: try submitting it empty">
           <Signup />
           <pre class="code">{{ CODE['validation'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Stepper" id="stepper" subtitle="A checkout in steps; Next checks each one">
+        <ui.Card title="Stepper" id="stepper" ref="stepper" subtitle="A checkout in steps; Next checks each one">
           <OrderSteps />
           <pre class="code">{{ CODE['stepper'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Choices" id="choices">
+        <ui.Card title="Choices" id="choices" ref="choices">
           <ui.Grid min_width="14rem" gap="lg">
             <ui.RadioGroup label="Plan" :options="PLANS" @bind="plan" />
             <ui.Column gap="sm">
@@ -75,7 +82,7 @@
           <pre class="code">{{ CODE['choices'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Autocomplete" id="autocomplete" subtitle="Suggestions as you type">
+        <ui.Card title="Autocomplete" id="autocomplete" ref="autocomplete" subtitle="Suggestions as you type">
           <ui.Column gap="lg">
             <ui.Grid min_width="16rem" gap="lg">
               <ui.Autocomplete label="Country" placeholder="Start typing a country"
@@ -101,7 +108,7 @@
           </ui.Column>
         </ui.Card>
 
-        <ui.Card title="Chips" id="chips" subtitle="Choose from a row, or type to add">
+        <ui.Card title="Chips" id="chips" ref="chips" subtitle="Choose from a row, or type to add">
           <ui.Column gap="lg">
             <ui.Chips label="Size" options="Small, Medium, Large" @bind="chip_size" required="true" />
             <ui.Chips label="Interests" multiple="true" @bind="interests"
@@ -137,7 +144,7 @@ tags={{ repr(tags) }}  invitees={{ repr(invitees) }}</pre>
           </ui.Column>
         </ui.Card>
 
-        <ui.Card title="Button toggle" id="button-toggle" subtitle="A joined row of buttons: one choice, or several">
+        <ui.Card title="Button toggle" id="button-toggle" ref="button-toggle" subtitle="A joined row of buttons: one choice, or several">
           <ui.Column gap="lg">
             <ui.Row align="end">
               <ui.ButtonToggle aria_label="Layout" :options="LAYOUTS" @bind="layout" />
@@ -157,7 +164,7 @@ tags={{ repr(tags) }}  invitees={{ repr(invitees) }}</pre>
           </ui.Column>
         </ui.Card>
 
-        <ui.Card title="Sliders" id="sliders" subtitle="Drag, or use the arrow keys">
+        <ui.Card title="Sliders" id="sliders" ref="sliders" subtitle="Drag, or use the arrow keys">
           <ui.Grid min_width="16rem" gap="lg">
             <ui.Slider label="Volume" @bind="volume" format="{}%" />
             <ui.Slider label="Price" :min="0" :max="500" :step="10" range="true" @bind="price"
@@ -171,7 +178,7 @@ tags={{ repr(tags) }}  invitees={{ repr(invitees) }}</pre>
           <pre class="code">{{ CODE['sliders'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Expansion panels" id="expansion-panels" subtitle="Open one, or a stack where one is open at a time">
+        <ui.Card title="Expansion panels" id="expansion-panels" ref="expansion-panels" subtitle="Open one, or a stack where one is open at a time">
           <ui.Column gap="lg">
             <ui.Expansion title="Delivery" description="Address and speed" icon="send" @bind="delivery_open">
               <ui.Column>
@@ -202,7 +209,7 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           </ui.Column>
         </ui.Card>
 
-        <ui.Card title="Dates and menus" id="dates-and-menus">
+        <ui.Card title="Dates and menus" id="dates-and-menus" ref="dates-and-menus">
           <ui.Column gap="lg">
             <ui.Grid min_width="16rem" gap="lg">
               <ui.DatePicker label="Check-in" @bind="check_in" :min="today" hint="From today on" />
@@ -221,7 +228,7 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           </ui.Column>
         </ui.Card>
 
-        <ui.Card title="Menus" id="menus" subtitle="Submenus, custom items and triggers, right-click">
+        <ui.Card title="Menus" id="menus" ref="menus" subtitle="Submenus, custom items and triggers, right-click">
           <ui.Column gap="lg">
             <ui.Row align="center">
               <ui.Menu label="File" :items="FILE_MENU" @select="menu_choice = event" />
@@ -248,7 +255,7 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           </ui.Column>
         </ui.Card>
 
-        <ui.Card title="Calendars" id="calendars" subtitle="Choosing a date, and showing events">
+        <ui.Card title="Calendars" id="calendars" ref="calendars" subtitle="Choosing a date, and showing events">
           <ui.Column gap="lg">
             <ui.Row gap="xl" align="start" wrap="true">
               <ui.Calendar @bind="picked_day" />
@@ -266,7 +273,7 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           </ui.Column>
         </ui.Card>
 
-        <ui.Card title="Feedback" id="feedback">
+        <ui.Card title="Feedback" id="feedback" ref="feedback">
           <ui.Column>
             <ui.Alert kind="info" title="Heads up">A neutral message.</ui.Alert>
             <ui.Alert kind="success">Saved. Your changes are live.</ui.Alert>
@@ -289,7 +296,7 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           </ui.Column>
         </ui.Card>
 
-        <ui.Card title="Progress" id="progress" subtitle="How far along: a bar or a ring, or just still working">
+        <ui.Card title="Progress" id="progress" ref="progress" subtitle="How far along: a bar or a ring, or just still working">
           <ui.Column gap="lg">
             <ui.Row align="center">
               <ui.Button variant="primary" icon="upload" :loading="uploading" @click="upload">Upload 24 files</ui.Button>
@@ -314,7 +321,7 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           </ui.Column>
         </ui.Card>
 
-        <ui.Card title="Dialog" id="dialog">
+        <ui.Card title="Dialog" id="dialog" ref="dialog">
           <ui.Row>
             <ui.Button variant="danger" icon="trash" @click="confirming = True">Delete project</ui.Button>
             <span class="note">{{ verdict }}</span>
@@ -329,7 +336,7 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['dialog'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Bottom sheet" id="bottom-sheet" subtitle="Slides up from the bottom: swipe it down, press Esc or tap outside">
+        <ui.Card title="Bottom sheet" id="bottom-sheet" ref="bottom-sheet" subtitle="Slides up from the bottom: swipe it down, press Esc or tap outside">
           <ui.Row align="center">
             <ui.Button icon="send" @click="sharing = True">Share</ui.Button>
             <ui.Button variant="secondary" icon="settings" @click="filtering = True">Filters</ui.Button>
@@ -351,7 +358,7 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['sheet'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Popover and tooltip" id="popover-and-tooltip" subtitle="Your own content beside a button; short labels on hover">
+        <ui.Card title="Popover and tooltip" id="popover-and-tooltip" ref="popover-and-tooltip" subtitle="Your own content beside a button; short labels on hover">
           <ui.Column gap="lg">
             <ui.Row align="center">
               <ui.Popover label="Share" icon="send" title="Share this page" @bind="share_pop">
@@ -393,7 +400,7 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           </ui.Column>
         </ui.Card>
 
-        <ui.Card title="Tabs" id="tabs">
+        <ui.Card title="Tabs" id="tabs" ref="tabs">
           <ui.Column gap="lg">
             <ui.Tabs label="Project" options="Overview, Activity, Settings" @bind="tab">
               <If cond="tab == 'Overview'"><p class="panel-text">Three people are working on this project.</p></If>
@@ -407,7 +414,7 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['tabs'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Table" id="table" subtitle="Click a heading to sort, a row to pick it">
+        <ui.Card title="Table" id="table" ref="table" subtitle="Click a heading to sort, a row to pick it">
           <ui.Table :rows="ORDERS" row_key="id" sortable="true" sort="-total" @select="picked = event"
                     :columns="[('id', '#'), 'customer', 'status', {'key': 'total', 'format': ',.2f'}]">
             <Fill name="cell">
@@ -419,12 +426,12 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['table'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Tree" id="tree" subtitle="Folders load as they open; search; checkboxes with partly checked parents">
+        <ui.Card title="Tree" id="tree" ref="tree" subtitle="Folders load as they open; search; checkboxes with partly checked parents">
           <Trees />
           <pre class="code">{{ CODE['tree'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Toasts" id="toasts" subtitle="Messages that go away by themselves">
+        <ui.Card title="Toasts" id="toasts" ref="toasts" subtitle="Messages that go away by themselves">
           <ui.Column>
           <ui.ButtonToggle label="Look" :options="[('toast', 'Toast'), ('snackbar', 'Snackbar')]" @bind="toast_look"
                            hint="Snackbar: a compact dark bar at the bottom, one at a time" />
@@ -439,7 +446,7 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['toasts'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Layout" id="layout" subtitle="Row, Column, Grid, Card and Divider: no CSS needed">
+        <ui.Card title="Layout" id="layout" ref="layout" subtitle="Row, Column, Grid, Card and Divider: no CSS needed">
           <ui.Grid cols="3" gap="sm">
             <For each="n in range(1, 7)" key="n"><div class="tile">{{ n }}</div></For>
           </ui.Grid>
@@ -481,6 +488,32 @@ import asyncio
 import datetime
 from pyweft_ui import toast, ui
 
+# What each section shows, so searching "datepicker" or "switch" finds it.
+SECTION_CONTROLS = {
+    "Buttons": ["Button"],
+    "Form": ["TextField", "NumberField", "Select", "TextArea", "mask"],
+    "Validation": ["Form", "rules", "validation"],
+    "Stepper": ["Stepper"],
+    "Choices": ["RadioGroup", "Checkbox", "Switch"],
+    "Autocomplete": ["Autocomplete"],
+    "Chips": ["Chips", "ChipInput"],
+    "Button toggle": ["ButtonToggle"],
+    "Sliders": ["Slider"],
+    "Expansion panels": ["Expansion", "Accordion"],
+    "Dates and menus": ["DatePicker", "DateRangePicker", "Menu"],
+    "Menus": ["Menu", "ContextMenu"],
+    "Calendars": ["Calendar", "EventCalendar"],
+    "Feedback": ["Alert", "Badge", "Spinner", "Icon"],
+    "Progress": ["Progress"],
+    "Dialog": ["Dialog"],
+    "Bottom sheet": ["BottomSheet"],
+    "Popover and tooltip": ["Popover", "Tooltip"],
+    "Tabs": ["Tabs"],
+    "Table": ["Table"],
+    "Tree": ["Tree"],
+    "Toasts": ["Toaster", "toast", "Snackbar"],
+    "Layout": ["Row", "Column", "Grid", "Card", "Divider", "AppShell"],
+}
 SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Progress", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Table", "Tree", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
@@ -529,6 +562,29 @@ menu_choice = None
 sharing: bool = False
 share_pop: bool = False
 toast_look: str = "toast"
+nav_query: str = ""
+
+def _squash(self, text):
+    return "".join(text.lower().split())
+
+@property
+def nav_items(self):
+    """The sections whose name, or a control they show, matches the search;
+    with the matching controls when the name alone doesn't say."""
+    q = self._squash(self.nav_query)
+    out = []
+    for name in SECTIONS:
+        controls = SECTION_CONTROLS.get(name, [])
+        hits = [c for c in controls if q and q in self._squash(c)]
+        if not q or q in self._squash(name) or hits:
+            shown = [] if q in self._squash(name) else hits
+            out.append({"name": name, "slug": name.lower().replace(" ", "-"), "hits": shown})
+    return out
+
+def jump_to_first(self):
+    items = self.nav_items
+    if items and self.nav_query.strip():
+        self.scroll_to(items[0]["slug"], align="start")
 uploaded: int = 0
 uploading: bool = False
 
@@ -968,6 +1024,20 @@ toast("Item deleted.", action="Undo", on_action=self.undo)""",
 .note { margin: 0; color: var(--ui-muted); font-size: 0.9rem; }
 .note.below { margin-top: 12px; }
 .panel-text { margin: 0; }
+/* Sections jumped to (a link, or Enter in the search) keep a little room above. */
+[id] { scroll-margin-top: 16px; }
+.nav-search {
+  width: 100%; box-sizing: border-box; margin-bottom: 8px; padding: 7px 10px;
+  font: inherit; font-size: 0.9rem; color: var(--ui-text);
+  background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius, 8px);
+}
+.nav-search:focus { outline: none; border-color: var(--ui-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary) 25%, transparent); }
+.nav-list { display: flex; flex-direction: column; gap: 4px; }
+.nav-hits { display: block; font-size: 0.75rem; color: var(--ui-muted); }
+.nav-empty { margin: 4px 2px; font-size: 0.85rem; color: var(--ui-muted); }
+@media (max-width: 720px) {
+  .nav-list { flex-direction: row; flex-wrap: wrap; }
+}
 .nav-link {
   color: var(--ui-text); text-decoration: none;
   padding: 6px 10px; border-radius: var(--ui-radius);
