@@ -140,7 +140,8 @@ function), `align` and `sortable`. Left out, they come from the first row.
 | Control | Fields | Notes |
 |---|---|---|
 | `Button` | `variant` (primary, secondary, ghost, danger), `size` (sm, md, lg), `icon`, `loading`, `disabled`, `block`, `type` | Emits `click`. |
-| `Menu` | `label`, `items`, `icon`, `icon_only`, `variant`, `align` (start, end), `caret`, `disabled` | A button that opens a list of actions; emits `select` with the chosen item's value. `items`: text, `(value, label)` pairs, or dicts with `value`, `label`, `icon`, `danger`, `disabled`; `"-"` is a divider. |
+| `Menu` | `label`, `items`, `icon`, `icon_only`, `variant`, `align` (start, end), `position` (below, above), `caret`, `disabled` | A button that opens a list of actions; emits `select` with the chosen item's value. `items`: text, `(value, label)` pairs, or dicts with `value`, `label`, `icon`, `description`, `hint`, `danger`, `disabled` and `items` (a submenu); `"-"` is a divider, `{"heading": ...}` a group heading. Fills: `trigger` (your own button content), `item` (with `item`). |
+| `ContextMenu` | `items`, `label`, `disabled` | Wraps content; right-click (or the Menu key, Shift+F10) opens `items` at the pointer. Emits `select`, `open`. Fill: `item`. |
 | `Dialog` | `title`, `width`, `dismissible` | `@bind` to a `bool`: open while it is `True`. Esc, a click outside or the X close it. Keeps Tab inside while open and gives focus back when closed. Fill: `footer`. |
 | `Toaster` | `position` (bottom-right, bottom-left, bottom-center, top-left, top-center, top-right), `limit` | Put one on the page; it shows what `toast()` raises. |
 | `Alert` | `kind` (info, success, warning, danger), `title`, `dismissible` | Emits `close`. |

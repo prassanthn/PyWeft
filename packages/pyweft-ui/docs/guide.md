@@ -26,6 +26,7 @@ fields; this guide is the how-to.
    - [What the form can tell you](#what-the-form-can-tell-you)
 5. [Buttons](#5-buttons)
    - [A menu of actions: Menu](#a-menu-of-actions-menu)
+   - [Right-click menus: ContextMenu](#right-click-menus-contextmenu)
 6. [Messages, badges and loading](#6-messages-badges-and-loading)
 7. [Dialogs](#7-dialogs)
 8. [Tabs](#8-tabs)
@@ -775,6 +776,70 @@ def act(self, action):
   disabled items), Enter picks, Esc closes it and returns to the button,
   and Tab closes it and moves on. A click anywhere else closes it too.
 
+#### Submenus, headings and richer items
+
+```xml
+<ui.Menu label="File" @select="act(event)" :items="[
+    {'heading': 'Document'},
+    {'value': 'new', 'label': 'New', 'icon': 'plus', 'hint': 'Ctrl+N'},
+    {'label': 'Share', 'icon': 'send', 'items': [
+        'Email',
+        {'label': 'Export as', 'items': ['PDF', 'Word']},
+    ]},
+    '-',
+    {'value': 'trash', 'label': 'Move to trash', 'danger': True,
+     'description': 'Kept for 30 days'},
+]" />
+```
+
+- An item with **`items`** opens a submenu beside it, as deep as you like.
+  It opens on hover, on a click, or with the right arrow; the left arrow
+  goes back. `@select` gets the value chosen at any depth.
+- **`hint`** shows text at the right of an item (a keyboard shortcut),
+  **`description`** a second line under its label, and
+  `{"heading": "..."}` a small heading over a group of items.
+- **`position="above"`** opens the list above the button, for a button at
+  the bottom of the page. Submenus open to the right, or to the left with
+  `align="end"`, and switch sides when there's no room.
+
+#### Your own trigger and items
+
+```xml
+<ui.Menu label="Account" align="end" :items="account" @select="act(event)">
+  <Fill name="trigger"><img class="avatar" src="assets/me.png" alt="" /></Fill>
+  <Fill name="item">
+    <b>{{ item['label'] }}</b>
+    <If cond="item['data'].get('email')"><small>{{ item['data']['email'] }}</small></If>
+  </Fill>
+</ui.Menu>
+```
+
+- **`<Fill name="trigger">`** replaces the button's look with your own
+  content: an avatar, a picture, some text. It is still the menu's button
+  (focusable, opened with the keyboard, `label` as its name), so put
+  content in it, not another button.
+- **`<Fill name="item">`** lays out every item, submenus included. It gets
+  `item`, with `label`, `value`, `icon`, `description`, `hint`, `items` and
+  `data` (the item as you wrote it, for your own keys).
+
+### Right-click menus: ContextMenu
+
+```xml
+<ui.ContextMenu :items="['Cut', 'Copy', 'Paste', '-', {'label': 'Sort by', 'items': ['Name', 'Date']}]"
+                @select="act(event)">
+  <div class="files">...</div>
+</ui.ContextMenu>
+```
+
+- Right-clicking inside the content (a long press on most touch screens)
+  opens the menu at the pointer instead of the browser's own. From the
+  keyboard, the Menu key or Shift+F10 opens it while focus is inside.
+- `items`, submenus and `<Fill name="item">` work as on `Menu`; `@select`
+  gets the value and `@open` fires as it opens, for remembering what was
+  right-clicked. Esc or choosing an item gives focus back to where it was.
+- It stays inside the window, near the bottom or right edge too.
+  `disabled="true"` leaves the browser's own menu alone.
+
 ## 6. Messages, badges and loading
 
 ### Alert
@@ -1379,8 +1444,10 @@ readers and mobile devices work the way people expect:
 - **Tables** use real table headings, and tell screen readers which column
   is sorted and which way.
 - **Menus** are announced as menus, with the button saying whether it's
-  open. Focus moves into the list when it opens and back to the button
-  when an item is chosen or Esc is pressed.
+  open, and items with a submenu saying so too. Focus moves into the list
+  when it opens, into a submenu with the right arrow and back with the
+  left, and back to the button when an item is chosen or Esc is pressed.
+  A right-click menu gives focus back to where it was.
 - **The date pickers'** calendar is a grid of days, each read out in full
   ("Tuesday 3 November 2026"), with today and the chosen days marked. It is
   one Tab stop, moved with the arrow keys.

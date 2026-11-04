@@ -1,0 +1,70 @@
+<template>
+  <If cond="disabled or not items">
+    <div class="area"><Slot /></div>
+  </If>
+  <Else>
+    <div class="area" @contextmenu.prevent="open_at(event)"
+         @keydown.context-menu.prevent="open_at(None)" @keydown.f10.shift.prevent="open_at(None)">
+      <Slot />
+      <If cond="_open">
+        <div class="backdrop" @click="close(False)" @contextmenu.prevent="close(False)"></div>
+        <MenuList :class="'drop' + (' at-pointer' if _at else '')" :style="place" vertical="true"
+                  :items="items" :custom="has_slot('item')" start="first" :aria_label="label"
+                  @select="choose(event)" @close="close(event)">
+          <Fill name="item"><Slot name="item" :item="item" /></Fill>
+        </MenuList>
+      </If>
+    </div>
+  </Else>
+</template>
+
+<code>
+# <ui.ContextMenu :items="['Copy', 'Paste', '-', ('delete', 'Delete')]" @select="act(event)">
+#   ... the area that right-clicking opens it on ...
+# </ui.ContextMenu>
+# Right-click inside the area (a long press on most touch screens, or the
+# Menu key or Shift+F10 on the keyboard) opens a menu at the pointer in
+# place of the browser's own. items and <Fill name="item"> work as on Menu,
+# submenus too. Emits "select" with the chosen item's value and "open" as
+# it opens. disabled="true" (or no items) leaves the browser's menu alone.
+items: list = []
+label: str = "Actions"    # names the menu for screen readers
+disabled: bool = False
+
+_open = False
+_at = None                # (x, y) in the window; None: opened from the keyboard
+
+def open_at(self, event):
+    # Where focus was, to give it back (Esc, or choosing an item).
+    if not self._open:
+        self.save_focus()
+    self._at = (event.get("clientX", 0), event.get("clientY", 0)) if event else None
+    self._open = True
+    self.emit("open", None)
+
+@property
+def place(self):
+    if self._at is None:
+        return None
+    x, y = self._at
+    return f"left: {x}px; top: {y}px"
+
+def close(self, refocus):
+    if not self._open:
+        return
+    self._open = False
+    if refocus:
+        self.restore_focus()
+
+def choose(self, value):
+    self.close(True)
+    self.emit("select", value)
+</code>
+
+<style>
+.area { position: relative; }
+.backdrop { position: fixed; inset: 0; z-index: 999; }
+/* From the keyboard: at the area's corner. From the pointer: right there. */
+.drop { position: absolute; top: 8px; left: 8px; z-index: 1000; }
+.drop.at-pointer { position: fixed; }
+</style>

@@ -29,6 +29,10 @@ def drain(r):
     r.take_commands()
 
 
+def menu_items(menu):
+    return [e.children[0] for e in menu.children if e.attrs.get("role") == "none"]
+
+
 def label_of(node):
     return text([node]).strip()
 
@@ -57,7 +61,7 @@ def test_menu_opens_moves_and_chooses(tmp_path):
     r.dispatch(trigger.events["click"], {})
     tree = cycle(r, tree)
     menu = find(tree, attr("role", "menu"))
-    items = [n for n in menu.children if n.tag == "button"]
+    items = menu_items(menu)
     assert [text([n]).strip() for n in items] == ["Edit", "Duplicate", "Archive", "Delete"]
     assert "disabled" in items[2].attrs and "danger" in items[3].attrs["class"]
     assert find(tree, attr("role", "separator")) is not None
@@ -65,17 +69,17 @@ def test_menu_opens_moves_and_chooses(tmp_path):
 
     # Down skips the disabled item; it wraps at the end.
     for expected in ("Duplicate", "Delete", "Edit"):
-        r.dispatch(menu.events["keydown.down.prevent"], {"key": "ArrowDown"})
+        r.dispatch(menu.events["keydown.down.prevent.stop"], {"key": "ArrowDown"})
         tree = cycle(r, tree)
         assert label_of(focused(r, tree)) == expected
-    r.dispatch(menu.events["keydown.end.prevent"], {"key": "End"})
+    r.dispatch(menu.events["keydown.end.prevent.stop"], {"key": "End"})
     tree = cycle(r, tree)
     assert label_of(focused(r, tree)) == "Delete"
-    r.dispatch(menu.events["keydown.up.prevent"], {"key": "ArrowUp"})
+    r.dispatch(menu.events["keydown.up.prevent.stop"], {"key": "ArrowUp"})
     tree = cycle(r, tree)
     assert label_of(focused(r, tree)) == "Duplicate"  # up skips Archive too
 
-    items = [n for n in find(tree, attr("role", "menu")).children if n.tag == "button"]
+    items = menu_items(find(tree, attr("role", "menu")))
     r.dispatch(items[1].events["click"], {})
     tree = cycle(r, tree)
     assert a.chosen == ["dup"] and find(tree, attr("role", "menu")) is None
@@ -98,7 +102,7 @@ def test_menu_keyboard_open_and_close(tmp_path):
     r.dispatch(trigger.events["keydown.down.prevent"], {"key": "ArrowDown"})
     tree = cycle(r, tree)
     menu = find(tree, attr("role", "menu"))
-    r.dispatch(menu.events["keydown.tab"], {"key": "Tab"})  # Tab moves on: no refocus
+    r.dispatch(menu.events["keydown.tab.stop"], {"key": "Tab"})  # Tab moves on: no refocus
     tree = cycle(r, tree)
     r.after_render()
     assert find(tree, attr("role", "menu")) is None and r.take_commands() == []

@@ -196,6 +196,33 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           </ui.Column>
         </ui.Card>
 
+        <ui.Card title="Menus" id="menus" subtitle="Submenus, custom items and triggers, right-click">
+          <ui.Column gap="lg">
+            <ui.Row align="center">
+              <ui.Menu label="File" :items="FILE_MENU" @select="menu_choice = event" />
+              <ui.Menu label="Opens above" position="above" :items="['Rename', 'Move', '-', 'Delete']"
+                       @select="menu_choice = event" />
+              <ui.Menu label="Account" align="end" :items="ACCOUNT_MENU" @select="menu_choice = event">
+                <Fill name="trigger"><span class="avatar">AL</span></Fill>
+                <Fill name="item">
+                  <If cond="item['data'].get('email')">
+                    <span class="person">
+                      <span class="person-name">{{ item['label'] }}</span>
+                      <span class="person-mail">{{ item['data']['email'] }}</span>
+                    </span>
+                  </If>
+                  <Else><ui.Icon :name="item['icon'] or 'user'" size="1.1em" />{{ item['label'] }}</Else>
+                </Fill>
+              </ui.Menu>
+            </ui.Row>
+            <ui.ContextMenu :items="CONTEXT_MENU" @select="menu_choice = event">
+              <div class="drop-zone" tabindex="0">Right-click here (or focus it and press Shift+F10)</div>
+            </ui.ContextMenu>
+            <p class="note">{{ 'You chose: ' + str(menu_choice) if menu_choice else 'Nothing chosen yet.' }}</p>
+            <pre class="code">{{ CODE['menus'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
         <ui.Card title="Calendars" id="calendars" subtitle="Choosing a date, and showing events">
           <ui.Column gap="lg">
             <ui.Row gap="xl" align="start" wrap="true">
@@ -306,7 +333,7 @@ import asyncio
 import datetime
 from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Autocomplete", "Chips", "Sliders", "Expansion panels", "Dates and menus", "Calendars", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Autocomplete", "Chips", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -349,6 +376,37 @@ items: int = 3
 check_in = None
 stay = None
 last_action: str = ""
+menu_choice = None
+FILE_MENU = [
+    {"heading": "Document"},
+    {"value": "new", "label": "New", "icon": "plus", "hint": "Ctrl+N"},
+    {"value": "copy", "label": "Make a copy", "icon": "copy", "hint": "Ctrl+D"},
+    {"label": "Share", "icon": "send", "items": [
+        {"value": "email", "label": "Email"},
+        {"value": "link", "label": "Copy link", "icon": "copy"},
+        {"label": "Export as", "icon": "download", "items": ["PDF", "Word", ("md", "Markdown")]},
+    ]},
+    "-",
+    {"value": "trash", "label": "Move to trash", "icon": "trash", "danger": True,
+     "description": "Kept for 30 days"},
+]
+ACCOUNT_MENU = [
+    {"value": "me", "label": "Ada Lovelace", "email": "ada@engine.org"},
+    "-",
+    {"value": "settings", "label": "Settings", "icon": "settings"},
+    {"label": "Theme", "icon": "sun", "items": [
+        {"value": "light", "label": "Light", "icon": "sun"},
+        {"value": "dark", "label": "Dark", "icon": "moon"},
+    ]},
+    {"value": "out", "label": "Sign out", "icon": "external"},
+]
+CONTEXT_MENU = [
+    {"value": "cut", "label": "Cut", "hint": "Ctrl+X"},
+    {"value": "copy", "label": "Copy", "icon": "copy", "hint": "Ctrl+C"},
+    {"value": "paste", "label": "Paste", "hint": "Ctrl+V", "disabled": True},
+    "-",
+    {"label": "Sort by", "items": ["Name", "Date", "Size"]},
+]
 picked_day = None
 picked_event: str = ""
 two_months: bool = False
@@ -503,6 +561,22 @@ def submit(self):
     "choices": """<ui.RadioGroup label="Plan" :options="[('free', 'Free'), ('pro', 'Pro')]" @bind="plan" />
 <ui.Checkbox label="Send me updates" @bind="updates" />
 <ui.Switch label="Dark mode" @bind="dark" />""",
+    "menus": """<ui.Menu label="File" @select="act(event)" :items="[
+    {'heading': 'Document'},
+    {'value': 'new', 'label': 'New', 'icon': 'plus', 'hint': 'Ctrl+N'},
+    {'label': 'Share', 'items': ['Email', 'Copy link']},
+    '-',
+    {'value': 'trash', 'label': 'Move to trash', 'danger': True,
+     'description': 'Kept for 30 days'},
+]" />
+<ui.Menu label="Opens above" position="above" :items="..." />
+<ui.Menu label="Account" align="end" :items="account">
+  <Fill name="trigger"><span class="avatar">AL</span></Fill>
+  <Fill name="item">{{ item['label'] }}</Fill>
+</ui.Menu>
+<ui.ContextMenu :items="['Cut', 'Copy', 'Paste']" @select="act(event)">
+  <div>Right-click here</div>
+</ui.ContextMenu>""",
     "dates": """<ui.DatePicker label="Check-in" @bind="check_in" :min="today" />
 <ui.DateRangePicker label="Stay" @bind="stay" :min="today" min_days="1" />
 
@@ -603,6 +677,11 @@ toast("Item deleted.", action="Undo", on_action=self.undo)""",
 .person-name { font-weight: 600; }
 .person-mail { font-size: 0.8rem; color: var(--ui-muted); overflow: hidden; text-overflow: ellipsis; }
 .intro { margin: 0; color: var(--ui-muted); }
+.drop-zone {
+  display: grid; place-items: center; min-height: 7rem; padding: 16px; text-align: center;
+  border: 2px dashed var(--ui-border); border-radius: var(--ui-radius, 8px);
+  color: var(--ui-muted); user-select: none;
+}
 .note { margin: 0; color: var(--ui-muted); font-size: 0.9rem; }
 .note.below { margin-top: 12px; }
 .panel-text { margin: 0; }

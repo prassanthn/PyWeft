@@ -1,0 +1,213 @@
+<template>
+  <div ref="root" :class="'list' + (' sub sub-' + side if level else '')" role="menu" :id="list_id or None"
+       :aria-labelledby="labelled_by or None" :aria-label="aria_label or None"
+       @keydown.down.prevent.stop="move(1)" @keydown.up.prevent.stop="move(-1)"
+       @keydown.home.prevent.stop="move_to(0)" @keydown.end.prevent.stop="move_to(-1)"
+       @keydown.right.prevent.stop="enter_sub()" @keydown.left.prevent.stop="leave()"
+       @keydown.tab.stop="emit('close', False)" @keydown.esc.stop="emit('close', True)">
+    <For each="e in entries" key="e['key']">
+      <If cond="e['separator']"><div class="sep" role="separator"></div></If>
+      <ElseIf cond="e['heading']"><div class="heading" role="presentation">{{ e['heading'] }}</div></ElseIf>
+      <Else>
+        <div class="entry" role="none">
+          <button type="button" role="menuitem" tabindex="-1" :ref="'item-' + str(e['index'])"
+                  :class="item_class(e)" :disabled="e['disabled']"
+                  :aria-haspopup="'menu' if e['items'] else None"
+                  :aria-expanded="('true' if _sub == e['index'] else 'false') if e['items'] else None"
+                  @click="choose(e)" @mouseenter="hover(e)" @focus="_active = e['index']">
+            <If cond="custom"><Slot name="item" :item="e" /></If>
+            <Else>
+              <If cond="e['icon']"><Icon :name="e['icon']" size="1.1em" /></If>
+              <span class="text">
+                <span class="label">{{ e['label'] }}</span>
+                <If cond="e['description']"><span class="desc">{{ e['description'] }}</span></If>
+              </span>
+              <If cond="e['hint']"><span class="hint">{{ e['hint'] }}</span></If>
+            </Else>
+            <If cond="e['items']"><span class="more"><Icon :name="'chevron-left' if side == 'left' else 'chevron-right'" size="1em" /></span></If>
+          </button>
+          <If cond="_sub == e['index'] and e['items']">
+            <Dynamic :is="sub_class" key="_sub_key"
+                     :props="{'items': e['items'], 'level': level + 1, 'side': side, 'custom': custom,
+                              'start': 'first' if _sub_focus else '', 'aria_label': e['label']}"
+                     @select="emit('select', event)" @close="emit('close', event)" @back="back()">
+              <Fill name="item"><Slot name="item" :item="item" /></Fill>
+            </Dynamic>
+          </If>
+        </div>
+      </Else>
+    </For>
+  </div>
+</template>
+
+<code>
+# One level of a menu, used by Menu and ContextMenu (not on its own).
+# Items: text, (value, label) pairs, or dicts with value, label and
+# optionally icon, description (a second line), hint (right-aligned, e.g. a
+# shortcut), danger, disabled and items (a submenu); "-" is a divider and
+# {"heading": "..."} a group heading. A submenu is this same component,
+# opened beside its item. Emits select (a value), close (refocus the
+# trigger or not) and back (Left in a submenu: its parent takes over).
+
+items: list = []
+level: int = 0
+side: str = "right"       # where submenus open: right or left
+custom: bool = False      # the owner has an "item" fill
+start: str = ""           # focus on creation: first, last, or nowhere
+list_id: str = ""
+labelled_by: str = ""
+aria_label: str = ""
+vertical: bool = False    # also keep it inside the window up and down
+
+_active = None
+_sub = None               # index of the item whose submenu is open
+_sub_focus = False
+_sub_key = 0
+
+def on_init(self):
+    # Opened near the window's edge. A submenu, or a menu at a point, may
+    # also shift up: nothing scrolls it into view.
+    # A submenu with no room on its side opens on the other side.
+    self.keep_in_view("root", vertical=self.vertical or self.level > 0, flip=self.level > 0)
+    stops = self.enabled
+    if self.start and stops:
+        self._active = stops[-1 if self.start == "last" else 0]
+        self.focus(f"item-{self._active}")
+
+@property
+def sub_class(self):
+    return type(self)
+
+@property
+def entries(self):
+    out, index = [], 0
+    for position, item in enumerate(self.items):
+        if item in ("-", None):
+            out.append({"key": f"sep-{position}", "separator": True, "heading": ""})
+            continue
+        if isinstance(item, dict) and "heading" in item:
+            out.append({"key": f"head-{position}", "separator": False, "heading": str(item["heading"])})
+            continue
+        if isinstance(item, dict):
+            value = item.get("value", item.get("label"))
+            text = item.get("label", value)
+            extra = item
+        elif isinstance(item, (tuple, list)) and len(item) == 2:
+            value, text = item
+            extra = {}
+        else:
+            value, text, extra = item, item, {}
+        out.append({
+            "key": f"item-{position}", "separator": False, "heading": "", "index": index,
+            "value": value, "label": str(text), "icon": extra.get("icon", ""),
+            "description": str(extra.get("description") or ""), "hint": str(extra.get("hint") or ""),
+            "danger": bool(extra.get("danger")), "disabled": bool(extra.get("disabled")),
+            "items": list(extra.get("items") or []), "data": item,
+        })
+        index += 1
+    return out
+
+@property
+def items_only(self):
+    return [e for e in self.entries if not e["separator"] and not e["heading"]]
+
+@property
+def enabled(self):
+    """Indexes of the items the keyboard can land on."""
+    return [e["index"] for e in self.items_only if not e["disabled"]]
+
+def item_class(self, e):
+    names = ["item"]
+    if e["danger"]:
+        names.append("danger")
+    if self._sub == e["index"]:
+        names.append("expanded")
+    return " ".join(names)
+
+def move(self, delta):
+    stops = self.enabled
+    if not stops:
+        return
+    at = stops.index(self._active) if self._active in stops else (-1 if delta > 0 else 0)
+    self.move_to((at + delta) % len(stops))
+
+def move_to(self, position):
+    stops = self.enabled
+    if stops:
+        self._active = stops[position]
+        self._sub = None
+        self.focus(f"item-{self._active}")
+
+def _entry(self, index):
+    return next((e for e in self.items_only if e["index"] == index), None)
+
+def open_sub(self, e, focus):
+    self._sub = e["index"]
+    self._sub_focus = focus
+    self._sub_key += 1      # a new submenu instance, so it focuses afresh
+
+def enter_sub(self):
+    e = self._entry(self._active)
+    if e and e["items"] and not e["disabled"]:
+        self.open_sub(e, True)
+
+def leave(self):
+    if self.level:
+        self.emit("back")
+
+def back(self):
+    # Left in the submenu: close it and return to its item.
+    self._sub = None
+    if self._active is not None:
+        self.focus(f"item-{self._active}")
+
+def hover(self, e):
+    if e["items"] and not e["disabled"]:
+        if self._sub != e["index"]:
+            self.open_sub(e, False)
+    else:
+        self._sub = None
+
+def choose(self, e):
+    if e["items"]:
+        self._active = e["index"]
+        self.open_sub(e, True)
+    else:
+        self.emit("select", e["value"])
+</code>
+
+<style>
+.list {
+  box-sizing: border-box; min-width: 11rem; max-width: calc(100vw - 16px); padding: 4px;
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: var(--ui-radius, 8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  animation: ui-menu-list-in 0.1s ease-out;
+}
+.sub { position: absolute; top: -5px; left: calc(100% + 2px); z-index: 1; }
+.sub-left { left: auto; right: calc(100% + 2px); }
+.entry { position: relative; }
+.item {
+  display: flex; align-items: center; gap: 0.6em; width: 100%;
+  font: inherit; font-size: 0.93rem; text-align: left;
+  padding: 0.5em 0.7em; border: 0; border-radius: calc(var(--ui-radius, 8px) - 2px);
+  background: transparent; color: inherit; cursor: pointer;
+}
+.item:hover:not(:disabled), .item:focus, .item.expanded { outline: none; background: var(--ui-subtle, #f6f8fa); }
+.item:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ui-primary, #4f46e5) 40%, transparent); }
+.item:disabled { opacity: 0.5; cursor: not-allowed; }
+.item.danger { color: var(--ui-danger, #d1242f); }
+.text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.desc { font-size: 0.8rem; color: var(--ui-muted, #59636e); }
+.hint { margin-left: 1.5em; font-size: 0.8rem; color: var(--ui-muted, #59636e); white-space: nowrap; }
+.more { display: inline-flex; margin-left: auto; color: var(--ui-muted, #59636e); }
+.sep { height: 1px; margin: 4px 2px; background: var(--ui-border, #d1d9e0); }
+.heading {
+  padding: 0.55em 0.7em 0.25em; font-size: 0.75rem; font-weight: 600;
+  letter-spacing: 0.02em; text-transform: uppercase; color: var(--ui-muted, #59636e);
+}
+@keyframes ui-menu-list-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .list { animation: none; } }
+</style>

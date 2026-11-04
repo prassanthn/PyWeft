@@ -14,6 +14,12 @@ releasing moves them under the new version (see
   `query`) and the empty state with `<Fill name="empty">`. For server
   results: `@search`, `match="none"` and `loading`. `free="true"` keeps
   whatever was typed.
+- **`Menu`**: submenus (an item with `items`, opened on hover, click or
+  the right arrow, flipping sides when there's no room), group headings,
+  `hint` (a shortcut) and `description` on items, `position="above"`,
+  and fills for your own trigger (`trigger`) and item layout (`item`).
+- **`ContextMenu`**: a right-click menu for an area, opened at the
+  pointer (or with the Menu key or Shift+F10), with the same items.
 - **`Expansion`**: a panel that opens and closes under its header, with a
   description, icon, action row, custom header and `lazy` content.
 - **`Accordion`**: a stack of expansion panels, one open at a time or
