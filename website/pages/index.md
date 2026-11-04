@@ -140,3 +140,6 @@ then `pyweft new myapp` and `pyweft run myapp`.
   PyWeft, and the [controls guide](controls/guide.md) the toolkit.
 - **Want to see it working first?** Try the [examples](examples.md), running
   live in this browser.
+- **Working with an AI assistant?** Every app comes with an `AGENTS.md`
+  that teaches it PyWeft, and `pyweft check` lets it find its own mistakes:
+  see [AI assistants](ai.md).

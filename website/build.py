@@ -75,7 +75,9 @@ LLMS_INDEX = f"""\
 PyWeft is new, so don't assume Vue, React, Blazor or Jinja syntax: control
 flow is `<If>`/`<For>` elements, templates are XML, and a component's code
 block is a plain Python class body. Read the guide for coding assistants
-first; it lists the mistakes generated code usually makes.
+first; it lists the mistakes generated code usually makes. After changing
+an app, run `uv run pyweft check APP`: it reports mistakes with file, line
+and the name probably meant, without a browser.
 
 ## Docs
 
@@ -83,6 +85,8 @@ first; it lists the mistakes generated code usually makes.
   directives, components, async, routing, data, common traps, the controls
 - [Full documentation as one text file]({SITE_URL}llms-full.txt): the
   assistant guide, the framework guide and the pyweft-ui reference and guide
+- [Using AI coding assistants]({SITE_URL}ai/): AGENTS.md, pyweft check and
+  these files
 - [Tutorial]({SITE_URL}tutorial/): a small app, step by step
 - [Guide]({SITE_URL}guide/): install, components, templates, composing
   components, apps and building, testing without a browser
