@@ -1,0 +1,176 @@
+<template>
+  <div :class="classes">
+    <If cond="shape == 'circle'">
+      <div class="ring-row">
+        <div class="ring" role="progressbar" :aria-labelledby="_id + '-label' if label else None"
+             :aria-label="None if label else (aria_label or 'Progress')"
+             aria-valuemin="0" :aria-valuemax="num(max)" :aria-valuenow="None if busy else num(value)"
+             :aria-valuetext="None if busy else text" :aria-busy="'true' if busy else None">
+          <svg viewBox="0 0 44 44" aria-hidden="true">
+            <circle class="ring-track" cx="22" cy="22" r="19" fill="none" stroke-width="5" />
+            <circle class="ring-fill" cx="22" cy="22" r="19" fill="none" stroke-width="5"
+                    stroke-linecap="round" :stroke-dasharray="dash" :stroke-dashoffset="offset" />
+          </svg>
+          <If cond="value_shown"><span class="ring-value">{{ text }}</span></If>
+        </div>
+        <If cond="label"><span class="label" :id="_id + '-label'">{{ label }}</span></If>
+      </div>
+    </If>
+    <Else>
+      <If cond="label or value_shown">
+        <div class="top">
+          <span class="label" :id="_id + '-label'">{{ label }}</span>
+          <If cond="value_shown"><span class="value">{{ text }}</span></If>
+        </div>
+      </If>
+      <div class="track" role="progressbar" :aria-labelledby="_id + '-label' if label else None"
+           :aria-label="None if label else (aria_label or 'Progress')"
+           aria-valuemin="0" :aria-valuemax="num(max)" :aria-valuenow="None if busy else num(value)"
+           :aria-valuetext="None if busy else text" :aria-busy="'true' if busy else None">
+        <If cond="buffer is not None and not busy">
+          <span class="buffer" :style="'width: ' + str(buffer_pct) + '%'"></span>
+        </If>
+        <span class="fill" :style="None if busy else 'width: ' + str(pct) + '%'"></span>
+      </div>
+    </Else>
+  </div>
+</template>
+
+<code>
+# <ui.Progress label="Uploading" :value="sent" :max="size" show_value="true" />
+# <ui.Progress label="Loading" />             (no value: still working)
+# <ui.Progress shape="circle" :value="72" />
+# How far along something is: value out of max (100 by default). Without a
+# value it is indeterminate: a bar moving back and forth, a turning ring.
+# buffer: a lighter fill ahead of the value (buffered video, say).
+# show_value puts the value beside the label ("40%"; a circle shows it in
+# the middle unless small); format shapes it from the value: "{} of 12
+# files", "{:.1f} MB". kind: primary, success, warning, danger; size: sm,
+# md, lg (a bar's thickness, a circle's diameter); striped="true" adds
+# moving stripes. Screen readers hear it as a progress bar with its value.
+import itertools
+import math
+
+label: str = ""
+aria_label: str = ""      # names it for screen readers when there's no label
+value: float | None = None
+max: float = 100
+buffer: float | None = None
+show_value: bool | None = None
+format: str = ""          # e.g. "{} of 12 files"; default: the percentage
+shape: str = "bar"        # bar or circle
+kind: str = "primary"     # primary, success, warning, danger
+size: str = "md"          # sm, md, lg
+striped: bool = False
+
+_ids = itertools.count(1)
+_C = 2 * math.pi * 19     # the ring's circumference
+
+def on_init(self):
+    self._id = f"ui-progress-{next(_ids)}"
+
+@property
+def busy(self):
+    return self.value is None
+
+def _pct(self, x):
+    top = float(self.max) or 1.0
+    p = float(x) / top * 100
+    return round(0.0 if p < 0 else 100.0 if p > 100 else p, 2)
+
+@property
+def pct(self):
+    return 0.0 if self.busy else self._pct(self.value)
+
+@property
+def buffer_pct(self):
+    return self._pct(self.buffer or 0)
+
+def num(self, x):
+    x = float(x)
+    return str(int(x)) if x.is_integer() else str(x)
+
+@property
+def text(self):
+    if self.busy:
+        return ""
+    if self.format:
+        v = float(self.value)
+        return self.format.format(int(v) if v.is_integer() else v)
+    return f"{self.pct:.0f}%"
+
+@property
+def value_shown(self):
+    if self.busy:
+        return False
+    if self.show_value is not None:
+        return self.show_value
+    return self.shape == "circle" and self.size != "sm"
+
+@property
+def dash(self):
+    return f"{_C * 0.3:.2f} {_C:.2f}" if self.busy else f"{_C:.2f}"
+
+@property
+def offset(self):
+    return None if self.busy else f"{_C * (1 - self.pct / 100):.2f}"
+
+@property
+def classes(self):
+    names = ["progress", self.shape, "kind-" + self.kind, "size-" + self.size]
+    if self.busy:
+        names.append("busy")
+    if self.striped:
+        names.append("striped")
+    return " ".join(names)
+</code>
+
+<style>
+.progress { --tone: var(--ui-primary, #4f46e5); min-width: 0; }
+.kind-success { --tone: var(--ui-success, #1a7f37); }
+.kind-warning { --tone: var(--ui-warning, #9a6700); }
+.kind-danger { --tone: var(--ui-danger, #d1242f); }
+.bar { display: flex; flex-direction: column; gap: 6px; }
+.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.label { font-size: 0.9rem; font-weight: 550; }
+.value { font-size: 0.85rem; color: var(--ui-muted, #59636e); font-variant-numeric: tabular-nums; }
+/* ---- bar */
+.track {
+  position: relative; overflow: hidden; height: 6px; border-radius: 999px;
+  background: color-mix(in srgb, var(--tone) 16%, var(--ui-surface, #fff));
+}
+.size-sm .track { height: 4px; }
+.size-lg .track { height: 10px; }
+.fill, .buffer { position: absolute; top: 0; bottom: 0; left: 0; border-radius: inherit; transition: width 0.3s ease; }
+.fill { background: var(--tone); }
+.buffer { background: color-mix(in srgb, var(--tone) 35%, var(--ui-surface, #fff)); }
+.busy .fill { width: 40%; animation: ui-progress-slide 1.4s ease-in-out infinite; }
+.striped .fill {
+  background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.22) 25%, transparent 25%,
+    transparent 50%, rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0.22) 75%, transparent 75%);
+  background-size: 1rem 1rem;
+  animation: ui-progress-stripes 0.8s linear infinite;
+}
+.busy.striped .fill { animation: ui-progress-slide 1.4s ease-in-out infinite, ui-progress-stripes 0.8s linear infinite; }
+@keyframes ui-progress-slide { from { left: -40%; } to { left: 100%; } }
+@keyframes ui-progress-stripes { to { background-position: 1rem 0; } }
+/* ---- circle */
+.ring-row { display: inline-flex; align-items: center; gap: 10px; }
+.ring { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.size-sm .ring { width: 1.5rem; height: 1.5rem; }
+.size-md .ring { width: 2.75rem; height: 2.75rem; }
+.size-lg .ring { width: 4.5rem; height: 4.5rem; }
+.ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring-track { stroke: color-mix(in srgb, var(--tone) 16%, var(--ui-surface, #fff)); }
+.ring-fill { stroke: var(--tone); transition: stroke-dashoffset 0.3s ease; }
+.busy .ring svg { animation: ui-progress-turn 1s linear infinite; }
+.ring-value { position: relative; font-size: 0.7rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.size-lg .ring-value { font-size: 0.95rem; }
+@keyframes ui-progress-turn { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .fill, .buffer, .ring-fill { transition: none; }
+  .busy .fill { animation-duration: 4s; }
+  .busy .ring svg { animation-duration: 3s; }
+  .striped .fill { animation: none; }
+}
+</style>

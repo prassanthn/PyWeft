@@ -14,6 +14,8 @@ releasing moves them under the new version (see
   `query`) and the empty state with `<Fill name="empty">`. For server
   results: `@search`, `match="none"` and `loading`. `free="true"` keeps
   whatever was typed.
+- **`Progress`**: a progress bar or ring, determinate or not, with a
+  buffer, a formatted value, colours, sizes and stripes.
 - **`Toaster look="snackbar"`**: `toast()` messages as a compact dark
   bar at the bottom centre, one at a time (a new one replaces the one
   showing), with a text action. `Toaster` also gained `dismissible`.

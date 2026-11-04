@@ -289,6 +289,31 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           </ui.Column>
         </ui.Card>
 
+        <ui.Card title="Progress" id="progress" subtitle="How far along: a bar or a ring, or just still working">
+          <ui.Column gap="lg">
+            <ui.Row align="center">
+              <ui.Button variant="primary" icon="upload" :loading="uploading" @click="upload">Upload 24 files</ui.Button>
+              <ui.Progress shape="circle" :value="uploaded" :kind="'success' if uploaded == 24 else 'primary'"
+                           :max="24" label="Files" />
+            </ui.Row>
+            <ui.Progress label="Uploading" :value="uploaded" :max="24" format="{} of 24 files" show_value="true"
+                         :kind="'success' if uploaded == 24 else 'primary'" :striped="uploading" />
+            <ui.Progress label="Streaming" :value="35" :buffer="60" show_value="true" />
+            <ui.Progress label="Waiting for the server" />
+            <ui.Grid min_width="12rem">
+              <ui.Progress :value="80" kind="success" size="sm" aria_label="Small" />
+              <ui.Progress :value="55" kind="warning" aria_label="Medium" />
+              <ui.Progress :value="25" kind="danger" size="lg" aria_label="Large" />
+            </ui.Grid>
+            <ui.Row align="center">
+              <ui.Progress shape="circle" size="sm" />
+              <ui.Progress shape="circle" />
+              <ui.Progress shape="circle" size="lg" :value="72" kind="warning" />
+            </ui.Row>
+            <pre class="code">{{ CODE['progress'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
         <ui.Card title="Dialog" id="dialog">
           <ui.Row>
             <ui.Button variant="danger" icon="trash" @click="confirming = True">Delete project</ui.Button>
@@ -456,7 +481,7 @@ import asyncio
 import datetime
 from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Table", "Tree", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Progress", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Table", "Tree", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -504,6 +529,16 @@ menu_choice = None
 sharing: bool = False
 share_pop: bool = False
 toast_look: str = "toast"
+uploaded: int = 0
+uploading: bool = False
+
+async def upload(self):
+    self.uploading, self.uploaded = True, 0
+    while self.uploaded < 24:
+        await asyncio.sleep(0.12)          # a pretend upload, a file at a time
+        self.uploaded += 1
+        self.state_has_changed()
+    self.uploading = False
 SHARE_LINK = "https://prassanthn.github.io/PyWeft/"
 
 def copied(self):
@@ -884,6 +919,11 @@ events = [
     <Else>{{ text }}</Else>
   </Fill>
 </ui.Table>""",
+    "progress": """<ui.Progress label="Uploading" :value="sent" :max="24"
+             format="{} of 24 files" show_value="true" />
+<ui.Progress label="Waiting for the server" />        <!-- no value: still working -->
+<ui.Progress :value="35" :buffer="60" />
+<ui.Progress shape="circle" :value="72" kind="warning" size="lg" />""",
     "toasts": """<ui.Toaster />   <!-- once, inside <ui.Theme> -->
 <ui.Toaster look="snackbar" />   <!-- or as a snackbar -->
 

@@ -1763,7 +1763,7 @@ with `from pyweft_ui import ui` in the code block. It covers layout
 `TextArea`, `NumberField`, `Select`, `Autocomplete`, `Chips`, `ChipInput`, `ButtonToggle`,
 `Slider`, `RadioGroup`, `Checkbox`, `Switch`, `DatePicker`, `DateRangePicker`, `Calendar`), data and navigation (`Table` with sorting, `Tree`, `Tabs`, `Stepper`,
 `EventCalendar`), actions
-and feedback (`Button`, `Menu`, `ContextMenu`, `Dialog`, `BottomSheet`, `Popover`, `Tooltip`, `Alert`, `Toaster` with `toast()`, `Badge`, `Spinner`,
+and feedback (`Button`, `Menu`, `ContextMenu`, `Dialog`, `BottomSheet`, `Popover`, `Tooltip`, `Alert`, `Toaster` with `toast()`, `Badge`, `Spinner`, `Progress`,
 `Icon`) and a `Theme` with light, dark and system modes and your own
 colours.
 
@@ -2331,7 +2331,7 @@ Working today:
 - **Data in and out:** `pyweft.http` calls web APIs and loads the app's
   data files; `pyweft.storage` keeps data between visits. Same code on
   both targets.
-- **Controls:** `pyweft-ui`, 41 ready-made, themeable controls: layout,
+- **Controls:** `pyweft-ui`, 42 ready-made, themeable controls: layout,
   form fields with validation, autocomplete, chips, sliders and masks, date and date-range pickers,
   calendars of events, menus, tabs, tables, dialogs, toasts (see
   "Ready-made controls" in section 5), with a live gallery.

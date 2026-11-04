@@ -154,6 +154,7 @@ function), `align` and `sortable`. Left out, they come from the first row.
 | `Alert` | `kind` (info, success, warning, danger), `title`, `dismissible` | Emits `close`. |
 | `Badge` | `kind` (neutral, primary, info, success, warning, danger) | |
 | `Spinner` | `size`, `label` | |
+| `Progress` | `value` (none: indeterminate), `max`, `buffer`, `label`, `aria_label`, `show_value`, `format`, `shape` (bar, circle), `kind`, `size` (sm, md, lg), `striped` | How far along something is; a bar, or a ring with the value inside. |
 | `Icon` | `name`, `size` | check, x, plus, minus, search, info, alert, chevron-up/down/left/right, menu, trash, edit, send, user, home, star, heart, download, upload, external, copy, settings, sun, moon, calendar, more, bold, italic, underline, align-left/center/right, list, grid, folder, folder-open, file |
 
 ## Checking forms

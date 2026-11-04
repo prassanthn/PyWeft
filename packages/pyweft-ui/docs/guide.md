@@ -29,6 +29,7 @@ fields; this guide is the how-to.
    - [A menu of actions: Menu](#a-menu-of-actions-menu)
    - [Right-click menus: ContextMenu](#right-click-menus-contextmenu)
 6. [Messages, badges and loading](#6-messages-badges-and-loading)
+   - [How far along: Progress](#how-far-along-progress)
 7. [Dialogs](#7-dialogs)
    - [Sheets from the bottom: BottomSheet](#sheets-from-the-bottom-bottomsheet)
    - [Small panels beside a button: Popover](#small-panels-beside-a-button-popover)
@@ -981,6 +982,40 @@ async def on_init(self):
 </code>
 ```
 
+### How far along: Progress
+
+```xml
+<ui.Progress label="Uploading" :value="sent" :max="total" format="{} of {} files" show_value="true" />
+<ui.Progress label="Waiting for the server" />
+<ui.Progress shape="circle" :value="72" kind="warning" size="lg" />
+```
+
+- **`value`** out of **`max`** (`100` by default; `0.4` with `max="1"`
+  works too) fills the bar, sliding as the value changes. **Without a
+  value** it is indeterminate: a bar moving back and forth, or a turning
+  ring, for work whose length you don't know.
+- `show_value="true"` puts the value beside the label, as a percentage;
+  **`format`** shapes it from the value instead (`"{} of 12 files"`,
+  `"{:.1f} MB"`). Screen readers hear that same text.
+- **`buffer`** draws a lighter fill ahead of the value (buffered video).
+- `kind` is `primary`, `success`, `warning` or `danger`; `size` is `sm`,
+  `md` or `lg` (a bar's thickness, a ring's diameter); `striped="true"`
+  adds moving stripes.
+- **`shape="circle"`** draws a ring with the value in the middle (not at
+  `size="sm"`), with `label` beside it.
+- Without a `label`, name it for screen readers with `aria_label`.
+
+To show progress from an `async` handler, change the value and call
+`self.state_has_changed()` after each step, so the page updates before
+the handler ends:
+
+```python
+async def upload(self):
+    for self.sent in range(1, self.total + 1):
+        await send_file(self.sent)
+        self.state_has_changed()
+```
+
 ## 7. Dialogs
 
 A dialog is open while the field you bind it to is `True`.
@@ -1764,6 +1799,9 @@ readers and mobile devices work the way people expect:
   one Tab stop, moved with the arrow keys.
 - **Menus and calendars stay on screen:** opened next to something near
   the window's edge, they shift sideways to fit.
+- **Progress bars and rings** are announced as progress bars with their
+  value and its text ("4 of 12 files"); one without a value says it is
+  busy.
 - **Toasts and snackbars** are read out politely when they appear (`danger` ones
   interrupt), and pause while someone is reading them.
 - **Motion is reduced** for visitors who ask their system for it: spinners
