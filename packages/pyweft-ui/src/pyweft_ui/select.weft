@@ -4,7 +4,8 @@
       <span class="label">{{ label }}<If cond="required"><span class="req" aria-hidden="true"> *</span></If></span>
     </If>
     <select class="control" :value="current" :name="name or None" :required="required"
-            :disabled="disabled" :aria-invalid="'true' if error else None" @change="picked(event)">
+            :disabled="disabled" :aria-invalid="'true' if error else None"
+            @change="picked(event)" @blur="emit('blur', value)">
       <If cond="placeholder"><option value="" disabled="">{{ placeholder }}</option></If>
       <For each="choice in choices" key="choice[2]">
         <option :value="choice[2]">{{ choice[1] }}</option>

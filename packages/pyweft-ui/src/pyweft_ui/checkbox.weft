@@ -1,8 +1,10 @@
 <template>
   <label class="check">
     <input type="checkbox" :checked="value" :name="name or None" :disabled="disabled"
+           :aria-invalid="'true' if error else None"
            @change="emit('update', event.checked)" />
     <span><Slot>{{ label }}</Slot></span>
+    <If cond="error"><span class="error">{{ error }}</span></If>
   </label>
 </template>
 
@@ -11,11 +13,14 @@
 label: str = ""
 value: bool = False
 name: str = ""
+error: str = ""           # shown under it, in red
 disabled: bool = False
 </code>
 
 <style>
-.check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.check { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; cursor: pointer; }
+.error { flex-basis: 100%; font-size: 0.82rem; color: var(--ui-danger, #d1242f); }
+input[aria-invalid="true"] { outline: 2px solid var(--ui-danger, #d1242f); outline-offset: 1px; }
 input {
   width: 1.1em; height: 1.1em; margin: 0;
   accent-color: var(--ui-primary, #4f46e5);

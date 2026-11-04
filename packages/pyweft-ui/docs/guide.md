@@ -243,9 +243,10 @@ Put the label between the tags when it needs more than text:
 
 ### A complete form: validation and submitting
 
-This sign-up form checks its fields when submitted, shows messages next to
-the fields that need attention, shows progress while saving, and confirms
-when done.
+`Form` checks a component's fields against rules and says what needs
+fixing, next to each field. This sign-up form shows nothing until a field
+is left or the form is submitted; from then on each message follows what
+the user types, so it disappears the moment the value is right.
 
 ```xml
 <template>
@@ -254,21 +255,20 @@ when done.
       <form novalidate="" @submit.prevent="submit">
         <ui.Column>
           <ui.TextField ref="email" label="Email" type="email" required="true" autocomplete="email"
-                        @bind="email" :error="errors.get('email', '')" />
+                        @bind="email" :error="form.error('email')" @blur="form.touch('email')" />
           <ui.TextField ref="password" label="Password" type="password" required="true"
-                        hint="At least 8 characters"
-                        @bind="password" :error="errors.get('password', '')" />
+                        hint="At least 8 characters" @bind="password"
+                        :error="form.error('password')" @blur="form.touch('password')" />
           <ui.Select ref="country" label="Country" placeholder="Choose your country"
-                     options="India, Netherlands, United States"
-                     @bind="country" :error="errors.get('country', '')" />
-          <ui.Checkbox @bind="agreed">I agree to the terms</ui.Checkbox>
+                     options="India, Netherlands, United States" @bind="country"
+                     :error="form.error('country')" @blur="form.touch('country')" />
+          <ui.Checkbox ref="agreed" @bind="agreed" :error="form.error('agreed')">I agree to the terms</ui.Checkbox>
 
           <If cond="done">
             <ui.Alert kind="success" title="Welcome!">Your account for {{ email }} is ready.</ui.Alert>
           </If>
 
-          <ui.Button type="submit" variant="primary" block="true"
-                     :loading="saving" :disabled="not agreed">Create account</ui.Button>
+          <ui.Button type="submit" variant="primary" block="true" :loading="saving">Create account</ui.Button>
         </ui.Column>
       </form>
     </ui.Card>
@@ -277,30 +277,24 @@ when done.
 
 <code>
 import asyncio
-from pyweft_ui import ui
+from pyweft_ui import Form, rules, ui
 
 email: str = ""
 password: str = ""
 country = None
 agreed: bool = False
-errors: dict = {}
 saving: bool = False
 done: bool = False
 
-def check(self):
-    errors = {}
-    if "@" not in self.email:
-        errors["email"] = "Enter an email address like you@example.com"
-    if len(self.password) < 8:
-        errors["password"] = "Use at least 8 characters"
-    if self.country is None:
-        errors["country"] = "Choose a country"
-    return errors
+form = Form(
+    email=[rules.required("Enter your email"), rules.email()],
+    password=[rules.required("Choose a password"), rules.min_length(8)],
+    country=rules.required("Choose a country"),
+    agreed=rules.accepted("Agree to the terms to continue"),
+)
 
 async def submit(self):
-    self.errors = self.check()
-    if self.errors:
-        self.focus(next(iter(self.errors)))   # the first field to fix
+    if not self.form.check():   # shows every message, focuses the first field to fix
         return
     self.saving = True
     await asyncio.sleep(1)      # send it to your server here
@@ -311,23 +305,82 @@ async def submit(self):
 
 How it fits together:
 
-- **`<form @submit.prevent="submit">`** runs `submit` when the user clicks the
-  `type="submit"` button *or presses Enter in a field*, and `.prevent` stops
-  the browser from reloading the page.
-- **`novalidate=""`** turns off the browser's own pop-up checks, so your
-  messages are the only ones. Leave it out and `required="true"` fields are
-  also checked by the browser, which blocks submitting until they're filled.
-- **`errors` is a dict of field name to message.** Each field shows
-  `errors.get('email', '')`, so a field with no problem shows nothing.
-  Setting `self.errors = {}` clears them all.
-- **`ref="email"` and `self.focus(...)`** put the cursor in the first field
-  that needs fixing. The refs match the keys of `errors`, so the first key
-  names the field.
+- **`form = Form(field=rules, ...)`** names each field of the component and
+  the rules it must pass: one rule, or a list checked in order (the first
+  that fails gives the message).
+- **`:error="form.error('email')"`** shows the field's message, or nothing
+  while there's nothing to say. **`@blur="form.touch('email')"`** says the
+  user has left the field, which is when its message starts to show.
+  `TextField`, `TextArea`, `NumberField` and `Select` report leaving;
+  every field, `Checkbox`, `Switch` and `RadioGroup` included, shows an
+  `error`.
+- **`self.form.check()`** is for submitting: it shows every message,
+  moves the cursor to the first field to fix (the one whose `ref` has the
+  same name) and returns `True` only when every field passes.
+- **`<form @submit.prevent="submit">`** runs `submit` when the user clicks
+  the `type="submit"` button *or presses Enter in a field*, and `.prevent`
+  stops the browser from reloading the page. **`novalidate=""`** turns off
+  the browser's own pop-up checks, so your messages are the only ones.
 - **`:loading="saving"`** shows a spinner on the button and makes it
   unclickable while the `async` handler waits, so nobody submits twice.
 
-To check each field as soon as the user leaves it, rather than on submit,
-handle `@update` on the field and update `errors` there.
+### Rules
+
+```python
+from pyweft_ui import rules
+```
+
+| Rule | Passes when |
+|---|---|
+| `required(message)` | there is a value: not `None`, blank text or an empty list |
+| `accepted(message)` | a `Checkbox` or `Switch` is on |
+| `email(message)`, `url(message)` | the text looks like an email address, or an `http(s)://` address |
+| `min_length(n)`, `max_length(n)` | the text has at least / at most `n` characters (a list, `n` items) |
+| `min_value(n)`, `max_value(n)` | the number is at least / at most `n` |
+| `pattern(regex, message)` | the whole text matches `regex` |
+| `one_of(choices)` | the value is one of `choices` |
+| `same_as("field", message)` | the value equals another field's, as when a password is typed twice |
+| `check(test, message)` | `test(value)` is true: `check(lambda v: v != "admin", "That name is taken")` |
+
+Every rule takes the message to show, and has a sensible one if you leave
+it out. Only `required` and `accepted` complain about an empty field; the
+others let it through, so put `required()` first when a field must be
+filled in.
+
+**Your own rule** is any function of the value that returns a message, or
+`None` when the value is fine. Give it a second parameter to read the
+other fields:
+
+```python
+def no_spaces(value):
+    return "Leave out the spaces" if " " in value else None
+
+def not_before_start(value, form):
+    if value and form.value("start") and value < form.value("start"):
+        return "The end can't be before the start"
+
+form = Form(
+    username=[rules.required(), no_spaces],
+    end=not_before_start,
+)
+```
+
+### What the form can tell you
+
+| Call | Gives |
+|---|---|
+| `form.error("email")` | the message to show under the field: `""` until it's left or submitted, and while it passes |
+| `form.touch("email")` | (nothing) the field was left: show its message from now on |
+| `form.check()` | shows every message, focuses the first field to fix (`focus=False` skips that), returns whether all pass |
+| `form.valid` | whether every field passes right now, messages showing or not, for `:disabled="not form.valid"` |
+| `form.errors` | `{field: message}` for every message showing |
+| `form.problem("email")` | the field's message whether it's showing or not |
+| `form.reset()` | hides every message again: after saving, when the fields start over empty |
+
+Rules are checked again on every update, against the fields' current
+values, so there is nothing to keep in step. A name in `Form` must be a
+field of the component; a `ref` of the same name is optional, and is what
+`check()` focuses.
 
 ## 5. Buttons
 

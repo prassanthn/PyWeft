@@ -6,7 +6,7 @@
     <textarea class="control" :rows="rows" :value="value" :name="name or None"
               :placeholder="placeholder or None" :required="required" :disabled="disabled"
               :aria-invalid="'true' if error else None"
-              @input="emit('update', event.value)"></textarea>
+              @input="emit('update', event.value)" @blur="emit('blur', value)"></textarea>
     <If cond="error"><span class="error">{{ error }}</span></If>
     <ElseIf cond="hint"><span class="hint">{{ hint }}</span></ElseIf>
   </label>

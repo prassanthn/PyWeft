@@ -110,7 +110,7 @@ height = 800
 [`pyweft-ui`](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/README.md) gives you styled, accessible
 controls as components: buttons, text fields, selects, checkboxes, switches,
 cards, tabs, sortable tables, dialogs, alerts, toasts, layout and light/dark
-themes.
+themes, plus form validation that shows what to fix next to each field.
 
 ```bash
 uv add pyweft-ui

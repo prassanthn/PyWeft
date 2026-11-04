@@ -50,6 +50,11 @@
           <pre class="code">{{ CODE['form'] }}</pre>
         </ui.Card>
 
+        <ui.Card title="Validation" id="validation" subtitle="Form and rules: try submitting it empty">
+          <Signup />
+          <pre class="code">{{ CODE['validation'] }}</pre>
+        </ui.Card>
+
         <ui.Card title="Choices" id="choices">
           <ui.Grid min_width="14rem" gap="lg">
             <ui.RadioGroup label="Plan" :options="PLANS" @bind="plan" />
@@ -154,7 +159,7 @@
 import asyncio
 from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Choices", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -222,6 +227,19 @@ CODE = {
 <ui.NumberField label="Quantity" min="1" max="99" @bind="quantity" />
 <ui.Select label="Size" options="Small, Medium, Large" @bind="size" />
 <ui.TextArea label="Notes" rows="3" @bind="notes" />""",
+    "validation": """form = Form(
+    email=[rules.required(), rules.email()],
+    password=[rules.required(), rules.min_length(8)],
+    confirm=rules.same_as("password", "The passwords don't match"),
+    agreed=rules.accepted("Agree to the terms to continue"),
+)
+
+def submit(self):
+    if self.form.check():      # every message shows; the first bad field gets focus
+        ...
+
+<ui.TextField ref="email" label="Email" @bind="email"
+              :error="form.error('email')" @blur="form.touch('email')" />""",
     "choices": """<ui.RadioGroup label="Plan" :options="[('free', 'Free'), ('pro', 'Pro')]" @bind="plan" />
 <ui.Checkbox label="Send me updates" @bind="updates" />
 <ui.Switch label="Dark mode" @bind="dark" />""",

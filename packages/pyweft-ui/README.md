@@ -108,6 +108,10 @@ of values, a list of `(value, label)` pairs or a list of
 `{"value": ..., "label": ...}` dicts. The bound field gets the value itself,
 so `[(1, "One"), (2, "Two")]` binds an `int`.
 
+`TextField`, `TextArea`, `NumberField` and `Select` emit `blur` when the
+user leaves them, which is when a [form](#checking-forms) starts showing
+that field's message.
+
 ### Data and navigation
 
 | Control | Fields | Notes |
@@ -131,6 +135,36 @@ function), `align` and `sortable`. Left out, they come from the first row.
 | `Badge` | `kind` (neutral, primary, info, success, warning, danger) | |
 | `Spinner` | `size`, `label` | |
 | `Icon` | `name`, `size` | check, x, plus, minus, search, info, alert, chevron-up/down/left/right, menu, trash, edit, send, user, home, star, heart, download, upload, external, copy, settings, sun, moon |
+
+## Checking forms
+
+```python
+from pyweft_ui import Form, rules
+
+form = Form(
+    email=[rules.required(), rules.email()],
+    password=[rules.required(), rules.min_length(8)],
+    agreed=rules.accepted("Agree to the terms to continue"),
+)
+
+async def submit(self):
+    if not self.form.check():     # shows every message, focuses the first field to fix
+        return
+    ...
+```
+
+```xml
+<ui.TextField ref="email" label="Email" @bind="email"
+              :error="form.error('email')" @blur="form.touch('email')" />
+```
+
+A field's message shows once the user has left it or tried to submit, then
+follows what they type. Rules: `required`, `accepted`, `email`, `url`,
+`min_length`, `max_length`, `min_value`, `max_value`, `pattern`, `one_of`,
+`same_as` and `check`, or any function of the value that returns a message.
+`form.valid`, `form.errors` and `form.reset()` do what they say. The
+[guide](https://prassanthn.github.io/PyWeft/controls/guide/#a-complete-form-validation-and-submitting)
+has the details.
 
 ## Toasts
 

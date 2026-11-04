@@ -1,9 +1,11 @@
 <template>
   <label class="switch">
     <input type="checkbox" role="switch" :checked="value" :name="name or None"
-           :disabled="disabled" @change="emit('update', event.checked)" />
+           :disabled="disabled" :aria-invalid="'true' if error else None"
+           @change="emit('update', event.checked)" />
     <span class="track" aria-hidden="true"><span class="thumb"></span></span>
     <span class="text"><Slot>{{ label }}</Slot></span>
+    <If cond="error"><span class="error">{{ error }}</span></If>
   </label>
 </template>
 
@@ -12,11 +14,14 @@
 label: str = ""
 value: bool = False
 name: str = ""
+error: str = ""           # shown under it, in red
 disabled: bool = False
 </code>
 
 <style>
-.switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; position: relative; }
+.switch { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; cursor: pointer; position: relative; }
+.error { flex-basis: 100%; font-size: 0.82rem; color: var(--ui-danger, #d1242f); }
+input[aria-invalid="true"] + .track { box-shadow: 0 0 0 2px var(--ui-danger, #d1242f); }
 input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
 .track {
   width: 2.3em; height: 1.3em; border-radius: 999px; flex-shrink: 0;

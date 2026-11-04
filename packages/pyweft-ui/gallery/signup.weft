@@ -1,0 +1,55 @@
+<template>
+  <form novalidate="" @submit.prevent="submit">
+    <ui.Column>
+      <ui.Grid min_width="16rem" gap="lg">
+        <ui.TextField ref="email" label="Email" type="email" required="true" autocomplete="email"
+                      @bind="email" :error="form.error('email')" @blur="form.touch('email')" />
+        <ui.Select ref="plan" label="Plan" placeholder="Choose a plan" options="Free, Pro, Team"
+                   required="true" @bind="plan" :error="form.error('plan')" @blur="form.touch('plan')" />
+        <ui.TextField ref="password" label="Password" type="password" required="true"
+                      hint="At least 8 characters" @bind="password"
+                      :error="form.error('password')" @blur="form.touch('password')" />
+        <ui.TextField ref="confirm" label="Password again" type="password" required="true"
+                      @bind="confirm" :error="form.error('confirm')" @blur="form.touch('confirm')" />
+      </ui.Grid>
+      <ui.Checkbox ref="agreed" @bind="agreed" :error="form.error('agreed')">I agree to the terms</ui.Checkbox>
+      <ui.Row>
+        <ui.Button type="submit" variant="primary" icon="check">Create account</ui.Button>
+        <ui.Button variant="ghost" @click="start_over">Start over</ui.Button>
+      </ui.Row>
+      <If cond="done">
+        <ui.Alert kind="success" title="Account created">Welcome aboard, {{ email }}.</ui.Alert>
+      </If>
+    </ui.Column>
+  </form>
+</template>
+
+<code>
+# A sign-up form checked with Form: messages appear when a field is left
+# or on submit, then follow what you type.
+from pyweft_ui import Form, rules, ui
+
+email: str = ""
+plan = None
+password: str = ""
+confirm: str = ""
+agreed: bool = False
+done: bool = False
+
+form = Form(
+    email=[rules.required("Enter your email"), rules.email()],
+    plan=rules.required("Choose a plan"),
+    password=[rules.required("Choose a password"), rules.min_length(8)],
+    confirm=[rules.required("Type the password again"),
+             rules.same_as("password", "The passwords don't match")],
+    agreed=rules.accepted("Agree to the terms to continue"),
+)
+
+def submit(self):
+    self.done = self.form.check()
+
+def start_over(self):
+    self.email = self.password = self.confirm = ""
+    self.plan, self.agreed, self.done = None, False, False
+    self.form.reset()
+</code>

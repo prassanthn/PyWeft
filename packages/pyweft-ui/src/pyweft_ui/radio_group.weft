@@ -5,11 +5,14 @@
       <For each="choice in choices" key="choice[2]">
         <label class="option">
           <input type="radio" :name="_group" :value="choice[2]" :checked="choice[0] == value"
+                 :aria-invalid="'true' if error else None"
                  @change="emit('update', choice[0])" />
           <span>{{ choice[1] }}</span>
         </label>
       </For>
     </div>
+    <If cond="error"><p class="error">{{ error }}</p></If>
+    <ElseIf cond="hint"><p class="hint">{{ hint }}</p></ElseIf>
   </fieldset>
 </template>
 
@@ -23,6 +26,8 @@ label: str = ""
 value = None
 options: list = []
 inline: bool = False      # side by side instead of stacked
+hint: str = ""            # small text under the options
+error: str = ""           # shown instead of the hint, in red
 disabled: bool = False
 
 _ids = itertools.count(1)
@@ -57,4 +62,8 @@ def choices(self):
 .option { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
 input { width: 1.05em; height: 1.05em; margin: 0; accent-color: var(--ui-primary, #4f46e5); cursor: inherit; }
 .group:disabled .option { opacity: 0.6; cursor: not-allowed; }
+.hint, .error { font-size: 0.82rem; margin: 6px 0 0; }
+.hint { color: var(--ui-muted, #59636e); }
+.error { color: var(--ui-danger, #d1242f); }
+input[aria-invalid="true"] { outline: 2px solid var(--ui-danger, #d1242f); outline-offset: 1px; }
 </style>

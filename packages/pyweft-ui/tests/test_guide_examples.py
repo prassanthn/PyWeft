@@ -81,26 +81,30 @@ def test_signup_form_validates_then_submits(app_dir):
     async def main():
         app, r = load(app_dir, block)
         tree = r.render()
-        form = next(n for n in walk(tree) if n.tag == "form")
+        assert app.form.errors == {}
+        email, password, country, agree = [n for n in walk(tree) if n.tag in ("input", "select")]
+        r.dispatch(email.events["blur"], {})  # left empty
+        assert app.form.errors == {"email": "Enter your email"}
+
+        form = next(n for n in walk(r.render()) if n.tag == "form")
         r.dispatch(form.events["submit.prevent"], {"type": "submit"})
-        assert set(app.errors) == {"email", "password", "country"}
+        assert set(app.form.errors) == {"email", "password", "country", "agreed"}
         r.render()
+        r.after_render()
         (focus,) = r.take_commands()  # into the email field's input
         assert focus["op"] == "focus" and "field" in node_at(r, focus["path"]).attrs["class"]
         errors = [text(n) for n in walk(r.render()) if "error" in n.attrs.get("class", "").split()]
-        assert "Use at least 8 characters" in errors
+        assert "Choose a password" in errors and "Agree to the terms to continue" in errors
 
-        fields = [n for n in walk(r.render()) if n.tag in ("input", "select")]
-        email, password, country, agree = fields
         r.dispatch(email.events["input"], {"value": "ada@example.com"})
+        r.dispatch(password.events["input"], {"value": "short"})
+        assert app.form.errors["password"] == "Use at least 8 characters"
         r.dispatch(password.events["input"], {"value": "correct horse"})
         r.dispatch(country.events["change"], {"value": "India"})
         r.dispatch(agree.events["change"], {"checked": True})
-        tree = r.render()
-        button = next(n for n in walk(tree) if n.tag == "button")
-        assert "disabled" not in button.attrs
+        assert app.form.errors == {} and app.form.valid
         r.dispatch(form.events["submit.prevent"], {"type": "submit"})
-        assert app.errors == {} and app.saving
+        assert app.saving
         await r.idle()
         assert app.done and not app.saving
         alert = next(n for n in walk(r.render()) if "alert-success" in n.attrs.get("class", ""))

@@ -8,6 +8,18 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- **Form validation**: `Form` and `rules`. Name each field's rules
+  (`required`, `email`, `min_length`, `same_as`, `check`, your own
+  functions...), show `form.error("field")` under it, and call
+  `form.check()` on submit. Messages show once a field is left or a submit
+  is tried, then follow what's typed; `check()` focuses the first field to
+  fix.
+- `Checkbox`, `Switch` and `RadioGroup` take an `error`; `RadioGroup` a
+  `hint` too. `TextField`, `TextArea`, `NumberField` and `Select` emit
+  `blur` when left.
+- The gallery has a Validation section, and the guide's sign-up recipe uses
+  `Form`.
+
 ## 0.2.0
 
 - For `pyweft` 0.3, which adds `pyweft.http` and `pyweft.storage`. The

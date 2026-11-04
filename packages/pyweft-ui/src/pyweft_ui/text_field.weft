@@ -6,7 +6,8 @@
     <input class="control" :type="type" :value="value" :name="name or None"
            :placeholder="placeholder or None" :required="required" :disabled="disabled"
            :autocomplete="autocomplete or None" :aria-invalid="'true' if error else None"
-           @input="emit('update', event.value)" @keydown.enter="emit('enter', value)" />
+           @input="emit('update', event.value)" @keydown.enter="emit('enter', value)"
+           @blur="emit('blur', value)" />
     <If cond="error"><span class="error">{{ error }}</span></If>
     <ElseIf cond="hint"><span class="hint">{{ hint }}</span></ElseIf>
   </label>
@@ -14,7 +15,8 @@
 
 <code>
 # <ui.TextField label="Email" type="email" @bind="email" :error="errors.get('email')" />
-# Emits "update" as you type (that is what @bind uses) and "enter" on Enter.
+# Emits "update" as you type (that is what @bind uses), "enter" on Enter,
+# and "blur" when the user leaves it (for Form's touch()).
 label: str = ""
 value: str = ""
 type: str = "text"        # text, email, password, search, url, tel, date, time
