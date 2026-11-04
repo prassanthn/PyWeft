@@ -87,6 +87,23 @@
           </ui.Column>
         </ui.Card>
 
+        <ui.Card title="Calendars" id="calendars" subtitle="Choosing a date, and showing events">
+          <ui.Column gap="lg">
+            <ui.Row gap="xl" align="start" wrap="true">
+              <ui.Calendar @bind="picked_day" />
+              <ui.Column gap="sm">
+                <p class="note">A <b>Calendar</b> on the page, always open. Its month and year
+                  are buttons too.</p>
+                <pre class="state">picked_day={{ repr(picked_day) }}</pre>
+              </ui.Column>
+            </ui.Row>
+            <ui.EventCalendar label="Team calendar" :events="calendar_events"
+                              @select="picked_event = event['title']" @day="add_event(event)" />
+            <p class="note">{{ 'You opened: ' + picked_event if picked_event else 'Click an event, or an empty day to add one.' }}</p>
+            <pre class="code">{{ CODE['calendars'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
         <ui.Card title="Feedback" id="feedback">
           <ui.Column>
             <ui.Alert kind="info" title="Heads up">A neutral message.</ui.Alert>
@@ -179,7 +196,7 @@ import asyncio
 import datetime
 from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Dates and menus", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Dates and menus", "Calendars", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -218,6 +235,33 @@ items: int = 3
 check_in = None
 stay = None
 last_action: str = ""
+picked_day = None
+picked_event: str = ""
+added_events: list = []
+
+@property
+def calendar_events(self):
+    # Sample events around today, so the calendar always has something on.
+    t = datetime.date.today()
+    at = lambda days, hour, minute=0: datetime.datetime.combine(
+        t + datetime.timedelta(days=days), datetime.time(hour, minute))
+    day = lambda days: t + datetime.timedelta(days=days)
+    return [
+        {"id": "standup", "title": "Standup", "start": at(0, 9, 30), "end": at(0, 9, 45), "color": "blue"},
+        {"id": "one-on-one", "title": "1:1 with Ada", "start": at(0, 9, 30), "end": at(0, 10, 15), "color": "green"},
+        {"id": "review", "title": "Design review", "start": at(1, 14), "end": at(1, 15, 30), "color": "purple"},
+        {"id": "lunch", "title": "Team lunch", "start": at(2, 12, 30), "end": at(2, 13, 30), "color": "amber"},
+        {"id": "release", "title": "Release 0.3", "start": day(4), "color": "red"},
+        {"id": "conf", "title": "PyCon trip", "start": day(8), "end": day(10), "color": "teal"},
+        {"id": "dentist", "title": "Dentist", "start": at(-3, 8, 45), "end": at(-3, 9, 30), "color": "gray"},
+        {"id": "planning", "title": "Sprint planning", "start": at(7, 10), "end": at(7, 11, 30), "color": "blue"},
+        {"id": "retro", "title": "Retro", "start": at(6, 16), "end": at(6, 17), "color": "pink"},
+    ] + self.added_events
+
+def add_event(self, when):
+    start = when if isinstance(when, datetime.datetime) else when
+    self.added_events = self.added_events + [
+        {"id": f"new-{len(self.added_events)}", "title": "New event", "start": start}]
 MENU = [
     {"value": "Edit", "label": "Edit", "icon": "edit"},
     {"value": "Duplicate", "label": "Duplicate", "icon": "copy"},
@@ -289,6 +333,17 @@ def submit(self):
     '-',
     {'value': 'delete', 'label': 'Delete', 'icon': 'trash', 'danger': True},
 ]" />""",
+    "calendars": """<ui.Calendar @bind="day" />
+
+<ui.EventCalendar :events="events" @select="open(event)" @day="add(event)" />
+<ui.EventCalendar :events="events" months="3" />   <!-- three months, one under another -->
+
+events = [
+    {"title": "Standup", "start": datetime.datetime(2026, 11, 3, 9, 30),
+     "end": datetime.datetime(2026, 11, 3, 9, 45), "color": "blue"},
+    {"title": "Release", "start": datetime.date(2026, 11, 7), "color": "red"},   # all day
+    {"title": "Trip", "start": datetime.date(2026, 11, 11), "end": datetime.date(2026, 11, 13)},
+]""",
     "feedback": """<ui.Alert kind="success">Saved.</ui.Alert>
 <ui.Alert kind="danger" title="Failed" dismissible="true" @close="hide()">...</ui.Alert>
 <ui.Badge kind="success">active</ui.Badge>  <ui.Spinner />  <ui.Icon name="star" />""",

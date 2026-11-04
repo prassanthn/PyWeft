@@ -22,6 +22,7 @@ fields; this guide is the how-to.
 13. [Changing how a control looks](#13-changing-how-a-control-looks)
 14. [Building your own components from controls](#14-building-your-own-components-from-controls)
 15. [Accessibility and keyboard](#15-accessibility-and-keyboard)
+16. [Calendars of events](#16-calendars-of-events)
 
 ---
 
@@ -1121,3 +1122,55 @@ What you should add yourself:
   if "email" in self.errors:
       self.focus("email")
   ```
+
+## 16. Calendars of events
+
+`EventCalendar` shows events in a month, a week, or a list by day, the way
+a team or booking calendar does:
+
+```xml
+<ui.EventCalendar :events="events" @select="open(event)" @day="add(event)" />
+```
+
+```python
+import datetime
+
+events = [
+    {"title": "Standup", "start": datetime.datetime(2026, 11, 3, 9, 30),
+     "end": datetime.datetime(2026, 11, 3, 9, 45), "color": "blue"},
+    {"title": "Release", "start": datetime.date(2026, 11, 7), "color": "red"},
+    {"title": "Trip", "start": datetime.date(2026, 11, 11), "end": datetime.date(2026, 11, 13)},
+]
+
+def open(self, event):
+    self.editing = event          # the very dict (or object) you passed in
+
+def add(self, when):
+    self.events = self.events + [{"title": "New event", "start": when}]
+```
+
+- **Events** are dicts or objects with `title` and `start`, and optionally
+  `end`, `color` and `id`. A `date` start (or text like `"2026-11-07"`)
+  is **all day**, and `end` is then the last day; a `datetime` start (or
+  `"2026-11-03T09:30"`) is **timed**, and `end` defaults to an hour later.
+  `color` is `blue`, `green`, `amber`, `red`, `purple`, `teal`, `pink`,
+  `gray`, or any CSS colour.
+- **Month view:** all-day and multi-day events are bars across their days,
+  continuing into the next week; timed ones show their time. A day with
+  more than `max_per_day` (3) rows shows "+2 more", which opens up the
+  week. `months="3"` shows three months, one under another.
+- **Week view:** the hours from `day_start` to `day_end` (8 to 20), with
+  timed events placed by their times and side by side where they overlap;
+  all-day events in a row above.
+- **Agenda:** the events by day, a good choice on phones.
+- **`@select`** gets the event you passed in. **`@day`** gets the date of
+  an empty day, or in the week view the `datetime` of the hour, so you can
+  add one there; days are only clickable when you listen to `@day`.
+- **`@navigate`** gets the `(first, last)` dates now showing, whenever the
+  user moves or switches view: load just those events from your server
+  with `pyweft.http`.
+- **Settings:** `view` (`month`, `week`, `agenda`), `date` (where it starts;
+  today), `week_start`, `time_format` (`"%I:%M %p"` for 9:30 AM),
+  `switcher="false"` to hide the view buttons, and `label` to name it for
+  screen readers. Every event is a button that reads out its title, day
+  and time.

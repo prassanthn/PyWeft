@@ -31,6 +31,10 @@ releasing moves them under the new version (see
   `min_days`/`max_days` limit its length.
 - **`Calendar`**: the calendar on its own, always open, for a date or a
   range. `DatePicker` and `DateRangePicker` are built on it.
+- **`EventCalendar`**: events by month (bars across days, "+N more"),
+  week (timed events by the hour, side by side when they overlap) or
+  agenda; `months="3"` shows several months. Emits `select`, `day` and
+  `navigate`.
 - Menus and calendars shift sideways to stay inside the window.
 - `AppShell`'s header wraps onto a second row when its actions don't fit
   beside the title, so a phone no longer scrolls sideways.

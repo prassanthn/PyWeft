@@ -1,0 +1,664 @@
+<template>
+  <section class="ecal" :aria-label="label or None">
+    <header class="bar">
+      <div class="nav-group">
+        <button type="button" class="today-btn" @click="go_today">Today</button>
+        <button type="button" class="nav" :aria-label="'Previous ' + unit" @click="shift(-1)"><Icon name="chevron-left" size="1.1em" /></button>
+        <button type="button" class="nav" :aria-label="'Next ' + unit" @click="shift(1)"><Icon name="chevron-right" size="1.1em" /></button>
+        <h2 class="title" aria-live="polite">{{ title }}</h2>
+      </div>
+      <If cond="switcher">
+        <div class="views" role="group" aria-label="View">
+          <For each="name in ['month', 'week', 'agenda']" key="name">
+            <button type="button" :class="'view on' if name == _mode else 'view'"
+                    :aria-pressed="'true' if name == _mode else 'false'" @click="switch(name)">{{ name.capitalize() }}</button>
+          </For>
+        </div>
+      </If>
+    </header>
+
+    <If cond="_mode == 'month'">
+      <For each="block in month_blocks" key="block['key']">
+      <div class="month">
+        <If cond="months > 1"><h3 class="month-name">{{ block['name'] }}</h3></If>
+        <div class="weekdays">
+          <For each="day in weekday_names" key="day"><span class="weekday">{{ day }}</span></For>
+        </div>
+        <For each="week in block['weeks']" key="week['key']">
+          <div class="week" :style="week['rows_style']">
+            <For each="cell in week['cells']" key="cell['iso']">
+              <div :class="cell['classes']" :style="cell['style']" @click="day_clicked(cell['date'])"></div>
+            </For>
+            <For each="cell in week['cells']" key="'n' + cell['iso']">
+              <span :class="'num today' if cell['today'] else 'num'" :style="'grid-column: ' + str(cell['col'] + 1)"
+                    :aria-label="cell['long']">{{ cell['day'] }}</span>
+            </For>
+            <For each="bar in week['bars']" key="bar['key']">
+              <button type="button" :class="bar['classes']" :style="bar['style']" :aria-label="bar['label']"
+                      @click="choose(bar['index'])">
+                <If cond="bar['time']"><span class="time">{{ bar['time'] }}</span></If>
+                <span class="name">{{ bar['title'] }}</span>
+              </button>
+            </For>
+            <For each="more in week['more']" key="more['key']">
+              <button type="button" class="more" :style="more['style']" @click="expand(week['key'])">
+                {{ more['text'] }}
+              </button>
+            </For>
+            <If cond="week['expanded']">
+              <button type="button" class="less" :style="week['less_style']" @click="collapse(week['key'])">Show less</button>
+            </If>
+          </div>
+        </For>
+      </div>
+      </For>
+    </If>
+
+    <ElseIf cond="_mode == 'week'">
+      <div class="weekview">
+        <div class="wv-head">
+          <span class="gutter"></span>
+          <For each="day in week_days" key="day['iso']">
+            <span :class="'wv-day today' if day['today'] else 'wv-day'">
+              <span class="wv-name">{{ day['name'] }}</span> <span class="wv-num">{{ day['day'] }}</span>
+            </span>
+          </For>
+        </div>
+        <If cond="week_allday['bars']">
+          <div class="wv-allday">
+            <span class="gutter label">All day</span>
+            <div class="week" :style="week_allday['rows_style']">
+              <For each="bar in week_allday['bars']" key="bar['key']">
+                <button type="button" :class="bar['classes']" :style="bar['style']" :aria-label="bar['label']"
+                        @click="choose(bar['index'])"><span class="name">{{ bar['title'] }}</span></button>
+              </For>
+            </div>
+          </div>
+        </If>
+        <div class="wv-body" :style="'--hours: ' + str(hour_count)">
+          <div class="gutter">
+            <For each="hour in hours" key="hour['h']"><span class="hour">{{ hour['label'] }}</span></For>
+          </div>
+          <For each="day in week_days" key="'c' + day['iso']">
+            <div :class="'wv-col today' if day['today'] else 'wv-col'">
+              <For each="hour in hours" key="hour['h']">
+                <div class="slot" @click="slot_clicked(day['date'], hour['h'])"></div>
+              </For>
+              <For each="ev in day['timed']" key="ev['key']">
+                <button type="button" class="timed" :style="ev['style']" :aria-label="ev['label']"
+                        @click="choose(ev['index'])">
+                  <span class="name">{{ ev['title'] }}</span>
+                  <span class="time">{{ ev['time'] }}</span>
+                </button>
+              </For>
+            </div>
+          </For>
+        </div>
+      </div>
+    </ElseIf>
+
+    <Else>
+      <div class="agenda">
+        <If cond="not agenda_days"><p class="empty">{{ empty }}</p></If>
+        <For each="day in agenda_days" key="day['iso']">
+          <div class="ag-day">
+            <h3 :class="'ag-date today' if day['today'] else 'ag-date'">{{ day['heading'] }}</h3>
+            <For each="ev in day['events']" key="ev['key']">
+              <button type="button" class="ag-event" :style="ev['style']" :aria-label="ev['label']"
+                      @click="choose(ev['index'])">
+                <span class="ag-time">{{ ev['time'] }}</span>
+                <span class="ag-dot" aria-hidden="true"></span>
+                <span class="name">{{ ev['title'] }}</span>
+              </button>
+            </For>
+          </div>
+        </For>
+      </div>
+    </Else>
+  </section>
+</template>
+
+<code>
+# <ui.EventCalendar :events="events" @select="open(event)" @day="add(event)" />
+# Shows events in a month, a week or an agenda list. Each event is a dict
+# or an object with title, start, and optionally end, color and id. A
+# start that is a date (not a datetime) means all day, and end is then the
+# last day; a datetime start is timed (end defaults to an hour later).
+# color: blue, green, amber, red, purple, teal, pink, gray, or any CSS
+# colour. Emits "select" with the event you passed in, "day" with the date
+# (or, in the week view, the datetime of the hour) of an empty spot that
+# was clicked, and "navigate" with the (first, last) dates now showing.
+# months="3" shows three months, one under another; the arrows still move
+# one month at a time.
+import datetime
+import itertools
+
+events: list = []
+view: str = "month"       # month, week or agenda: the one it starts on
+months: int = 1           # month view and agenda: how many months, one under another
+date = None               # the day it starts on (a date or "YYYY-MM-DD"); today
+week_start: str = "monday"  # or "sunday"
+day_start: int = 8        # the week view's first hour
+day_end: int = 20         # and the hour it stops at
+max_per_day: int = 3      # month view: rows of events before "+N more"
+time_format: str = "%H:%M"  # e.g. "%I:%M %p" for 10:00 AM
+switcher: bool = True     # the Month / Week / Agenda buttons
+label: str = ""           # names the calendar for screen readers
+empty: str = "Nothing planned."
+
+_MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+           "August", "September", "October", "November", "December"]
+_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+_COLORS = {
+    "blue": "#2563eb", "green": "#16a34a", "amber": "#d97706", "red": "#dc2626",
+    "purple": "#7c3aed", "teal": "#0d9488", "pink": "#db2777", "gray": "#64748b",
+}
+
+_mode = "month"
+_date = None
+_expanded = None
+
+def on_init(self):
+    self._mode = self.view if self.view in ("month", "week", "agenda") else "month"
+    self._date = self._as_date(self.date) or self.today
+    self._expanded = set()
+
+# ------------------------------------------------------------- data
+
+@property
+def today(self):
+    return datetime.date.today()
+
+def _as_date(self, value):
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime.datetime):
+        return value.date()
+    if isinstance(value, datetime.date):
+        return value
+    return datetime.date.fromisoformat(str(value).strip()[:10])
+
+def _as_moment(self, value):
+    if value is None or isinstance(value, (datetime.date, datetime.datetime)):
+        return value
+    text = str(value).strip()
+    if len(text) > 10:
+        return datetime.datetime.fromisoformat(text)
+    return datetime.date.fromisoformat(text)
+
+@property
+def items(self):
+    """Every event in one shape: dicts with first and last day covered."""
+    out = []
+    for index, item in enumerate(self.events or []):
+        if isinstance(item, dict):
+            get = item.get
+        else:
+            get = lambda key, default=None, item=item: getattr(item, key, default)
+        start = self._as_moment(get("start"))
+        if start is None:
+            continue
+        end = self._as_moment(get("end"))
+        all_day = bool(get("all_day")) or not isinstance(start, datetime.datetime)
+        if all_day:
+            first = self._as_date(start)
+            last = self._as_date(end) or first
+            if last < first:
+                last = first
+            begin = finish = None
+        else:
+            begin = start
+            finish = end if isinstance(end, datetime.datetime) else begin + datetime.timedelta(hours=1)
+            if finish <= begin:
+                finish = begin + datetime.timedelta(minutes=30)
+            first = begin.date()
+            last = (finish - datetime.timedelta(microseconds=1)).date()
+        color = str(get("color") or "")
+        out.append({
+            "index": index, "key": str(get("id", index)), "title": str(get("title", "") or ""),
+            "all_day": all_day, "first": first, "last": last, "begin": begin, "finish": finish,
+            "color": self._COLORS.get(color, color) or "var(--ui-primary, #4f46e5)",
+        })
+    out.sort(key=lambda e: (e["first"], not e["all_day"], -(e["last"] - e["first"]).days,
+                            e["begin"] or datetime.datetime.min, e["title"]))
+    return out
+
+def _time(self, moment):
+    return moment.strftime(self.time_format).lstrip("0") if self.time_format.startswith("%I") else moment.strftime(self.time_format)
+
+def _long(self, day):
+    return f"{self._DAYS[day.weekday()]} {day.day} {self._MONTHS[day.month - 1]} {day.year}"
+
+def _describe(self, e):
+    if e["all_day"]:
+        when = self._long(e["first"]) + ("" if e["last"] == e["first"] else " to " + self._long(e["last"]))
+        return f"{e['title']}, {when}, all day"
+    return f"{e['title']}, {self._long(e['first'])}, {self._time(e['begin'])} to {self._time(e['finish'])}"
+
+# ------------------------------------------------------------- moving
+
+def _column(self, day):
+    return (day.weekday() + (1 if self.week_start == "sunday" else 0)) % 7
+
+def _week_of(self, day):
+    return day - datetime.timedelta(days=self._column(day))
+
+def _add_months(self, day, delta):
+    month = day.month - 1 + delta
+    return datetime.date(day.year + month // 12, month % 12 + 1, 1)
+
+@property
+def unit(self):
+    return "week" if self._mode == "week" else "month"
+
+@property
+def showing(self):
+    """The (first, last) days on screen."""
+    if self._mode == "week":
+        first = self._week_of(self._date)
+        return first, first + datetime.timedelta(days=6)
+    first = self._date.replace(day=1)
+    count = self.months if self.months > 1 else 1
+    last = self._add_months(first, count) - datetime.timedelta(days=1)
+    if self._mode == "month":
+        return self._week_of(first), self._week_of(last) + datetime.timedelta(days=6)
+    return first, last
+
+def _moved(self):
+    self._expanded = set()
+    self.emit("navigate", self.showing)
+
+def shift(self, delta):
+    if self._mode == "week":
+        self._date += datetime.timedelta(days=7 * delta)
+    else:
+        self._date = self._add_months(self._date, delta)
+    self._moved()
+
+def go_today(self):
+    self._date = self.today
+    self._moved()
+
+def switch(self, mode):
+    self._mode = mode
+    self._moved()
+
+def expand(self, key):
+    self._expanded = self._expanded | {key}
+
+def collapse(self, key):
+    self._expanded = self._expanded - {key}
+
+def choose(self, index):
+    self.emit("select", self.events[index])
+
+def day_clicked(self, day):
+    self.emit("day", day)
+
+def slot_clicked(self, day, hour):
+    self.emit("day", datetime.datetime.combine(day, datetime.time(hour)))
+
+@property
+def title(self):
+    if self._mode == "week":
+        first, last = self.showing
+        if first.month == last.month:
+            return f"{first.day} – {last.day} {self._MONTHS[last.month - 1][:3]} {last.year}"
+        if first.year == last.year:
+            return f"{first.day} {self._MONTHS[first.month - 1][:3]} – {last.day} {self._MONTHS[last.month - 1][:3]} {last.year}"
+        return f"{first.day} {self._MONTHS[first.month - 1][:3]} {first.year} – {last.day} {self._MONTHS[last.month - 1][:3]} {last.year}"
+    first = self._date.replace(day=1)
+    if self.months > 1:
+        last = self._add_months(first, self.months - 1)
+        if first.year == last.year:
+            return f"{self._MONTHS[first.month - 1]} – {self._MONTHS[last.month - 1]} {last.year}"
+        return f"{self._MONTHS[first.month - 1]} {first.year} – {self._MONTHS[last.month - 1]} {last.year}"
+    return f"{self._MONTHS[first.month - 1]} {first.year}"
+
+@property
+def weekday_names(self):
+    order = self._DAYS[6:] + self._DAYS[:6] if self.week_start == "sunday" else self._DAYS
+    return [name[:3] for name in order]
+
+# ------------------------------------------------------------- the grids
+
+def _lay_out(self, first, events, limit):
+    """Bars for one week starting at `first`: each event gets a column
+    span and the first row (lane) free across it."""
+    last = first + datetime.timedelta(days=6)
+    lanes, bars = [], []
+    for e in events:
+        if e["last"] < first or e["first"] > last:
+            continue
+        c0 = (e["first"] - first).days if e["first"] > first else 0
+        c1 = (e["last"] - first).days if e["last"] < last else 6
+        for lane, taken_to in enumerate(lanes):
+            if taken_to < c0:
+                lanes[lane] = c1
+                break
+        else:
+            lanes.append(c1)
+            lane = len(lanes) - 1
+        bars.append((e, c0, c1, lane))
+    shown = [b for b in bars if limit is None or b[3] < limit]
+    hidden = [0] * 7
+    for e, c0, c1, lane in bars:
+        if limit is not None and lane >= limit:
+            for column in range(c0, c1 + 1):
+                hidden[column] += 1
+    return shown, hidden, len(lanes)
+
+def _bar(self, e, c0, c1, lane, first, last, row_offset):
+    classes = ["event"]
+    timed_dot = not e["all_day"] and e["first"] == e["last"]
+    if timed_dot:
+        classes.append("dot")
+    if e["first"] < first:
+        classes.append("from-before")
+    if e["last"] > last:
+        classes.append("goes-on")
+    return {
+        "key": f"{e['key']}-{first.isoformat()}", "index": e["index"], "title": e["title"],
+        "time": self._time(e["begin"]) if timed_dot else "",
+        "classes": " ".join(classes), "label": self._describe(e),
+        "style": f"grid-column: {c0 + 1} / span {c1 - c0 + 1}; grid-row: {lane + row_offset}; --ev: {e['color']}",
+    }
+
+@property
+def month_blocks(self):
+    first = self._date.replace(day=1)
+    events = self.items
+    blocks = []
+    for offset in range(self.months if self.months > 1 else 1):
+        month_first = self._add_months(first, offset)
+        blocks.append({
+            "key": month_first.isoformat(), "weeks": self._month_weeks(month_first, events),
+            "name": f"{self._MONTHS[month_first.month - 1]} {month_first.year}",
+        })
+    return blocks
+
+def _month_weeks(self, month_first, events):
+    month_last = self._add_months(month_first, 1) - datetime.timedelta(days=1)
+    first_shown = self._week_of(month_first)
+    last_shown = self._week_of(month_last) + datetime.timedelta(days=6)
+    today, month = self.today, month_first.month
+    weeks = []
+    start = first_shown
+    while start <= last_shown:
+        key = start.isoformat()
+        expanded = key in self._expanded
+        limit = None if expanded else self.max_per_day
+        end = start + datetime.timedelta(days=6)
+        shown, hidden, lane_count = self._lay_out(start, events, limit)
+        lanes = lane_count if expanded else (lane_count if lane_count < limit else limit)
+        has_more = any(hidden)
+        rows = 1 + lanes + (1 if has_more or expanded else 0)
+        cells = []
+        for column in range(7):
+            day = start + datetime.timedelta(days=column)
+            classes = ["cell"]
+            if day.month != month:
+                classes.append("outside")
+            if day == today:
+                classes.append("today")
+            if getattr(self, "on_day", None):
+                classes.append("clickable")
+            cells.append({
+                "date": day, "iso": day.isoformat(), "day": day.day, "col": column,
+                "today": day == today, "classes": " ".join(classes), "long": self._long(day),
+                "style": f"grid-column: {column + 1}; grid-row: 1 / span {rows + 1}",
+            })
+        more = [
+            {"key": f"more-{column}", "text": f"+{count} more",
+             "style": f"grid-column: {column + 1}; grid-row: {lanes + 2}"}
+            for column, count in enumerate(hidden) if count
+        ]
+        weeks.append({
+            "key": key, "cells": cells, "more": more, "expanded": expanded,
+            "bars": [self._bar(e, c0, c1, lane, start, end, 2) for e, c0, c1, lane in shown],
+            "rows_style": f"grid-template-rows: auto repeat({rows - 1}, auto) 1fr",
+            "less_style": f"grid-column: 1 / span 7; grid-row: {lanes + 2}",
+        })
+        start = end + datetime.timedelta(days=1)
+    return weeks
+
+@property
+def hours(self):
+    out = []
+    for h in range(self.day_start, self.day_end):
+        label = self._time(datetime.datetime(2000, 1, 1, h)) if self.time_format != "%H:%M" else f"{h:02d}:00"
+        out.append({"h": h, "label": label})
+    return out
+
+@property
+def hour_count(self):
+    return self.day_end - self.day_start
+
+@property
+def week_days(self):
+    first, _ = self.showing
+    timed = [e for e in self.items if not e["all_day"] and e["first"] == e["last"]]
+    span = (self.day_end - self.day_start) * 60
+    out = []
+    for column in range(7):
+        day = first + datetime.timedelta(days=column)
+        todays = sorted((e for e in timed if e["first"] == day), key=lambda e: (e["begin"], e["finish"]))
+        # Overlapping events share the column: each cluster splits it evenly.
+        placed, cluster, cluster_end = [], [], None
+        def close(cluster):
+            lanes = []
+            for e in cluster:
+                for lane, free_at in enumerate(lanes):
+                    if free_at <= e["begin"]:
+                        lanes[lane] = e["finish"]
+                        break
+                else:
+                    lanes.append(e["finish"])
+                    lane = len(lanes) - 1
+                e_lane = (e, lane)
+                placed.append(e_lane)
+            return len(lanes)
+        widths = {}
+        for e in todays:
+            if cluster and e["begin"] >= cluster_end:
+                count = close(cluster)
+                widths.update({id(x): count for x in cluster})
+                cluster = []
+            cluster.append(e)
+            cluster_end = e["finish"] if not cluster_end or len(cluster) == 1 or e["finish"] > cluster_end else cluster_end
+        if cluster:
+            count = close(cluster)
+            widths.update({id(x): count for x in cluster})
+        boxes = []
+        for e, lane in placed:
+            start_min = (e["begin"].hour * 60 + e["begin"].minute) - self.day_start * 60
+            end_min = (e["finish"].hour * 60 + e["finish"].minute) - self.day_start * 60
+            if e["finish"].date() > day:
+                end_min = span
+            start_min, end_min = (start_min if start_min > 0 else 0), (end_min if end_min < span else span)
+            if end_min <= start_min:
+                continue  # outside the hours shown
+            count = widths[id(e)]
+            boxes.append({
+                "key": e["key"], "index": e["index"], "title": e["title"],
+                "time": f"{self._time(e['begin'])} – {self._time(e['finish'])}",
+                "label": self._describe(e),
+                "style": (f"top: {start_min / span * 100:.3f}%; height: {(end_min - start_min) / span * 100:.3f}%; "
+                          f"left: {lane / count * 100:.3f}%; width: {100 / count:.3f}%; --ev: {e['color']}"),
+            })
+        out.append({
+            "date": day, "iso": day.isoformat(), "day": day.day, "today": day == self.today,
+            "name": self._DAYS[day.weekday()][:3], "timed": boxes,
+        })
+    return out
+
+@property
+def week_allday(self):
+    first, last = self.showing
+    long_ones = [e for e in self.items if e["all_day"] or e["first"] != e["last"]]
+    shown, _, lanes = self._lay_out(first, long_ones, None)
+    return {
+        "bars": [self._bar(e, c0, c1, lane, first, last, 1) for e, c0, c1, lane in shown],
+        "rows_style": f"grid-template-rows: repeat({lanes if lanes else 1}, auto)",
+    }
+
+@property
+def agenda_days(self):
+    first, last = self.showing
+    out = []
+    for offset in range((last - first).days + 1):
+        day = first + datetime.timedelta(days=offset)
+        todays = [e for e in self.items if e["first"] <= day <= e["last"]]
+        if not todays:
+            continue
+        rows = []
+        for e in todays:
+            if e["all_day"]:
+                time = "All day"
+            elif e["first"] == e["last"]:
+                time = f"{self._time(e['begin'])} – {self._time(e['finish'])}"
+            elif day == e["first"]:
+                time = "From " + self._time(e["begin"])
+            elif day == e["last"]:
+                time = "Until " + self._time(e["finish"])
+            else:
+                time = "All day"
+            rows.append({"key": e["key"], "index": e["index"], "title": e["title"], "time": time,
+                         "label": self._describe(e), "style": f"--ev: {e['color']}"})
+        out.append({"iso": day.isoformat(), "today": day == self.today, "events": rows,
+                    "heading": f"{self._DAYS[day.weekday()]} {day.day} {self._MONTHS[day.month - 1]}"})
+    return out
+</code>
+
+<style>
+.ecal {
+  --line: var(--ui-border, #d1d9e0);
+  color: var(--ui-text, #1f2328); background: var(--ui-surface, #fff);
+  border: 1px solid var(--line); border-radius: calc(var(--ui-radius, 8px) * 1.5);
+  min-width: 0;
+}
+.bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+  padding: 12px 14px; border-bottom: 1px solid var(--line);
+}
+.nav-group { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.title { margin: 0 0 0 8px; font-size: 1.05rem; font-weight: 650; white-space: nowrap; }
+.today-btn, .view, .nav, .more, .less {
+  font: inherit; cursor: pointer; color: var(--ui-text, #1f2328);
+  border-radius: calc(var(--ui-radius, 8px) - 2px);
+}
+.today-btn { padding: 0.35em 0.8em; font-size: 0.9rem; font-weight: 550; background: var(--ui-surface, #fff); border: 1px solid var(--line); }
+.nav { padding: 6px; line-height: 0; border: 0; background: transparent; }
+.today-btn:hover, .nav:hover { background: var(--ui-subtle, #f6f8fa); }
+.views { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--ui-radius, 8px); background: var(--ui-subtle, #f6f8fa); }
+.view { border: 0; background: transparent; padding: 0.3em 0.8em; font-size: 0.88rem; font-weight: 550; color: var(--ui-muted, #59636e); }
+.view.on { background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-primary, #4f46e5) 55%, transparent);
+}
+
+/* Month: each week is a grid. Cells span its rows behind; day numbers sit in
+   row 1, event bars in the rows below, each in its lane. */
+.month-name { margin: 0; padding: 14px 14px 6px; font-size: 1rem; font-weight: 650; }
+.month + .month { border-top: 1px solid var(--line); }
+.weekdays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+.weekday { padding: 6px 8px; font-size: 0.75rem; font-weight: 600; color: var(--ui-muted, #59636e); text-transform: uppercase; letter-spacing: 0.04em; }
+.week {
+  position: relative; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+  row-gap: 2px; min-height: 6.5rem; padding-bottom: 4px;
+}
+.month .week + .week { border-top: 1px solid var(--line); }
+.cell { z-index: 0; }
+.cell + .cell { border-left: 1px solid var(--line); }
+.cell.outside { background: color-mix(in srgb, var(--ui-subtle, #f6f8fa) 70%, transparent); }
+.cell.clickable { cursor: pointer; }
+.cell.clickable:hover { background: color-mix(in srgb, var(--ui-primary, #4f46e5) 5%, transparent); }
+.num {
+  z-index: 1; grid-row: 1; justify-self: start; pointer-events: none;
+  margin: 4px 6px 2px; min-width: 1.6rem; height: 1.6rem; padding: 0 4px; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; font-weight: 600; border-radius: 999px; color: var(--ui-muted, #59636e);
+}
+.num.today { background: var(--ui-primary, #4f46e5); color: var(--ui-on-primary, #fff); }
+.event {
+  z-index: 1; min-width: 0; margin: 0 4px; padding: 2px 6px;
+  display: flex; align-items: center; gap: 4px;
+  font: inherit; font-size: 0.78rem; text-align: left; line-height: 1.35;
+  border: 0; border-left: 3px solid var(--ev); border-radius: 4px;
+  background: color-mix(in srgb, var(--ev) 16%, var(--ui-surface, #fff));
+  color: var(--ui-text, #1f2328); cursor: pointer; overflow: hidden;
+}
+.event:hover { background: color-mix(in srgb, var(--ev) 26%, var(--ui-surface, #fff)); }
+.event.from-before { margin-left: 0; border-left-width: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.event.goes-on { margin-right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.event.dot { background: transparent; border-left: 0; padding-left: 4px; }
+.event.dot::before { content: ""; flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--ev); }
+.event.dot:hover { background: var(--ui-subtle, #f6f8fa); }
+.time { flex-shrink: 0; color: var(--ui-muted, #59636e); font-variant-numeric: tabular-nums; }
+.name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.more, .less {
+  z-index: 1; justify-self: start; margin: 0 4px; padding: 1px 6px; border: 0; background: transparent;
+  font-size: 0.75rem; font-weight: 600; color: var(--ui-muted, #59636e);
+}
+.more:hover, .less:hover { background: var(--ui-subtle, #f6f8fa); color: var(--ui-text, #1f2328); }
+
+/* Week: an all-day row, then the hours, with timed events placed by time. */
+.weekview { overflow-x: auto; }
+.wv-head, .wv-allday, .wv-body { display: grid; grid-template-columns: 3.5rem repeat(7, minmax(4.5rem, 1fr)); min-width: 38rem; }
+.wv-head { border-bottom: 1px solid var(--line); }
+.wv-day { padding: 8px 6px; text-align: center; font-size: 0.8rem; color: var(--ui-muted, #59636e); }
+.wv-num { font-size: 1.05rem; font-weight: 650; color: var(--ui-text, #1f2328); }
+.wv-day.today .wv-num { color: var(--ui-primary, #4f46e5); }
+.wv-allday { border-bottom: 1px solid var(--line); padding: 4px 0; }
+.wv-allday .week { grid-column: 2 / span 7; min-height: 0; padding: 0; }
+.gutter.label { font-size: 0.7rem; color: var(--ui-muted, #59636e); padding: 4px; align-self: center; }
+.wv-body { position: relative; }
+.wv-body .gutter { display: grid; grid-template-rows: repeat(var(--hours), 3rem); }
+.hour { font-size: 0.7rem; color: var(--ui-muted, #59636e); padding: 0 6px; transform: translateY(-0.5em); text-align: right; }
+.hour:first-child { transform: none; }
+.wv-col {
+  position: relative; display: grid; grid-template-rows: repeat(var(--hours), 3rem);
+  border-left: 1px solid var(--line);
+}
+.wv-col.today { background: color-mix(in srgb, var(--ui-primary, #4f46e5) 4%, transparent); }
+.slot { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.timed {
+  position: absolute; box-sizing: border-box; padding: 3px 6px; overflow: hidden;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  font: inherit; font-size: 0.75rem; text-align: left; line-height: 1.25;
+  border: 1px solid var(--ui-surface, #fff); border-left: 3px solid var(--ev); border-radius: 4px;
+  background: color-mix(in srgb, var(--ev) 18%, var(--ui-surface, #fff));
+  color: var(--ui-text, #1f2328); cursor: pointer;
+}
+.timed:hover { background: color-mix(in srgb, var(--ev) 28%, var(--ui-surface, #fff)); }
+/* A short event keeps its name and lets the time go; it never gets too
+   small to read or click. */
+.timed { min-height: 1.35rem; }
+.timed .name { flex-shrink: 0; font-weight: 600; max-width: 100%; }
+.timed .time { flex-shrink: 1; min-height: 0; overflow: hidden; }
+
+/* Agenda: a list by day. */
+.agenda { padding: 8px 14px 14px; }
+.empty { color: var(--ui-muted, #59636e); padding: 24px 0; text-align: center; margin: 0; }
+.ag-day { padding: 8px 0; }
+.ag-day + .ag-day { border-top: 1px solid var(--line); }
+.ag-date { margin: 4px 0 6px; font-size: 0.85rem; font-weight: 650; color: var(--ui-muted, #59636e); }
+.ag-date.today { color: var(--ui-primary, #4f46e5); }
+.ag-event {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px;
+  font: inherit; font-size: 0.92rem; text-align: left;
+  border: 0; border-radius: calc(var(--ui-radius, 8px) - 2px); background: transparent;
+  color: var(--ui-text, #1f2328); cursor: pointer;
+}
+.ag-event:hover { background: var(--ui-subtle, #f6f8fa); }
+.ag-time { flex: 0 0 8.5rem; color: var(--ui-muted, #59636e); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.ag-dot { flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%; background: var(--ev); }
+@media (max-width: 560px) {
+  .ag-time { flex-basis: 6.5rem; }
+  .weekday { padding: 6px 4px; font-size: 0.68rem; }
+  .event { margin: 0 2px; padding: 1px 4px; font-size: 0.7rem; }
+  .event .time { display: none; }
+  .week { min-height: 5rem; }
+}
+</style>
