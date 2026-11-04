@@ -8,6 +8,9 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- **`Breadcrumbs`**: the trail to the current page, with icons, a "…"
+  menu for long trails, any separator, and `auto="true"` to build it from
+  the router (pages name themselves with `crumb = "..."`).
 - **`Carousel`**: slides moved by arrows, dots, a swipe or a mouse drag;
   several per view, looping, and autoplay that pauses on hover and focus,
   stops when someone takes over, and has a stop button.

@@ -245,6 +245,9 @@ Pages = router("pages")         # one page per .weft file in pages/
   `id: int = 0`. Query values fill fields of the same name.
 - `navigate("/orders", query={"status": "paid"})` from code;
   `pyweft.routing.back()`. URLs are hash URLs (`#/orders`).
+- `crumb = "Orders"` (or `"Order #{id}"`) in a page's code block names it
+  in breadcrumbs: `pyweft.routing.trail()`, or
+  `<ui.Breadcrumbs auto="true" />`.
 
 ## Traps (where generated code usually goes wrong)
 
@@ -289,7 +292,8 @@ lists take `"A, B, C"`, a list of values, `(value, label)` pairs or dicts.
   `Select`, `Autocomplete`, `Chips`, `ChipInput`, `ButtonToggle`, `Slider`,
   `RadioGroup`, `Checkbox`, `Switch`, `DatePicker`, `DateRangePicker`,
   `Calendar`.
-- Data: `Table` (sortable), `Tree`, `EventCalendar`.
+- Data and navigation: `Table` (sortable), `Tree`, `EventCalendar`,
+  `Breadcrumbs`.
 - Actions and feedback: `Button`, `Menu`, `ContextMenu`, `Dialog`,
   `BottomSheet`, `Popover`, `Tooltip`, `Alert`, `Badge`, `Spinner`,
   `Progress`, `Icon`, and toasts: `<ui.Toaster />` once, then

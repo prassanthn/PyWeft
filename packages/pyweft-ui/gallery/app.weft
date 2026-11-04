@@ -416,6 +416,16 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['tabs'] }}</pre>
         </ui.Card>
 
+        <ui.Card title="Breadcrumbs" id="breadcrumbs" ref="breadcrumbs" subtitle="Where a page sits; in a routed app, auto=&quot;true&quot; builds the trail from the URL">
+          <ui.Column gap="lg">
+            <ui.Breadcrumbs :items="crumb_trail" @select="go_crumb(event)" />
+            <ui.Breadcrumbs :items="LONG_TRAIL" max="4" separator="slash" @select="go_crumb(event)" />
+            <ui.Breadcrumbs :items="ICON_TRAIL" @select="go_crumb(event)" />
+            <p class="note">{{ 'Went to ' + crumb_to if crumb_to else 'Click a level, or the … to see the hidden ones.' }}</p>
+            <pre class="code">{{ CODE['breadcrumbs'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
         <ui.Card title="Table" id="table" ref="table" subtitle="Click a heading to sort, a row to pick it">
           <ui.Table :rows="ORDERS" row_key="id" sortable="true" sort="-total" @select="picked = event"
                     :columns="[('id', '#'), 'customer', 'status', {'key': 'total', 'format': ',.2f'}]">
@@ -536,12 +546,13 @@ SECTION_CONTROLS = {
     "Popover and tooltip": ["Popover", "Tooltip"],
     "Tabs": ["Tabs"],
     "Table": ["Table"],
+    "Breadcrumbs": ["Breadcrumbs", "trail", "navigation"],
     "Tree": ["Tree"],
     "Carousel": ["Carousel", "slider", "slideshow"],
     "Toasts": ["Toaster", "toast", "Snackbar"],
     "Layout": ["Row", "Column", "Grid", "Card", "Divider", "AppShell"],
 }
-SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Progress", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Table", "Tree", "Carousel", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Progress", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Breadcrumbs", "Table", "Tree", "Carousel", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -590,6 +601,18 @@ sharing: bool = False
 share_pop: bool = False
 toast_look: str = "toast"
 place: int = 0
+crumb_to: str = ""
+LONG_TRAIL = [("/", "Home"), ("/shop", "Shop"), ("/shop/garden", "Garden"), ("/shop/garden/tools", "Tools"),
+              ("/shop/garden/tools/hand", "Hand tools"), "Trowel, stainless steel"]
+ICON_TRAIL = [{"to": "/", "label": "Home", "icon": "home"}, {"to": "/files", "label": "Files", "icon": "folder"},
+              {"to": "/files/2026", "label": "2026", "icon": "folder"}, {"label": "budget.xlsx", "icon": "file"}]
+
+@property
+def crumb_trail(self):
+    return [("/", "Home"), ("/orders", "Orders"), "Order #1041"]
+
+def go_crumb(self, to):
+    self.crumb_to = to
 PLACES = [
     {"name": "Mountains", "note": "Cold air, long views", "bg": "linear-gradient(135deg, #1e3a8a, #60a5fa)"},
     {"name": "Desert", "note": "Dunes at sunset", "bg": "linear-gradient(135deg, #b45309, #fcd34d)"},
@@ -930,6 +953,12 @@ def submit(self):
 ]" />
 
 <ui.ButtonToggle label="Plan" options="Monthly, Yearly" full_width="true" @bind="plan" />""",
+    "breadcrumbs": """<ui.Breadcrumbs :items="[('/', 'Home'), ('/orders', 'Orders'), 'Order #1041']" />
+<ui.Breadcrumbs :items="trail" max="4" separator="slash" />
+
+<!-- In an app with router(): the trail of the current URL, each page
+     labelled by `crumb = "Orders"` (or "Order {id}") in its code block -->
+<ui.Breadcrumbs auto="true" home_icon="true" />""",
     "carousel": """<ui.Carousel label="Places" :items="places" @bind="place" loop="true">
   <Fill name="slide">
     <img :src="slide['src']" :alt="slide['alt']" />

@@ -1,0 +1,153 @@
+<template>
+  <nav class="crumbs" :aria-label="label">
+    <ol>
+      <For each="e in entries" key="e['key']">
+        <li :class="e['classes']">
+          <If cond="not e['first']">
+            <span class="sep" aria-hidden="true">
+              <If cond="separator == 'chevron'"><Icon name="chevron-right" size="0.95em" /></If>
+              <ElseIf cond="separator == 'slash'">/</ElseIf>
+              <Else>{{ separator }}</Else>
+            </span>
+          </If>
+          <If cond="e['more']">
+            <Menu label="Show the levels in between" icon="more" icon_only="true" variant="ghost"
+                  :items="e['hidden']" @select="pick_hidden(event)" />
+          </If>
+          <ElseIf cond="e['current']">
+            <span class="text" aria-current="page" :title="e['label']">
+              <Slot name="item" :item="e['item']" :current="True"><If cond="e['icon']"><Icon :name="e['icon']" size="1.05em" /></If><span class="label">{{ e['label'] }}</span></Slot>
+            </span>
+          </ElseIf>
+          <ElseIf cond="not e['to'] or e['disabled']">
+            <span class="text plain" :title="e['label']">
+              <Slot name="item" :item="e['item']" :current="False"><If cond="e['icon']"><Icon :name="e['icon']" size="1.05em" /></If><span class="label">{{ e['label'] }}</span></Slot>
+            </span>
+          </ElseIf>
+          <ElseIf cond="selecting">
+            <button type="button" class="link" :title="e['label']" @click="emit('select', e['to'])">
+              <Slot name="item" :item="e['item']" :current="False"><If cond="e['icon']"><Icon :name="e['icon']" size="1.05em" /></If><span class="label">{{ e['label'] }}</span></Slot>
+            </button>
+          </ElseIf>
+          <ElseIf cond="not e['to'].startswith('/')">
+            <a class="link" :href="e['to']" :title="e['label']">
+              <Slot name="item" :item="e['item']" :current="False"><If cond="e['icon']"><Icon :name="e['icon']" size="1.05em" /></If><span class="label">{{ e['label'] }}</span></Slot>
+            </a>
+          </ElseIf>
+          <Else>
+            <Link :to="e['to']" exact="true" class="link" :title="e['label']">
+              <Slot name="item" :item="e['item']" :current="False"><If cond="e['icon']"><Icon :name="e['icon']" size="1.05em" /></If><span class="label">{{ e['label'] }}</span></Slot>
+            </Link>
+          </Else>
+        </li>
+      </For>
+    </ol>
+  </nav>
+</template>
+
+<code>
+# <ui.Breadcrumbs :items="[('/', 'Home'), ('/orders', 'Orders'), 'Order #1041']" />
+# <ui.Breadcrumbs auto="true" />     (the trail of the current route)
+# Where the current page sits. items: (to, label) pairs, dicts with to,
+# label, icon, disabled, or text (a level with no link); the last is the
+# current page. A `to` starting with / goes through the router (like
+# <Link>), anything else is an ordinary link. With @select in the parent,
+# items are buttons that emit their `to` instead (no router needed).
+# auto="true": the trail of the current URL from the app's router(), each
+# page labelled by its `crumb = "..."` (pyweft.routing.trail); `home` names
+# "/", home_icon="true" gives it an icon. separator: chevron, slash, or any
+# text. max="4": the levels in between fold into a "..." menu.
+# <Fill name="item"> lays out an item (it gets item and current).
+from pyweft import Link, navigate
+from pyweft.routing import trail
+
+label: str = "Breadcrumb"   # names the trail for screen readers
+items: list = []
+auto: bool = False
+home: str = "Home"
+home_icon: bool = False
+separator: str = "chevron"  # chevron, slash, or any text
+max: int = 0                # fold the middle when there are more items than this
+
+@property
+def selecting(self):
+    return callable(getattr(self, "on_select", None))
+
+def _item(self, raw):
+    if hasattr(raw, "to") and hasattr(raw, "label"):           # a routing.Crumb
+        return {"to": raw.to, "label": raw.label, "icon": "", "disabled": False, "data": raw}
+    if isinstance(raw, dict):
+        return {"to": raw.get("to"), "label": str(raw.get("label", raw.get("to", ""))),
+                "icon": raw.get("icon") or "", "disabled": bool(raw.get("disabled")), "data": raw}
+    if isinstance(raw, (tuple, list)) and len(raw) == 2:
+        return {"to": raw[0], "label": str(raw[1]), "icon": "", "disabled": False, "data": raw}
+    return {"to": None, "label": str(raw), "icon": "", "disabled": False, "data": raw}
+
+@property
+def trail_items(self):
+    if self.auto:
+        crumbs = [self._item(c) for c in trail(home=self.home)]
+        if self.home_icon and crumbs and crumbs[0]["to"] == "/":
+            crumbs[0]["icon"] = "home"
+        return crumbs
+    return [self._item(i) for i in self.items]
+
+@property
+def entries(self):
+    crumbs = self.trail_items
+    n = len(crumbs)
+    keep = self.max if self.max >= 3 else 3
+    fold = 0 < self.max < n
+    hidden = crumbs[1:n - (keep - 2)] if fold else []
+    out = []
+    for i, c in enumerate(crumbs):
+        if fold and 1 <= i < n - (keep - 2):
+            if i == 1:
+                out.append({
+                    "key": "more", "more": True, "first": False, "current": False,
+                    "classes": "crumb more",
+                    "hidden": [(j, h["label"]) for j, h in enumerate(hidden, start=1)],
+                })
+            continue
+        current = i == n - 1
+        out.append({
+            "key": f"c{i}", "more": False, "first": not out, "current": current,
+            "to": c["to"], "label": c["label"], "icon": c["icon"], "disabled": c["disabled"],
+            "item": c["data"], "classes": "crumb current" if current else "crumb",
+        })
+    return out
+
+def pick_hidden(self, index):
+    crumb = self.trail_items[int(index)]
+    to = crumb["to"]
+    if not to or crumb["disabled"]:
+        return
+    if self.selecting or not str(to).startswith("/"):
+        self.emit("select", to)
+    else:
+        navigate(to)
+</code>
+
+<style>
+.crumbs { min-width: 0; font-size: 0.92rem; }
+ol { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 0; margin: 0; padding: 0; list-style: none; }
+.crumb { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; }
+.sep {
+  display: inline-flex; align-items: center; margin: 0 6px; flex: none;
+  color: var(--ui-muted, #59636e); user-select: none;
+}
+.link, .text {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 0; max-width: 16rem;
+  padding: 3px 4px; border-radius: 4px;
+}
+.link {
+  font: inherit; color: var(--ui-muted, #59636e); text-decoration: none; cursor: pointer;
+  border: 0; background: none;
+}
+.link:hover { color: var(--ui-text, #1f2328); text-decoration: underline; text-underline-offset: 3px; }
+.link:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 35%, transparent); }
+.text { color: var(--ui-text, #1f2328); }
+.current .text { font-weight: 600; }
+.plain { color: var(--ui-muted, #59636e); }
+.label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+</style>

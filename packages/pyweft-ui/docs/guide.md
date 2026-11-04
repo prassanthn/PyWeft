@@ -36,6 +36,7 @@ fields; this guide is the how-to.
    - [Labels on hover: Tooltip](#labels-on-hover-tooltip)
 8. [Tabs](#8-tabs)
    - [A task in steps: Stepper](#a-task-in-steps-stepper)
+   - [Where you are: Breadcrumbs](#where-you-are-breadcrumbs)
 9. [Tables and trees](#9-tables-and-trees)
    - [Trees: Tree](#trees-tree)
 10. [Calendars of events](#10-calendars-of-events)
@@ -1323,6 +1324,43 @@ def check(self, step):          # False keeps the stepper on this step
 - `back_label`, `next_label`, `finish_label` and `optional_label` change
   the words.
 
+### Where you are: Breadcrumbs
+
+```xml
+<ui.Breadcrumbs :items="[('/', 'Home'), ('/orders', 'Orders'), 'Order #1041']" />
+<ui.Breadcrumbs :items="trail" max="4" separator="slash" />
+```
+
+- **`items`** are `(to, label)` pairs, dicts with `to`, `label`, `icon`
+  and `disabled`, or plain text for a level with no link. The last item is
+  the current page: shown as text and marked as the current page for
+  screen readers.
+- A `to` starting with `/` goes through the router, like `<Link>`; any
+  other is an ordinary link. If you listen to **`@select`**, the items are
+  buttons that emit their `to` instead, for apps without the router.
+- **`separator`**: `chevron` (the default), `slash`, or any text.
+  **`max="4"`** folds the levels in between into a "…" menu once the
+  trail is longer. Long labels are cut short with "…" (the full text
+  shows on hover), and the trail wraps on narrow screens.
+- `<Fill name="item">` lays out an item; it gets `item` and `current`.
+
+**In an app with pages** (`router()`), `auto="true"` builds the trail from
+the current URL and keeps it up to date:
+
+```xml
+<ui.Breadcrumbs auto="true" home_icon="true" />
+```
+
+```python
+# pages/orders.weft          # pages/order.weft
+crumb = "Orders"             route = "/orders/{id}"
+                             crumb = "Order #{id}"
+```
+
+Each level is labelled by its page's `crumb` (route parameters fill in),
+else its URL segment made readable; `home` (default "Home") names `/`, and
+a level with no page of its own is shown as text.
+
 ## 9. Tables and trees
 
 `Table` shows a list of dicts (or objects) as rows. Name the fields to show
@@ -1814,6 +1852,9 @@ readers and mobile devices work the way people expect:
   open (so Esc closes them straight away), keep Tab and Shift+Tab inside
   while open, close with Esc, and give focus back to whatever had it
   before, such as the button that opened them.
+- **Breadcrumbs** are a navigation landmark named "Breadcrumb" holding a
+  list, with separators hidden and the last item marked as the current
+  page.
 - **Tabs** are announced as tabs, with the chosen one marked, and their
   content as the chosen tab's panel. The tab row is one Tab stop: the arrow
   keys move between tabs, and Home and End jump to the first and last.
