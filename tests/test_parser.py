@@ -78,6 +78,18 @@ def test_at_directive_rewriting_only_touches_tags():
     assert "a@b.com @notattr" in out
 
 
+def test_comments_are_left_alone():
+    # An apostrophe in a comment once opened a "quote" that swallowed the
+    # rest of the template, so later @click attributes stayed unrewritten.
+    src = ('<div><!-- the box\'s children; <b @click="no"> --><b @click="go">y</b>'
+           '<!-- unclosed')
+    out = rewrite_at_directives(src)
+    assert '<!-- the box\'s children; <b @click="no"> -->' in out
+    assert '<b py-at-click="go">' in out and out.endswith("<!-- unclosed")
+    nodes = parse_template('<div><!-- it\'s fine --><button @click="go">a</button></div>')
+    assert list(nodes[0].children[0].events) == ["click"]
+
+
 def test_element_directives_and_interpolation():
     nodes = parse_template(
         '<div class="row {{ cls }}"><button @click="go" key="item.id">'

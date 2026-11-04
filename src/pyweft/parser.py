@@ -195,6 +195,14 @@ def rewrite_at_directives(src: str) -> str:
     while i < n:
         ch = src[i]
         if not in_tag:
+            if src.startswith("<!--", i):
+                # A comment is copied as it is: an apostrophe in it ("the
+                # box's") must not open a quote, nor @click in it be rewritten.
+                end = src.find("-->", i + 4)
+                end = n if end < 0 else end + 3
+                out.append(src[i:end])
+                i = end
+                continue
             if ch == "<":
                 in_tag = True
             out.append(ch)

@@ -8,6 +8,11 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- Fixed: an apostrophe in an HTML comment in a template (`<!-- the box's
+  -->`) left every later `@event` and `:attr` unrewritten, so the template
+  failed to parse. Comments are now passed through untouched, and
+  directives inside them are no longer rewritten.
+
 ## 0.4.0
 
 - **Input masks:** `<input data-mask="(999) 999-9999">` shapes what's typed
