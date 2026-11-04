@@ -29,8 +29,12 @@ suggests the name you probably meant. `--json` gives the same as JSON.
 
 (`pip install`/`python -m pyweft` work too.) Dependencies go in
 `pyproject.toml`'s `[project].dependencies`, managed with `uv add`; in the
-browser they must be pure-Python wheels or packages Pyodide has built (numpy,
-pandas, ...). There is no other manifest.
+browser they (and everything they depend on) must be pure-Python wheels or
+packages Pyodide has built (numpy, pandas, pydantic 2.7, ...). LangChain and
+the OpenAI and Anthropic SDKs don't install in the browser (native code);
+call an HTTP API with `pyweft.http`, or use the desktop app, where any
+package works. `pyweft check` reports a dependency that won't install. There
+is no other manifest.
 
 ## The app folder
 

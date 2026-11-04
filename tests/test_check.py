@@ -255,7 +255,7 @@ def test_the_examples_and_gallery_are_clean():
 
     root = Path(__file__).parent.parent
     for app in ("examples/todo", "examples/shop", "packages/pyweft-ui/gallery"):
-        problems, files = check_app(root / app)
+        problems, files = check_app(root / app, deps=False)   # (PyPI is off in tests)
         assert files and [str(p) for p in problems] == [], app
 
 

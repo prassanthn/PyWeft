@@ -62,9 +62,10 @@ class Problem:
         return f"{where}: {self.severity}: {self.message} [{self.code}]"
 
 
-def check_app(app_dir: Path) -> tuple[list[Problem], int]:
-    """Every problem found in the app's components, and how many files were
-    checked."""
+def check_app(app_dir: Path, deps: bool = True, fetch: Any = None) -> tuple[list[Problem], int]:
+    """Every problem found in the app's components (and, with ``deps``, in
+    whether its dependencies install in the browser), and how many
+    component files were checked. ``fetch`` stands in for PyPI in tests."""
     from .cli import app_pyweft_files
 
     app_dir = app_dir.resolve()
@@ -73,6 +74,8 @@ def check_app(app_dir: Path) -> tuple[list[Problem], int]:
     with _app_on_path(app_dir):
         for rel in files:
             problems += _Checker(app_dir, rel).run()
+    if deps:
+        problems += _browser_dependencies(app_dir, fetch)
     # One file's failure shows again in every component that uses it.
     seen: set[tuple[str, int, str]] = set()
     unique = []
@@ -82,6 +85,34 @@ def check_app(app_dir: Path) -> tuple[list[Problem], int]:
             unique.append(p)
     unique.sort(key=lambda p: (p.file, p.line, p.severity != "error"))
     return unique, len(files)
+
+
+def _browser_dependencies(app_dir: Path, fetch: Any) -> list[Problem]:
+    """Dependencies that won't install in the browser, against the line of
+    pyproject.toml that brings each in."""
+    from . import browser_deps
+    from .cli import browser_packages
+
+    requirements = browser_packages(app_dir)
+    if not requirements:
+        return []
+    findings = browser_deps.check(requirements, **({"fetch": fetch} if fetch else {}))
+    pyproject = app_dir / "pyproject.toml"
+    text = pyproject.read_text(encoding="utf-8") if pyproject.exists() else ""
+    lines = text.splitlines()
+
+    def line_of(name: str) -> int:
+        for number, line in enumerate(lines, 1):
+            quoted = re.findall(r"[\"']([^\"']+)[\"']", line)
+            if any(browser_deps.normalise(re.split(r"[\s\[<>=!~;@(]", q, maxsplit=1)[0]) == name for q in quoted):
+                return number
+        return next((n for n, line in enumerate(lines, 1) if line.strip().startswith("dependencies")), 0)
+
+    return [
+        Problem("pyproject.toml", line_of(f.root), f.severity, f.code,
+                f"in the browser: {f.message} (the desktop app isn't affected)")
+        for f in findings
+    ]
 
 
 class _app_on_path:

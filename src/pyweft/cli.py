@@ -394,7 +394,7 @@ def browser_packages(app_dir: Path) -> list[str]:
 
 
 # Never shipped to the browser: they run where `pyweft` runs.
-_HOST_ONLY = {"cli.py", "__main__.py", "prerender.py", "desktop.py", "packaging.py", "check.py"}
+_HOST_ONLY = {"cli.py", "__main__.py", "prerender.py", "desktop.py", "packaging.py", "check.py", "browser_deps.py"}
 
 
 def pyweft_modules() -> list[str]:
@@ -665,10 +665,10 @@ def cmd_agents(app_dir: Path) -> None:
     print(f"wrote {', '.join(written)} in {app_dir}/ (a guide for AI coding assistants)")
 
 
-def cmd_check(app_dir: Path, as_json: bool = False) -> int:
+def cmd_check(app_dir: Path, as_json: bool = False, deps: bool = True) -> int:
     from . import check
 
-    problems, files = check.check_app(app_dir)
+    problems, files = check.check_app(app_dir, deps=deps)
     if as_json:
         print(json.dumps(check.as_json(problems, files), indent=2))
     else:
@@ -1031,6 +1031,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_check.add_argument("app_dir", type=Path)
     p_check.add_argument("--json", action="store_true", help="print the problems as JSON")
+    p_check.add_argument(
+        "--no-deps", action="store_true",
+        help="skip checking that the app's dependencies install in the browser (which asks PyPI)",
+    )
 
     p_run = sub.add_parser("run", help="serve an app directory for the browser")
     p_run.add_argument("app_dir", type=Path)
@@ -1066,7 +1070,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "agents":
             cmd_agents(args.app_dir)
         elif args.command == "check":
-            return cmd_check(args.app_dir, as_json=args.json)
+            return cmd_check(args.app_dir, as_json=args.json, deps=not args.no_deps)
         elif args.command == "run" and args.desktop:
             from .desktop import run_desktop
 

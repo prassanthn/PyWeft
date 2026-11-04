@@ -8,6 +8,12 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **`pyweft check` checks dependencies for the browser:** it follows the
+  app's dependencies through their own requirements, as micropip would,
+  against the packages the Pyodide in use has built (a snapshot ships with
+  PyWeft) and PyPI's pure-Python wheels, and names the one that won't
+  install: native code Pyodide doesn't build, a version that clashes with
+  a built-in one, a source-only release. `--no-deps` skips it.
 - **Breadcrumb trails:** `pyweft.routing.trail()` names each level of the
   current URL from the router: a page's `crumb = "Orders"` (or
   `"Order #{id}"`, filled from the route), else its URL segment.

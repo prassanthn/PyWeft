@@ -1516,6 +1516,12 @@ a handler that sets state the component doesn't declare, `:class` next to
 code block calls (`max: int` then `max(a, b)`), and list comprehensions in
 a template that fail on Python 3.10 and 3.11.
 
+**It also checks that the app's dependencies install in the browser**
+(see [Using PyPI packages](#using-pypi-packages)): each one, and everything
+it needs, must be pure Python or built into Pyodide, in a version that fits.
+That part asks PyPI (answers are kept for a day); offline, it says it
+couldn't check rather than failing, and `--no-deps` skips it.
+
 It exits with 1 when there are errors, so it can guard a commit or a CI job.
 `--json` prints the problems as JSON (`file`, `line`, `severity`, `code`,
 `message`) for editors and other tools. AI coding assistants are told to
@@ -1905,10 +1911,24 @@ def remaining_label(self):
 Because the same `pyproject.toml` drives both, `uv sync`/`pip install -e .`
 gives you identical packages locally for tests and tooling.
 
-One constraint, inherited from the browser: a package must be **pure Python**
-(most are) or one of the ~250 packages Pyodide ships prebuilt (numpy, pandas,
-pillow, matplotlib, …). Packages needing raw sockets or subprocesses won't
-work in a browser regardless.
+One constraint, inherited from the browser: a package, and everything it
+depends on, must be **pure Python** (most are) or one of the packages
+[Pyodide ships prebuilt](https://pyodide.org/en/0.26.4/usage/packages-in-pyodide.html)
+(numpy, pandas, pydantic, scikit-learn, …), and the prebuilt ones come in
+fixed versions (pydantic is 2.7.0). A package with native code that Pyodide
+doesn't build can't be installed: today that includes LangChain and the
+official OpenAI and Anthropic SDKs. Packages needing raw sockets or
+subprocesses won't work in a browser regardless. The desktop app runs
+ordinary Python, so none of this applies there.
+
+**`pyweft check` tells you before you ship** (see
+[Checking an app](#checking-an-app-pyweft-check)): it follows each
+dependency's own requirements the way micropip would and names the one
+that won't install, and why:
+
+```
+pyproject.toml:8: error: in the browser: 'jiter' (needed by anthropic) has native code (wheels only for Windows, macOS and Linux), and Pyodide 0.26.4 doesn't build it, so it can't be installed in the browser (the desktop app isn't affected) [dependency-native]
+```
 
 ### Calling JavaScript
 

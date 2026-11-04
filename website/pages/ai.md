@@ -54,8 +54,11 @@ app.weft:20: warning: <ui.TextField>: 'lable' is not one of its props, so it goe
 1 error, 1 warning in 4 component files.
 ```
 
-`AGENTS.md` tells the assistant to run it after every change and fix what
-it finds. It exits with 1 when there are errors, so it also works as a
+It also checks that the app's dependencies install in the browser, naming
+the package that won't (LangChain and the OpenAI and Anthropic SDKs don't:
+they need native code), so an assistant doesn't build on a library the
+page can't load. `AGENTS.md` tells the assistant to run it after every
+change and fix what it finds. It exits with 1 when there are errors, so it also works as a
 pre-commit or CI step, and `--json` gives editors and tools the same
 results as data. The full list of what it checks is in the guide:
 [Checking an app](guide/projects.md#checking-an-app-pyweft-check).
