@@ -2292,7 +2292,8 @@ Working today:
   inline statements) with modifiers (`@submit.prevent`, `@keydown.enter`)
   and a detailed event object (keys, modifier keys, mouse, form fields),
   `<If>`/`<For>` with keyed lists, `@property` computed values, `ref=` with
-  `focus()` and `scroll_to()`.
+  `focus()`, `scroll_to()` and `keep_in_view()`, and input masks
+  (`data-mask`).
 - **Composition:** child components with props, events (`emit`) and
   lifecycle hooks; slots (named, with fallbacks and slot props); `@bind` on
   components; attributes passed through to a component's root element;
@@ -2330,9 +2331,10 @@ Working today:
 - **Data in and out:** `pyweft.http` calls web APIs and loads the app's
   data files; `pyweft.storage` keeps data between visits. Same code on
   both targets.
-- **Controls:** `pyweft-ui`, 27 ready-made, themeable controls and form
-  validation (see "Ready-made controls" in section 5), with a live
-  gallery.
+- **Controls:** `pyweft-ui`, 27 ready-made, themeable controls: layout,
+  form fields with validation and masks, date and date-range pickers,
+  calendars of events, menus, tabs, tables, dialogs, toasts (see
+  "Ready-made controls" in section 5), with a live gallery.
 - **Releases:** `pyweft` and `pyweft-ui` on PyPI.
 
 Coming next: a faster first start that also works offline, `pyweft check`

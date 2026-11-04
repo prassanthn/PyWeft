@@ -95,9 +95,10 @@ then `pyweft new myapp` and `pyweft run myapp`.
 
     ---
 
-    `pyweft-ui`: buttons, menus, form fields with validation, date pickers,
-    tabs, sortable tables, dialogs, toasts, layout and light and dark
-    themes. No HTML or CSS needed.
+    `pyweft-ui`: buttons, menus, form fields with validation and input
+    masks, date and range pickers, an event calendar, tabs, sortable
+    tables, dialogs, toasts, layout, and light and dark themes. No HTML or
+    CSS needed.
 
     <a href="live/gallery/" target="_blank">:octicons-arrow-right-24: Try them live</a>
 

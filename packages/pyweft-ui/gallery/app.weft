@@ -99,7 +99,8 @@
                 <pre class="state">picked_day={{ repr(picked_day) }}</pre>
               </ui.Column>
             </ui.Row>
-            <ui.EventCalendar label="Team calendar" :events="calendar_events"
+            <ui.Switch label="Show two months" @bind="two_months" />
+            <ui.EventCalendar label="Team calendar" :events="calendar_events" :months="2 if two_months else 1"
                               @select="picked_event = event['title']" @day="add_event(event)" />
             <p class="note">{{ 'You opened: ' + picked_event if picked_event else 'Click an event, or an empty day to add one.' }}</p>
             <pre class="code">{{ CODE['calendars'] }}</pre>
@@ -210,8 +211,10 @@ MODES = [("light", "Light"), ("dark", "Dark"), ("auto", "System")]
 ACCENTS = [("", "Indigo"), ("#0f766e", "Teal"), ("#c2410c", "Orange"), ("#be185d", "Pink")]
 RADII = [("", "Rounded"), ("2px", "Square"), ("14px", "Round")]
 PLANS = [("free", "Free"), ("pro", "Pro — $8/mo"), ("team", "Team — $20/mo")]
-ICONS = ["check", "x", "plus", "search", "info", "alert", "menu", "trash", "edit", "send",
-         "user", "home", "star", "heart", "download", "copy", "settings", "sun", "moon"]
+ICONS = ["check", "x", "plus", "minus", "search", "info", "alert", "menu", "more",
+         "chevron-up", "chevron-down", "chevron-left", "chevron-right", "trash", "edit",
+         "send", "copy", "download", "upload", "external", "user", "home", "star", "heart",
+         "calendar", "settings", "sun", "moon"]
 
 mode: str = "light"
 primary: str = ""
@@ -241,6 +244,7 @@ stay = None
 last_action: str = ""
 picked_day = None
 picked_event: str = ""
+two_months: bool = False
 added_events: list = []
 
 @property

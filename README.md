@@ -160,11 +160,12 @@ To see every control live, clone this repository and run
 - **Template syntax:**
   - **Values:** `{{ expression }}` shows a value, `:attr="expression"` sets an
     attribute from Python, `@bind="field"` keeps a form control and a field
-    in sync.
+    in sync, and `data-mask="(999) 999-9999"` shapes what's typed.
   - **Events:** `@click="method"` handles an event, with modifiers like
     `@submit.prevent` and `@keydown.enter`.
   - **Focus:** `ref="name"` marks an element; `self.focus("name")` and
-    `self.scroll_to("name")` move the keyboard focus or the page to it.
+    `self.scroll_to("name")` move the keyboard focus or the page to it, and
+    `self.keep_in_view("name")` keeps a popup inside the window.
   - **Control flow:** `<If>`, `<ElseIf>`, `<Else>` and `<For>`.
 - **Composition:** components inside components, with props, events, slots
   for passing content, and `@bind` on your own components. Organise them in
@@ -203,7 +204,8 @@ To see every control live, clone this repository and run
 | Run code when a component appears, updates or goes away | [Lifecycle](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#lifecycle-when-your-code-runs) |
 | Split an app into components, use slots | [Composing components](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#4-composing-components) |
 | Build an app with several pages | [Pages and navigation](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#pages-and-navigation) |
-| Handle forms and keyboard input | [Binding form controls](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#binding-form-controls), [event modifiers](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#event-modifiers) |
+| Handle forms and keyboard input | [Binding form controls](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#binding-form-controls), [event modifiers](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#event-modifiers), [input masks](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#input-masks) |
+| Check a form, pick dates, show a calendar of events | [pyweft-ui guide: forms](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/docs/guide.md#4-forms), [calendars of events](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/docs/guide.md#10-calendars-of-events) |
 | Load data, run async code, do heavy work | [Async handlers](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#async-handlers-and-background-work), [`run_in_background`](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#heavy-work-run_in_background) |
 | Style with Tailwind or Bootstrap | [Using CSS frameworks](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#using-css-frameworks) |
 | Build screens with the ready-made controls | [pyweft-ui guide](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/docs/guide.md), then the [reference](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/README.md) |

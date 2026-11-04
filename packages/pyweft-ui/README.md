@@ -1,8 +1,9 @@
 # pyweft-ui
 
 Ready-made controls for [PyWeft](https://github.com/prassanthn/PyWeft):
-buttons, form fields, cards, layout, tabs, tables, dialogs, toasts and more,
-styled and accessible out of the box. Build a good-looking app in Python without writing HTML or
+buttons, menus, form fields with validation and input masks, date and
+date-range pickers, an event calendar, cards, layout, tabs, tables,
+dialogs, toasts and more, styled and accessible out of the box. Build a good-looking app in Python without writing HTML or
 CSS.
 
 ```xml

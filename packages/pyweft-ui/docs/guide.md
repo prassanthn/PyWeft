@@ -1,8 +1,8 @@
 # Using pyweft-ui
 
-This guide shows how to build screens with the ready-made controls: forms,
-layouts, dialogs and themes, with complete examples you can paste into an
-app. The [README](../README.md) has the compact reference of every control's
+This guide shows how to build screens with the ready-made controls: forms
+and their validation, dates and calendars, layouts, menus, dialogs, tables
+and themes, with complete examples you can paste into an app. The [README](../README.md) has the compact reference of every control's
 fields; this guide is the how-to.
 
 **Contents**
@@ -11,18 +11,29 @@ fields; this guide is the how-to.
 2. [How controls work](#2-how-controls-work)
 3. [Page layout](#3-page-layout)
 4. [Forms](#4-forms)
+   - [The fields](#the-fields)
+   - [Shaped input: mask](#shaped-input-mask)
+   - [Options for Select and RadioGroup](#options-for-select-and-radiogroup)
+   - [Checkbox and Switch labels with links](#checkbox-and-switch-labels-with-links)
+   - [Dates: DatePicker](#dates-datepicker)
+   - [Date ranges: DateRangePicker](#date-ranges-daterangepicker)
+   - [A calendar on the page: Calendar](#a-calendar-on-the-page-calendar)
+   - [A complete form: validation and submitting](#a-complete-form-validation-and-submitting)
+   - [Rules](#rules)
+   - [What the form can tell you](#what-the-form-can-tell-you)
 5. [Buttons](#5-buttons)
+   - [A menu of actions: Menu](#a-menu-of-actions-menu)
 6. [Messages, badges and loading](#6-messages-badges-and-loading)
 7. [Dialogs](#7-dialogs)
 8. [Tabs](#8-tabs)
 9. [Tables](#9-tables)
-10. [Toasts](#10-toasts)
-11. [Icons](#11-icons)
-12. [Themes](#12-themes)
-13. [Changing how a control looks](#13-changing-how-a-control-looks)
-14. [Building your own components from controls](#14-building-your-own-components-from-controls)
-15. [Accessibility and keyboard](#15-accessibility-and-keyboard)
-16. [Calendars of events](#16-calendars-of-events)
+10. [Calendars of events](#10-calendars-of-events)
+11. [Toasts](#11-toasts)
+12. [Icons](#12-icons)
+13. [Themes](#13-themes)
+14. [Changing how a control looks](#14-changing-how-a-control-looks)
+15. [Building your own components from controls](#15-building-your-own-components-from-controls)
+16. [Accessibility and keyboard](#16-accessibility-and-keyboard)
 
 ---
 
@@ -836,7 +847,59 @@ is the text shown when there are no rows ("Nothing to show"; the `empty`
 fill replaces it with anything). On a narrow screen the table scrolls
 sideways inside its frame.
 
-## 10. Toasts
+## 10. Calendars of events
+
+`EventCalendar` shows events in a month, a week, or a list by day, the way
+a team or booking calendar does:
+
+```xml
+<ui.EventCalendar :events="events" @select="open(event)" @day="add(event)" />
+```
+
+```python
+import datetime
+
+events = [
+    {"title": "Standup", "start": datetime.datetime(2026, 11, 3, 9, 30),
+     "end": datetime.datetime(2026, 11, 3, 9, 45), "color": "blue"},
+    {"title": "Release", "start": datetime.date(2026, 11, 7), "color": "red"},
+    {"title": "Trip", "start": datetime.date(2026, 11, 11), "end": datetime.date(2026, 11, 13)},
+]
+
+def open(self, event):
+    self.editing = event          # the very dict (or object) you passed in
+
+def add(self, when):
+    self.events = self.events + [{"title": "New event", "start": when}]
+```
+
+- **Events** are dicts or objects with `title` and `start`, and optionally
+  `end`, `color` and `id`. A `date` start (or text like `"2026-11-07"`)
+  is **all day**, and `end` is then the last day; a `datetime` start (or
+  `"2026-11-03T09:30"`) is **timed**, and `end` defaults to an hour later.
+  `color` is `blue`, `green`, `amber`, `red`, `purple`, `teal`, `pink`,
+  `gray`, or any CSS colour.
+- **Month view:** all-day and multi-day events are bars across their days,
+  continuing into the next week; timed ones show their time. A day with
+  more than `max_per_day` (3) rows shows "+2 more", which opens up the
+  week. `months="3"` shows three months, one under another.
+- **Week view:** the hours from `day_start` to `day_end` (8 to 20), with
+  timed events placed by their times and side by side where they overlap;
+  all-day events in a row above.
+- **Agenda:** the events by day, a good choice on phones.
+- **`@select`** gets the event you passed in. **`@day`** gets the date of
+  an empty day, or in the week view the `datetime` of the hour, so you can
+  add one there; days are only clickable when you listen to `@day`.
+- **`@navigate`** gets the `(first, last)` dates now showing, whenever the
+  user moves or switches view: load just those events from your server
+  with `pyweft.http`.
+- **Settings:** `view` (`month`, `week`, `agenda`), `date` (where it starts;
+  today), `week_start`, `time_format` (`"%I:%M %p"` for 9:30 AM),
+  `switcher="false"` to hide the view buttons, and `label` to name it for
+  screen readers. Every event is a button that reads out its title, day
+  and time.
+
+## 11. Toasts
 
 Toasts are short messages that appear in a corner of the page and go away
 by themselves: "Saved", "Copied", "Message sent". Put one `<ui.Toaster />` on
@@ -892,7 +955,7 @@ Good to know:
   `limit` (at most 5 at once by default; older ones wait their turn).
 - Toasts raised before the Toaster is on the page appear once it is.
 
-## 11. Icons
+## 12. Icons
 
 ```xml
 <ui.Icon name="star" />
@@ -908,7 +971,7 @@ Available names: `check`, `x`, `plus`, `minus`, `search`, `info`, `alert`,
 `upload`, `external`, `copy`, `settings`, `sun`, `moon`, `calendar`,
 `more`.
 
-## 12. Themes
+## 13. Themes
 
 ```xml
 <ui.Theme mode="auto" primary="#0f766e" radius="12px" font="Inter, sans-serif">
@@ -971,7 +1034,7 @@ Every colour the controls use is a CSS variable. Set any of them on the
 A `Theme` inside another restyles just that part of the page, for example a
 dark sidebar in a light app.
 
-## 13. Changing how a control looks
+## 14. Changing how a control looks
 
 From the lightest touch to the heaviest:
 
@@ -997,7 +1060,7 @@ What happens *inside* a control, such as the exact padding of a text field,
 is styled by the toolkit. Prefer the theme variables over overriding those
 details, so your app keeps working as the toolkit improves.
 
-## 14. Building your own components from controls
+## 15. Building your own components from controls
 
 Your own components can use controls in their templates and pass content
 through to them.
@@ -1086,7 +1149,7 @@ email: str = ""
 </code>
 ```
 
-## 15. Accessibility and keyboard
+## 16. Accessibility and keyboard
 
 The controls are built on standard HTML elements, so keyboards, screen
 readers and mobile devices work the way people expect:
@@ -1125,7 +1188,7 @@ What you should add yourself:
 - A text alternative for buttons with only an icon:
   `aria-label="Close"`.
 - An `aria-label` on fields with no visible `label`, like the colour-mode
-  `Select` in section 12, and a `label` on `Tabs`.
+  `Select` in section 13, and a `label` on `Tabs`.
 - Don't put the only copy of something important in a toast: it goes away.
   Show errors that need fixing next to what needs fixing.
 - After a failed submit, move focus to the first field with a problem, so
@@ -1143,55 +1206,3 @@ What you should add yourself:
   if "email" in self.errors:
       self.focus("email")
   ```
-
-## 16. Calendars of events
-
-`EventCalendar` shows events in a month, a week, or a list by day, the way
-a team or booking calendar does:
-
-```xml
-<ui.EventCalendar :events="events" @select="open(event)" @day="add(event)" />
-```
-
-```python
-import datetime
-
-events = [
-    {"title": "Standup", "start": datetime.datetime(2026, 11, 3, 9, 30),
-     "end": datetime.datetime(2026, 11, 3, 9, 45), "color": "blue"},
-    {"title": "Release", "start": datetime.date(2026, 11, 7), "color": "red"},
-    {"title": "Trip", "start": datetime.date(2026, 11, 11), "end": datetime.date(2026, 11, 13)},
-]
-
-def open(self, event):
-    self.editing = event          # the very dict (or object) you passed in
-
-def add(self, when):
-    self.events = self.events + [{"title": "New event", "start": when}]
-```
-
-- **Events** are dicts or objects with `title` and `start`, and optionally
-  `end`, `color` and `id`. A `date` start (or text like `"2026-11-07"`)
-  is **all day**, and `end` is then the last day; a `datetime` start (or
-  `"2026-11-03T09:30"`) is **timed**, and `end` defaults to an hour later.
-  `color` is `blue`, `green`, `amber`, `red`, `purple`, `teal`, `pink`,
-  `gray`, or any CSS colour.
-- **Month view:** all-day and multi-day events are bars across their days,
-  continuing into the next week; timed ones show their time. A day with
-  more than `max_per_day` (3) rows shows "+2 more", which opens up the
-  week. `months="3"` shows three months, one under another.
-- **Week view:** the hours from `day_start` to `day_end` (8 to 20), with
-  timed events placed by their times and side by side where they overlap;
-  all-day events in a row above.
-- **Agenda:** the events by day, a good choice on phones.
-- **`@select`** gets the event you passed in. **`@day`** gets the date of
-  an empty day, or in the week view the `datetime` of the hour, so you can
-  add one there; days are only clickable when you listen to `@day`.
-- **`@navigate`** gets the `(first, last)` dates now showing, whenever the
-  user moves or switches view: load just those events from your server
-  with `pyweft.http`.
-- **Settings:** `view` (`month`, `week`, `agenda`), `date` (where it starts;
-  today), `week_start`, `time_format` (`"%I:%M %p"` for 9:30 AM),
-  `switcher="false"` to hide the view buttons, and `label` to name it for
-  screen readers. Every event is a button that reads out its title, day
-  and time.
