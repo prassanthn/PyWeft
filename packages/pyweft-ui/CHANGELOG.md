@@ -14,6 +14,9 @@ releasing moves them under the new version (see
   `query`) and the empty state with `<Fill name="empty">`. For server
   results: `@search`, `match="none"` and `loading`. `free="true"` keeps
   whatever was typed.
+- **`Toaster look="snackbar"`**: `toast()` messages as a compact dark
+  bar at the bottom centre, one at a time (a new one replaces the one
+  showing), with a text action. `Toaster` also gained `dismissible`.
 - **`Popover`**: a button opening a small panel of your own content,
   placed on any side with an arrow; or, with `open_on="hover"`, a preview
   card.

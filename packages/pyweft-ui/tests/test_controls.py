@@ -501,6 +501,59 @@ def test_toasts_raised_before_the_toaster_wait_for_it(tmp_path, toasts):
     asyncio.run(main())
 
 
+def test_snackbar_look_one_at_a_time_without_icon_or_x(tmp_path, toasts):
+    import asyncio
+
+    from pyweft_ui import clear_toasts, toast
+
+    async def main():
+        _, a, r, tree = app(tmp_path, '<div><ui.Toaster look="snackbar" /></div>', "undone: list = []")
+        toaster = find(tree, cls("toaster"))
+        assert toaster.attrs["class"].split()[:3] == ["toaster", "bottom-center", "look-snackbar"]
+        toast("First", duration=30)
+        toast("Archived", "danger", duration=30, action="Undo", on_action=lambda: a.undone.append(1))
+        tree = cycle(r, tree)
+        items = [n for n in _walk(tree) if "toast" in n.attrs.get("class", "").split()]
+        assert [text([find([i], cls("content"))]) for i in items] == ["Archived"]   # the newest only
+        assert items[0].attrs["role"] == "alert"
+        assert find(tree, cls("icon")) is None and find(tree, cls("close")) is None
+        assert [t.message for t in toasts._toasts] == ["Archived"]   # "First" was replaced, not queued
+        r.dispatch(find(tree, cls("action")).events["click"], {})
+        tree = cycle(r, tree)
+        assert a.undone == [1] and find(tree, cls("toast")) is None
+        timed = toast("Saved")                                    # goes away by itself: no x
+        tree = cycle(r, tree)
+        assert find(tree, cls("close")) is None
+        toast("Disk almost full", duration=None)                  # would stay: gets an x
+        tree = cycle(r, tree)
+        assert find(tree, cls("close")) is not None and timed not in toasts._toasts
+        clear_toasts()
+
+    asyncio.run(main())
+
+
+def test_snackbar_settings_can_be_overridden(tmp_path, toasts):
+    import asyncio
+
+    from pyweft_ui import clear_toasts, toast
+
+    async def main():
+        _, a, r, tree = app(tmp_path, '<div><ui.Toaster look="snackbar" position="top-right" limit="2" '
+                                      'dismissible="true" /><ui.Toaster dismissible="false" /></div>')
+        snack, plain = [n for n in _walk(tree) if "toaster" in n.attrs.get("class", "").split()]
+        assert "top-right" in snack.attrs["class"] and "bottom-right" in plain.attrs["class"]
+        for n in range(3):
+            toast(f"n{n}", duration=None)
+        tree = cycle(r, tree)
+        snack, plain = [n for n in _walk(tree) if "toaster" in n.attrs.get("class", "").split()]
+        assert len([n for n in _walk([snack]) if "toast" in n.attrs.get("class", "").split()]) == 2
+        assert find([snack], cls("close")) is not None and find([plain], cls("close")) is None
+        assert find([plain], cls("icon")) is not None            # the toast look keeps its icons
+        clear_toasts()
+
+    asyncio.run(main())
+
+
 # ------------------------------------------------------------------ layout
 
 

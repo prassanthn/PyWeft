@@ -400,13 +400,17 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
         </ui.Card>
 
         <ui.Card title="Toasts" id="toasts" subtitle="Messages that go away by themselves">
+          <ui.Column>
+          <ui.ButtonToggle label="Look" :options="[('toast', 'Toast'), ('snackbar', 'Snackbar')]" @bind="toast_look"
+                           hint="Snackbar: a compact dark bar at the bottom, one at a time" />
           <ui.Row>
             <ui.Button variant="primary" icon="check" @click="toast('Changes saved.', 'success')">Save</ui.Button>
             <ui.Button icon="info" @click="toast('A new version is ready.', title='Update')">Info</ui.Button>
             <ui.Button icon="alert" @click="toast('Disk almost full.', 'warning', duration=None)">Stays until closed</ui.Button>
             <ui.Button variant="danger" icon="trash" @click="delete_item">Delete with undo</ui.Button>
           </ui.Row>
-          <p class="note below">Items: {{ items }}</p>
+          <p class="note">Items: {{ items }}</p>
+          </ui.Column>
           <pre class="code">{{ CODE['toasts'] }}</pre>
         </ui.Card>
 
@@ -443,7 +447,7 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
         </ui.Card>
       </ui.Column>
     </ui.AppShell>
-    <ui.Toaster />
+    <ui.Toaster :look="toast_look" />
   </ui.Theme>
 </template>
 
@@ -499,6 +503,7 @@ last_action: str = ""
 menu_choice = None
 sharing: bool = False
 share_pop: bool = False
+toast_look: str = "toast"
 SHARE_LINK = "https://prassanthn.github.io/PyWeft/"
 
 def copied(self):
@@ -880,6 +885,7 @@ events = [
   </Fill>
 </ui.Table>""",
     "toasts": """<ui.Toaster />   <!-- once, inside <ui.Theme> -->
+<ui.Toaster look="snackbar" />   <!-- or as a snackbar -->
 
 from pyweft_ui import toast
 toast("Changes saved.", "success")

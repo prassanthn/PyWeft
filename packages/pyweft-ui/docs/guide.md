@@ -1505,9 +1505,23 @@ Good to know:
   early, for example a "Uploading…" toast with `duration=None` that you close
   when the upload finishes. `clear_toasts()` closes them all.
 - **`<ui.Toaster>` fields:** `position` (`bottom-right`, the default;
-  `bottom-left`, `bottom-center`, `top-left`, `top-center`, `top-right`) and
-  `limit` (at most 5 at once by default; older ones wait their turn).
+  `bottom-left`, `bottom-center`, `top-left`, `top-center`, `top-right`),
+  `limit` (at most 5 at once by default; older ones wait their turn),
+  `dismissible` (the × on each toast) and `look` (see below).
 - Toasts raised before the Toaster is on the page appear once it is.
+
+### As a snackbar
+
+```xml
+<ui.Toaster look="snackbar" />
+```
+
+`look="snackbar"` shows the same `toast()` messages as a compact dark bar
+at the bottom centre: one at a time, a new message replacing the one
+showing, with no icon, the action as a text button, and no × (a message
+with `duration=None` still gets one, or it could never be closed).
+`position`, `limit` and `dismissible` change those defaults. The rest is
+unchanged, so switching an app between the two looks is one attribute.
 
 ## 12. Icons
 
@@ -1750,7 +1764,7 @@ readers and mobile devices work the way people expect:
   one Tab stop, moved with the arrow keys.
 - **Menus and calendars stay on screen:** opened next to something near
   the window's edge, they shift sideways to fit.
-- **Toasts** are read out politely when they appear (`danger` ones
+- **Toasts and snackbars** are read out politely when they appear (`danger` ones
   interrupt), and pause while someone is reading them.
 - **Motion is reduced** for visitors who ask their system for it: spinners
   slow down, and dialogs and toasts appear without animating.

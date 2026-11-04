@@ -1,10 +1,10 @@
 <template>
-  <section :class="'toaster ' + position" aria-label="Notifications" aria-live="polite"
+  <section :class="'toaster ' + where + ' look-' + look" aria-label="Notifications" aria-live="polite"
            @mouseenter="_paused = True" @mouseleave="_paused = False"
            @focusin="_paused = True" @focusout="_paused = False">
     <For each="t in shown" key="t.id">
       <div :class="'toast toast-' + t.kind" :role="'alert' if t.kind == 'danger' else None">
-        <Icon :name="_ICONS.get(t.kind, 'info')" size="1.2em" />
+        <If cond="look != 'snackbar'"><Icon :name="_ICONS.get(t.kind, 'info')" size="1.2em" /></If>
         <div class="content">
           <If cond="t.title"><strong class="title">{{ t.title }}</strong></If>
           <div>{{ t.message }}</div>
@@ -12,7 +12,7 @@
         <If cond="t.action">
           <button class="action" type="button" @click="act(t)">{{ t.action }}</button>
         </If>
-        <button class="close" type="button" aria-label="Dismiss" @click="t.close()"><Icon name="x" /></button>
+        <If cond="closable(t)"><button class="close" type="button" aria-label="Dismiss" @click="t.close()"><Icon name="x" /></button></If>
       </div>
     </For>
   </section>
@@ -23,11 +23,16 @@
 # handler or task:
 #     from pyweft_ui import toast
 #     toast("Saved", "success")
+# look="snackbar": a compact dark bar, bottom centre, one at a time (a new
+# one replaces the one showing), no icon, the action as a text button, and
+# no x unless the message has no duration (dismissible sets it either way).
 import asyncio
 from pyweft_ui import toasts as _store
 
-position: str = "bottom-right"   # top-left, top-center, top-right, bottom-left, bottom-center
-limit: int = 5                   # the most shown at once, newest kept
+look: str = "toast"              # toast or snackbar
+position: str = ""               # top-left, top-center, top-right, bottom-left, bottom-center, bottom-right
+limit: int | None = None         # the most shown at once, newest kept (toast 5, snackbar 1; 0 = all)
+dismissible: bool | None = None  # the x button (toast: yes; snackbar: only if it would stay)
 
 _ICONS = {"info": "info", "success": "check", "warning": "alert", "danger": "alert"}
 _paused = False
@@ -42,8 +47,26 @@ def on_dispose(self):
     _store._changed()  # its timers were cancelled: another Toaster takes them over
 
 @property
+def snackbar(self):
+    return self.look == "snackbar"
+
+@property
+def where(self):
+    return self.position or ("bottom-center" if self.snackbar else "bottom-right")
+
+def closable(self, t):
+    if self.dismissible is not None:
+        return self.dismissible
+    # A snackbar has no x, unless it would otherwise never go away.
+    return not self.snackbar or t.duration is None
+
+@property
+def most(self):
+    return self.limit if self.limit is not None else (1 if self.snackbar else 5)
+
+@property
 def shown(self):
-    return _store._toasts[-self.limit:] if self.limit > 0 else list(_store._toasts)
+    return _store._toasts[-self.most:] if self.most > 0 else list(_store._toasts)
 
 def act(self, t):
     t.close()
@@ -51,6 +74,11 @@ def act(self, t):
         return t.on_action()  # may be async: the renderer runs it as a task
 
 def _refresh(self):
+    if self.snackbar and self.most > 0:
+        # A new snackbar replaces the one showing rather than queueing
+        # behind it (toasts past the limit just wait hidden).
+        for t in list(_store._toasts[:-self.most]):
+            t.close()
     for t in _store._toasts:
         if t.duration and (t._timer is None or t._timer.done()):
             t._timer = self.start_task(self._expire(t))
@@ -112,6 +140,25 @@ async def _expire(self, t):
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 35%, transparent);
 }
+/* look="snackbar": a compact bar in the text colour, hugging its text. */
+.toaster.look-snackbar { width: auto; max-width: 100vw; align-items: center; }
+/* Centred: span the window (it lets clicks through) so the bar can be
+   as wide as its text, not capped at the half left of a 50% offset. */
+.toaster.look-snackbar.top-center, .toaster.look-snackbar.bottom-center { left: 0; right: 0; transform: none; }
+.toaster.look-snackbar.top-left, .toaster.look-snackbar.bottom-left { align-items: flex-start; }
+.toaster.look-snackbar.top-right, .toaster.look-snackbar.bottom-right { align-items: flex-end; }
+.look-snackbar .toast {
+  align-items: center; gap: 8px; width: max-content; min-width: min(21rem, calc(100vw - 32px));
+  max-width: min(40rem, calc(100vw - 32px)); box-sizing: border-box;
+  padding: 6px 8px 6px 16px; min-height: 48px;
+  background: var(--ui-text, #1f2328); color: var(--ui-surface, #fff);
+  border: 0; border-radius: 6px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.look-snackbar .content { padding: 6px 0; }
+.look-snackbar .action { color: color-mix(in srgb, var(--ui-primary, #4f46e5) 50%, var(--ui-surface, #fff)); padding: 8px 10px; }
+.look-snackbar .action:hover, .look-snackbar .close:hover { background: color-mix(in srgb, var(--ui-surface, #fff) 12%, transparent); }
+.look-snackbar .close { color: color-mix(in srgb, var(--ui-surface, #fff) 75%, transparent); padding: 6px; }
+.look-snackbar .close:hover { color: var(--ui-surface, #fff); }
 @keyframes ui-toaster-in { from { opacity: 0; transform: translateY(8px); } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 </style>
