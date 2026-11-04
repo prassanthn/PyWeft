@@ -1736,7 +1736,33 @@ with `from pyweft_ui import ui` in the code block. It covers layout
 data and navigation (`Table` with sorting, `Tabs`), actions and feedback
 (`Button`, `Dialog`, `Alert`, `Toaster` with `toast()`, `Badge`, `Spinner`,
 `Icon`) and a `Theme` with light, dark and system modes and your own
-colours. The [pyweft-ui guide](../packages/pyweft-ui/docs/guide.md) shows how
+colours.
+
+It also checks forms. Name each field's rules, show each field's message,
+and check them all on submit:
+
+```python
+from pyweft_ui import Form, rules
+
+form = Form(
+    email=[rules.required(), rules.email()],
+    password=[rules.required(), rules.min_length(8)],
+)
+
+async def submit(self):
+    if not self.form.check():   # shows every message, focuses the first field to fix
+        return
+```
+
+```xml
+<ui.TextField ref="email" label="Email" @bind="email"
+              :error="form.error('email')" @blur="form.touch('email')" />
+```
+
+A message appears once the user has left the field or tried to submit,
+then follows what they type.
+
+The [pyweft-ui guide](../packages/pyweft-ui/docs/guide.md) shows how
 to build pages, forms, tables and dialogs with them;
 [packages/pyweft-ui/README.md](../packages/pyweft-ui/README.md) is the
 reference; and the gallery shows every control live:
@@ -2272,10 +2298,15 @@ Working today:
   with an error overlay; the first screen rendered ahead of time, so pages
   appear at once; a customizable loading screen that shows real progress;
   PyPI dependencies from `pyproject.toml`, installed in the browser.
-- **Controls:** `pyweft-ui`, 22 ready-made, themeable controls (see
-  "Ready-made controls" in section 5), with a live gallery.
+- **Data in and out:** `pyweft.http` calls web APIs and loads the app's
+  data files; `pyweft.storage` keeps data between visits. Same code on
+  both targets.
+- **Controls:** `pyweft-ui`, 22 ready-made, themeable controls and form
+  validation (see "Ready-made controls" in section 5), with a live
+  gallery.
+- **Releases:** `pyweft` and `pyweft-ui` on PyPI.
 
-Coming next: more controls (menus, a date picker, form validation),
-publishing to PyPI, and installers (`.msi`, `.dmg`) and code signing for
-desktop apps.
+Coming next: more controls (a date picker, a dropdown menu), a faster first
+start that also works offline, and installers (`.msi`, `.dmg`) and code
+signing for desktop apps.
 

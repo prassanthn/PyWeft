@@ -301,12 +301,14 @@ pages and navigation; shared state with stores; events with modifiers and
 handlers and Web Worker background work; file and confirmation dialogs on
 both targets; the app's title and icon, and window settings; scoped styles
 and CSS framework support; the `pyweft` CLI with hot reload, static builds
-and pre-rendered first screens; `pyweft-ui` with 22 keyboard-accessible
-controls and a gallery; both released on PyPI.
+and pre-rendered first screens; calling web APIs and saving data between
+visits (`pyweft.http`, `pyweft.storage`); `pyweft-ui` with 22
+keyboard-accessible controls, form validation and a gallery; both released
+on PyPI.
 
-**Next:** more controls (menus,
-a date picker, form validation); installers (`.msi`, `.dmg`) and code
-signing for desktop apps.
+**Next:** more controls (a date picker, a dropdown menu); a faster first
+start that also works offline; installers (`.msi`, `.dmg`) and code signing
+for desktop apps.
 
 **Later:** mobile packaging with Briefcase, developer tools.
 
