@@ -368,10 +368,35 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['toasts'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Layout" id="layout" subtitle="Row, Column, Grid and Card: no CSS needed">
+        <ui.Card title="Layout" id="layout" subtitle="Row, Column, Grid, Card and Divider: no CSS needed">
           <ui.Grid cols="3" gap="sm">
             <For each="n in range(1, 7)" key="n"><div class="tile">{{ n }}</div></For>
           </ui.Grid>
+          <ui.Divider spacing="lg" />
+          <div class="people">
+            <For each="p in PEOPLE[:3]" key="p['value']" index="i">
+              <div>
+                <If cond="i &gt; 0"><ui.Divider inset="3.1rem" spacing="none" /></If>
+                <div class="person-row">
+                  <span class="avatar">{{ p['initials'] }}</span>
+                  <span class="person">
+                    <span class="person-name">{{ p['label'] }}</span>
+                    <span class="person-mail">{{ p['email'] }}</span>
+                  </span>
+                </div>
+              </div>
+            </For>
+          </div>
+          <ui.Divider label="or" spacing="lg" />
+          <ui.Row align="center">
+            <ui.Button variant="ghost" icon="bold" aria-label="Bold"></ui.Button>
+            <ui.Button variant="ghost" icon="italic" aria-label="Italic"></ui.Button>
+            <ui.Divider vertical="true" />
+            <ui.Button variant="ghost" icon="align-left" aria-label="Align left"></ui.Button>
+            <ui.Button variant="ghost" icon="align-center" aria-label="Align centre"></ui.Button>
+            <ui.Divider vertical="true" />
+            <ui.Button variant="ghost" icon="trash" aria-label="Delete"></ui.Button>
+          </ui.Row>
           <pre class="code">{{ CODE['layout'] }}</pre>
         </ui.Card>
       </ui.Column>
@@ -400,7 +425,8 @@ PLANS = [("free", "Free"), ("pro", "Pro — $8/mo"), ("team", "Team — $20/mo")
 ICONS = ["check", "x", "plus", "minus", "search", "info", "alert", "menu", "more",
          "chevron-up", "chevron-down", "chevron-left", "chevron-right", "trash", "edit",
          "send", "copy", "download", "upload", "external", "user", "home", "star", "heart",
-         "calendar", "settings", "sun", "moon"]
+         "calendar", "settings", "sun", "moon", "bold", "italic", "underline",
+         "align-left", "align-center", "align-right", "list", "grid", "folder", "folder-open", "file"]
 
 mode: str = "light"
 primary: str = ""
@@ -799,7 +825,12 @@ toast("Changes saved.", "success")
 toast("Item deleted.", action="Undo", on_action=self.undo)""",
     "layout": """<ui.Grid cols="3" gap="sm"> ... </ui.Grid>
 <ui.Row justify="between"> ... </ui.Row>
-<ui.Column gap="lg"> ... </ui.Column>""",
+<ui.Column gap="lg"> ... </ui.Column>
+
+<ui.Divider />
+<ui.Divider inset="3.1rem" spacing="none" />   <!-- under a list with avatars -->
+<ui.Divider label="or" />
+<ui.Divider vertical="true" />                 <!-- between buttons in a Row -->""",
 }
 </code>
 
@@ -816,6 +847,8 @@ toast("Item deleted.", action="Undo", on_action=self.undo)""",
 .sample.underline { text-decoration: underline; }
 .faq { margin: 0; color: var(--ui-muted, #59636e); }
 .avatar.small { width: 1.35rem; height: 1.35rem; font-size: 0.6rem; margin-left: -0.45em; }
+.people { display: flex; flex-direction: column; }
+.person-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
 .person { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .person-name { font-weight: 600; }
 .person-mail { font-size: 0.8rem; color: var(--ui-muted); overflow: hidden; text-overflow: ellipsis; }

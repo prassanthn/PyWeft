@@ -14,6 +14,8 @@ releasing moves them under the new version (see
   `query`) and the empty state with `<Fill name="empty">`. For server
   results: `@search`, `match="none"` and `loading`. `free="true"` keeps
   whatever was typed.
+- **`Divider`**: a line between things, inset, labelled ("or") or
+  vertical between items in a row.
 - **`Tree`**: nested nodes that open and close, with selection,
   checkboxes (partly checked parents), loading children on demand, a
   filter that keeps the parents of matches, and the full tree keyboard.

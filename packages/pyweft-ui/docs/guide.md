@@ -207,6 +207,29 @@ These three replace almost all layout CSS.
 A card shows a header only when it has a `title`, `subtitle`, or a
 `title`/`actions` fill, and a footer only when it has a `footer` fill.
 
+### Separating things: Divider
+
+```xml
+<ui.Divider />
+<ui.Divider inset="true" spacing="none" />   <!-- between list rows with avatars -->
+<ui.Divider label="or" />
+<ui.Row align="center">
+  <ui.Button variant="ghost" icon="bold" aria-label="Bold"></ui.Button>
+  <ui.Divider vertical="true" />
+  <ui.Button variant="ghost" icon="trash" aria-label="Delete"></ui.Button>
+</ui.Row>
+```
+
+- A thin line in the theme's border colour. **`spacing`** is the room
+  around it: `none`, `sm`, `md` (the default) or `lg`.
+- **`inset`** indents it from the left so it lines up with text next to an
+  avatar or icon: `"true"` for the usual indent, or a length (`"3.5rem"`).
+- **`label`** puts text on the line ("or", "Today"); `align="start"` or
+  `"end"` moves it to one side. A labelled divider is read as its text, a
+  plain one as a separator.
+- **`vertical="true"`** draws a vertical line as tall as the row, between
+  items in a `Row` or a toolbar.
+
 ### Panels that open and close: Expansion and Accordion
 
 **`Expansion`** is a panel whose content opens and closes under its header,

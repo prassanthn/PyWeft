@@ -1,0 +1,65 @@
+<template>
+  <If cond="label and not vertical">
+    <div :class="classes" :style="inset_style">
+      <span class="line"></span><span class="text">{{ label }}</span><span class="line"></span>
+    </div>
+  </If>
+  <Else>
+    <div :class="classes" role="separator" :aria-orientation="'vertical' if vertical else None"
+         :style="inset_style"></div>
+  </Else>
+</template>
+
+<code>
+# <ui.Divider />  <ui.Divider inset="true" />  <ui.Divider label="or" />
+# <ui.Divider vertical="true" />  (between items in a Row or a toolbar)
+# A thin line in the theme's border colour. spacing: none, sm, md, lg
+# (the room around it). inset indents it from the left: "true" for the
+# usual indent past an avatar or icon, or a length such as "3.5rem".
+# label puts text on the line (align: center, start, end); a labelled
+# divider is ordinary text to screen readers, a plain one a separator.
+label: str = ""
+align: str = "center"     # center, start, end (where a label sits)
+vertical: bool = False
+inset: str = ""           # "true", or a length
+spacing: str = "md"       # none, sm, md, lg
+
+@property
+def classes(self):
+    names = ["divider", "vertical" if self.vertical else "horizontal", "space-" + self.spacing]
+    if self.label and not self.vertical:
+        names += ["labelled", "align-" + self.align]
+    return " ".join(names)
+
+@property
+def inset_style(self):
+    if self.vertical or self.inset.strip().lower() in ("", "false", "0"):
+        return None
+    length = "4.5rem" if self.inset.strip().lower() == "true" else self.inset.strip()
+    return f"margin-left: {length}"
+</code>
+
+<style>
+.horizontal { border: 0; height: 1px; background: var(--ui-border, #d1d9e0); flex-shrink: 0; }
+.vertical {
+  align-self: stretch; width: 1px; min-height: 1.25em; flex-shrink: 0;
+  background: var(--ui-border, #d1d9e0);
+}
+.horizontal.space-none { margin-top: 0; margin-bottom: 0; }
+.horizontal.space-sm { margin-top: 4px; margin-bottom: 4px; }
+.horizontal.space-md { margin-top: 12px; margin-bottom: 12px; }
+.horizontal.space-lg { margin-top: 24px; margin-bottom: 24px; }
+.vertical.space-sm { margin: 0 4px; }
+.vertical.space-md { margin: 0 8px; }
+.vertical.space-lg { margin: 0 16px; }
+/* With a label: two lines with the text between them. */
+.labelled {
+  height: auto; background: none;
+  display: flex; align-items: center; gap: 12px;
+  font-size: 0.82rem; color: var(--ui-muted, #59636e);
+}
+.line { flex: 1 1 0; height: 1px; background: var(--ui-border, #d1d9e0); }
+.align-start .line:first-child { flex: 0 0 16px; }
+.align-end .line:last-child { flex: 0 0 16px; }
+.text { white-space: nowrap; }
+</style>

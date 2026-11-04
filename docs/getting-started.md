@@ -1759,7 +1759,7 @@ accessible controls as components:
 ```
 
 with `from pyweft_ui import ui` in the code block. It covers layout
-(`AppShell`, `Row`, `Column`, `Grid`, `Card`, `Expansion`, `Accordion`), form fields (`TextField`,
+(`AppShell`, `Row`, `Column`, `Grid`, `Card`, `Divider`, `Expansion`, `Accordion`), form fields (`TextField`,
 `TextArea`, `NumberField`, `Select`, `Autocomplete`, `Chips`, `ChipInput`, `ButtonToggle`,
 `Slider`, `RadioGroup`, `Checkbox`, `Switch`, `DatePicker`, `DateRangePicker`, `Calendar`), data and navigation (`Table` with sorting, `Tree`, `Tabs`, `Stepper`,
 `EventCalendar`), actions
@@ -2331,7 +2331,7 @@ Working today:
 - **Data in and out:** `pyweft.http` calls web APIs and loads the app's
   data files; `pyweft.storage` keeps data between visits. Same code on
   both targets.
-- **Controls:** `pyweft-ui`, 38 ready-made, themeable controls: layout,
+- **Controls:** `pyweft-ui`, 39 ready-made, themeable controls: layout,
   form fields with validation, autocomplete, chips, sliders and masks, date and date-range pickers,
   calendars of events, menus, tabs, tables, dialogs, toasts (see
   "Ready-made controls" in section 5), with a live gallery.
