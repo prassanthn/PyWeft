@@ -1,7 +1,7 @@
 # Using pyweft-ui
 
-This guide shows how to build screens with the ready-made controls: forms
-and their validation, dates and calendars, layouts, menus, dialogs, tables
+This guide shows how to build screens with the ready-made controls: forms,
+autocomplete and validation, dates and calendars, layouts, menus, dialogs, tables
 and themes, with complete examples you can paste into an app. The [README](../README.md) has the compact reference of every control's
 fields; this guide is the how-to.
 
@@ -14,6 +14,7 @@ fields; this guide is the how-to.
    - [The fields](#the-fields)
    - [Shaped input: mask](#shaped-input-mask)
    - [Options for Select and RadioGroup](#options-for-select-and-radiogroup)
+   - [Suggestions as you type: Autocomplete](#suggestions-as-you-type-autocomplete)
    - [Checkbox and Switch labels with links](#checkbox-and-switch-labels-with-links)
    - [Dates: DatePicker](#dates-datepicker)
    - [Date ranges: DateRangePicker](#date-ranges-daterangepicker)
@@ -220,6 +221,7 @@ and `name` (the field's name inside a `<form>`), and all work with `@bind`.
 <ui.Switch label="Email me offers" @bind="offers" />
 <ui.DatePicker label="Arrival" @bind="arrival" />
 <ui.TextField label="Phone" mask="(999) 999-9999" @bind="phone" />
+<ui.Autocomplete label="Country" :options="countries" @bind="country" />
 ```
 
 What each one gives your field:
@@ -231,6 +233,7 @@ What each one gives your field:
 | `Select`, `RadioGroup` | the chosen option's value |
 | `Checkbox`, `Switch` | a `bool` |
 | `DatePicker` | a `datetime.date`, or `None` until one is chosen |
+| `Autocomplete` | the chosen option's value (with `free="true"`, the typed text) |
 
 ### Shaped input: mask
 
@@ -266,6 +269,78 @@ Your field receives the **value**, not the label, and keeps its type: with
 the pairs above, `rating` becomes the `int` 5. A `Select` with a
 `placeholder` shows it, greyed out, until something is chosen; your field
 stays `None` until then.
+
+### Suggestions as you type: Autocomplete
+
+A text field with a list of suggestions that narrows as the user types:
+
+```xml
+<ui.Autocomplete label="Country" :options="countries" @bind="country" />
+```
+
+It takes `options` like `Select` (text, `(value, label)` pairs, or dicts),
+and your field gets the chosen option's **value**; the field shows its
+label. The typed text is matched anywhere in a label (`match="starts"` for
+the start only), the match is shown in bold, and up to `max_results` (8)
+suggestions show. With `free="true"` your field gets whatever is typed,
+so a suggestion is a shortcut rather than a must.
+
+**Your own suggestions.** `<Fill name="option">` lays each one out; it gets
+`option` (with `label`, `value`, and `data`, the dict you passed, so any
+key of yours is there), `active` (the one Enter would pick) and `query`:
+
+```xml
+<ui.Autocomplete label="Assign to" :options="people" @bind="assignee">
+  <Fill name="option">
+    <span class="avatar">{{ option['data']['initials'] }}</span>
+    <span>{{ option['label'] }} <small>{{ option['data']['email'] }}</small></span>
+    <ui.Badge :kind="'primary' if active else 'neutral'">{{ option['data']['role'] }}</ui.Badge>
+  </Fill>
+  <Fill name="empty">Nobody matches "{{ query }}"</Fill>
+</ui.Autocomplete>
+```
+
+```python
+people = [
+    {"value": "ada", "label": "Ada Lovelace", "email": "ada@engine.org", "initials": "AL", "role": "Owner"},
+    {"value": "grace", "label": "Grace Hopper", "email": "grace@cobol.net", "initials": "GH", "role": "Admin"},
+]
+```
+
+**Suggestions from a server.** `@search` gets the text on every keystroke;
+fetch the matches into `options`, set `match="none"` so they're shown as
+they come, and `loading` while you wait ("Searching…"):
+
+```xml
+<ui.Autocomplete label="City" :options="cities" match="none" :loading="searching"
+                 @search="find_cities(event)" @bind="city" />
+```
+
+```python
+from pyweft import http
+
+cities: list = []
+searching: bool = False
+_searches: int = 0
+
+async def find_cities(self, query):
+    self._searches += 1
+    mine = self._searches
+    self.searching = True
+    found = await http.get_json("https://api.example.com/cities", params={"q": query})
+    if mine == self._searches:     # typing on started a newer search: drop this one
+        self.cities = [(c["id"], c["name"]) for c in found]
+        self.searching = False
+```
+
+- **Keyboard:** Down and Up move through the suggestions (Down also opens
+  them), Enter picks, Esc closes them and, pressed again, puts back the
+  chosen option's label. Leaving the field closes them too. While the list
+  is closed, Enter emits `enter`, for submitting.
+- **Also:** `@select` gets the whole option you passed (the dict, not just
+  its value); `min_chars` waits for that many characters; `placeholder`,
+  `hint`, `error`, `required`, `disabled` and `@blur` work as on the other
+  fields, so `Form` checks it like any other.
 
 ### Checkbox and Switch labels with links
 

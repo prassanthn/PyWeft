@@ -1,0 +1,260 @@
+<template>
+  <div class="field">
+    <If cond="label">
+      <label class="label" :for="_id">{{ label }}<If cond="required"><span class="req" aria-hidden="true"> *</span></If></label>
+    </If>
+    <div :class="'combo align-' + align">
+      <input class="control" :id="_id" ref="input" role="combobox" autocomplete="off"
+             aria-autocomplete="list" :aria-expanded="'true' if _open else 'false'"
+             :aria-controls="_id + '-list'" :aria-activedescendant="active_id"
+             :aria-invalid="'true' if error else None"
+             :value="shown" :placeholder="placeholder or None" :name="name or None"
+             :required="required" :disabled="disabled"
+             @input="typed(event.value)" @click="open_list" @blur="left"
+             @keydown.down.prevent="move(1)" @keydown.up.prevent="move(-1)"
+             @keydown.enter.prevent="enter" @keydown.esc="escape" />
+      <If cond="_open">
+        <ul class="list" ref="list" role="listbox" :id="_id + '-list'"
+            :aria-label="label or placeholder or None" @mousedown.prevent="">
+          <If cond="loading"><li class="status" aria-live="polite">{{ loading_text }}</li></If>
+          <ElseIf cond="not matches">
+            <li class="status" aria-live="polite"><Slot name="empty" :query="query">{{ empty }}</Slot></li>
+          </ElseIf>
+          <Else>
+            <For each="m in matches" key="m['key']">
+              <li role="option" :id="_id + '-o-' + str(m['index'])" :ref="'o-' + str(m['index'])"
+                  :class="'option active' if m['active'] else 'option'"
+                  :aria-selected="'true' if m['active'] else 'false'"
+                  @click="pick(m['index'])" @mouseenter="hover(m['index'])">
+                <Slot name="option" :option="m" :active="m['active']" :query="query">
+                  <span class="text">{{ m['before'] }}<mark>{{ m['match'] }}</mark>{{ m['after'] }}</span>
+                </Slot>
+              </li>
+            </For>
+          </Else>
+        </ul>
+      </If>
+    </div>
+    <If cond="error"><span class="error">{{ error }}</span></If>
+    <ElseIf cond="hint"><span class="hint">{{ hint }}</span></ElseIf>
+  </div>
+</template>
+
+<code>
+# <ui.Autocomplete label="Country" :options="countries" @bind="country" />
+# A text field that suggests options as you type. options take the same
+# forms as Select's (text, (value, label) pairs, or dicts with value and
+# label, whose other keys you can show); the bound field gets the chosen
+# option's value, or with free="true" whatever was typed.
+#
+# Customise each suggestion with <Fill name="option">: it gets option (a
+# dict with value, label, data = the dict you passed, and before/match/after
+# around the typed text), active and query. <Fill name="empty"> replaces
+# "No matches". For suggestions from a server: @search gets each query,
+# match="none" shows your options as they are, and loading="true" shows
+# "Searching…" meanwhile.
+#
+# Keyboard: Down and Up move through the suggestions, Enter picks one (and
+# emits "enter" when the list is closed), Esc closes the list and then
+# puts back the chosen option's label; leaving the field closes it too.
+import itertools
+
+label: str = ""
+value = None
+options: list = []
+match: str = "contains"   # contains, starts, or none (you filter: server results)
+max_results: int = 8
+min_chars: int = 0        # characters typed before suggestions show
+free: bool = False        # the field gets the typed text, not only a chosen option
+loading: bool = False
+loading_text: str = "Searching…"
+empty: str = "No matches"
+placeholder: str = ""
+hint: str = ""
+error: str = ""
+name: str = ""
+required: bool = False
+disabled: bool = False
+align: str = "start"      # the list lines up with the start or end of the field
+
+_ids = itertools.count(1)
+_open = False
+_text = None              # what's typed, while it differs from the chosen label
+_active = 0               # which suggestion Enter would pick
+_picked = None            # (value, label) of the last pick, for async options
+
+def on_init(self):
+    self._id = f"ui-auto-{next(_ids)}"
+
+@property
+def choices(self):
+    items = self.options
+    if isinstance(items, str):
+        items = [part.strip() for part in items.split(",") if part.strip()]
+    out = []
+    for item in items or []:
+        if isinstance(item, dict):
+            val = item.get("value", item.get("label"))
+            text = item.get("label", val)
+        elif isinstance(item, (tuple, list)) and len(item) == 2:
+            val, text = item
+        else:
+            val, text = item, item
+        out.append({"value": val, "label": str(text), "data": item})
+    return out
+
+def _label_of(self, val):
+    for choice in self.choices:
+        if choice["value"] == val:
+            return choice["label"]
+    if self._picked is not None and self._picked[0] == val:
+        return self._picked[1]
+    return "" if val is None else str(val)
+
+@property
+def shown(self):
+    return self._text if self._text is not None else self._label_of(self.value)
+
+@property
+def query(self):
+    return self._text if self._text is not None else ""
+
+@property
+def matches(self):
+    q = self.query.strip()
+    low = q.lower()
+    out = []
+    for position, choice in enumerate(self.choices):
+        text = choice["label"]
+        at = text.lower().find(low) if low else -1
+        if low and self.match == "contains" and at < 0:
+            continue
+        if low and self.match == "starts" and at != 0:
+            continue
+        index = len(out)
+        hit = low and at >= 0
+        out.append({
+            **choice, "index": index, "key": f"{position}-{choice['value']}",
+            "active": index == self._active,
+            "before": text[:at] if hit else text, "match": text[at:at + len(q)] if hit else "",
+            "after": text[at + len(q):] if hit else "",
+        })
+        if len(out) >= self.max_results:
+            break
+    return out
+
+@property
+def active_id(self):
+    if not self._open or self.loading or not self.matches:
+        return None
+    return f"{self._id}-o-{self._active}"
+
+def _show_list(self):
+    if not self._open:
+        self._open = True
+        self.keep_in_view("list")
+
+def typed(self, text):
+    self._text = text
+    self._active = 0
+    self.emit("search", text)
+    if self.free:
+        self.emit("update", text)
+    if len(text.strip()) >= self.min_chars:
+        self._show_list()
+    else:
+        self._open = False
+
+def open_list(self):
+    if not self.disabled and len(self.query.strip()) >= self.min_chars:
+        self._show_list()
+
+def move(self, delta):
+    if not self._open:
+        self.open_list()
+        return
+    count = len(self.matches)
+    if count:
+        self._active = (self._active + delta) % count
+        self.scroll_to(f"o-{self._active}")
+
+def hover(self, index):
+    self._active = index
+
+def pick(self, index):
+    matches = self.matches
+    if not 0 <= index < len(matches):
+        return
+    chosen = matches[index]
+    self._picked = (chosen["value"], chosen["label"])
+    self._text = chosen["label"] if self.free else None
+    self._open = False
+    self._active = 0
+    self.emit("update", chosen["value"])
+    self.emit("select", chosen["data"])
+
+def enter(self):
+    if self._open and not self.loading and self.matches:
+        self.pick(self._active)
+    else:
+        self.emit("enter", self.value)
+
+def escape(self):
+    if self._open:
+        self._open = False
+    elif not self.free:
+        self._text = None       # back to the chosen option's label
+
+def left(self):
+    self._open = False
+    if not self.free:
+        self._text = None
+    self.emit("blur", self.value)
+</code>
+
+<style>
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.label { font-size: 0.9rem; font-weight: 550; }
+.req { color: var(--ui-danger, #d1242f); }
+.combo { position: relative; }
+.control {
+  box-sizing: border-box; width: 100%;
+  font: inherit; color: var(--ui-text, #1f2328);
+  background: var(--ui-surface, #fff);
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: var(--ui-radius, 8px);
+  padding: 0.5em 0.75em;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.control:focus {
+  outline: none;
+  border-color: var(--ui-primary, #4f46e5);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 25%, transparent);
+}
+.control:disabled { opacity: 0.6; cursor: not-allowed; }
+.control[aria-invalid="true"] { border-color: var(--ui-danger, #d1242f); }
+.hint { font-size: 0.82rem; color: var(--ui-muted, #59636e); }
+.error { font-size: 0.82rem; color: var(--ui-danger, #d1242f); }
+.list {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 1000;
+  box-sizing: border-box; min-width: 12rem; max-height: 16rem; overflow-y: auto;
+  margin: 0; padding: 4px; list-style: none;
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: var(--ui-radius, 8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  animation: ui-auto-in 0.1s ease-out;
+}
+.align-end .list { left: auto; }
+.option {
+  display: flex; align-items: center; gap: 0.6em;
+  padding: 0.45em 0.6em; border-radius: calc(var(--ui-radius, 8px) - 2px);
+  cursor: pointer; font-size: 0.93rem;
+}
+.option.active { background: color-mix(in srgb, var(--ui-primary, #4f46e5) 12%, var(--ui-surface, #fff)); }
+.text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+mark { background: transparent; color: inherit; font-weight: 700; }
+.status { padding: 0.55em 0.6em; font-size: 0.88rem; color: var(--ui-muted, #59636e); }
+@keyframes ui-auto-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .list { animation: none; } }
+</style>

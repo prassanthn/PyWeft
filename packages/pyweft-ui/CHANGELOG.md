@@ -8,6 +8,15 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- **`Autocomplete`**: a text field with suggestions that narrow as you type
+  (matched text in bold), picked with the keyboard or a click. Lay out each
+  suggestion yourself with `<Fill name="option">` (`option`, `active`,
+  `query`) and the empty state with `<Fill name="empty">`. For server
+  results: `@search`, `match="none"` and `loading`. `free="true"` keeps
+  whatever was typed.
+- `AppShell`'s content area can shrink beside the sidebar, so wide content
+  (a long line of code) no longer widens the page.
+
 ## 0.3.0
 
 For `pyweft` 0.4 (the date controls need its fix for `date.today()` in a

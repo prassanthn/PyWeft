@@ -1,7 +1,7 @@
 # pyweft-ui
 
 Ready-made controls for [PyWeft](https://github.com/prassanthn/PyWeft):
-buttons, menus, form fields with validation and input masks, date and
+buttons, menus, form fields with validation, autocomplete and input masks, date and
 date-range pickers, an event calendar, cards, layout, tabs, tables,
 dialogs, toasts and more, styled and accessible out of the box. Build a good-looking app in Python without writing HTML or
 CSS.
@@ -103,6 +103,7 @@ All have `label`, `hint`, `error`, `required`, `disabled`, `name`, and take
 | `RadioGroup` | the chosen option's value | `options`, `inline` |
 | `Checkbox` | `bool` | |
 | `Switch` | `bool` | |
+| `Autocomplete` | the chosen option's value (`free="true"`: the typed text) | `options`, `match` (contains, starts, none), `max_results`, `min_chars`, `free`, `loading`, `empty`, `placeholder`, `align`; emits `search` (the text, each keystroke), `select` (the whole option), `enter`. Fills: `option` (with `option`, `active`, `query`), `empty` |
 | `DateRangePicker` | `(start, end)` dates or `None` | `min`, `max`, `min_days`, `max_days`, `months`, `placeholder`, `format`, `week_start`, `align`; `name` sends `<name>_start` and `<name>_end` |
 | `Calendar` | `datetime.date`, or with `range="true"` `(start, end)` | always open on the page: `range`, `months`, `min`, `max`, `min_days`, `max_days`, `week_start` |
 | `DatePicker` | `datetime.date` or `None` | `min`, `max` (a date or `"YYYY-MM-DD"`), `placeholder`, `format` (strftime), `week_start` (monday, sunday), `align` |

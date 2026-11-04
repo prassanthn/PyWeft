@@ -70,6 +70,32 @@
           <pre class="code">{{ CODE['choices'] }}</pre>
         </ui.Card>
 
+        <ui.Card title="Autocomplete" id="autocomplete" subtitle="Suggestions as you type">
+          <ui.Column gap="lg">
+            <ui.Grid min_width="16rem" gap="lg">
+              <ui.Autocomplete label="Country" placeholder="Start typing a country"
+                               :options="COUNTRIES" @bind="country" />
+              <ui.Autocomplete label="Assign to" placeholder="Name or email"
+                               :options="PEOPLE" @bind="assignee">
+                <Fill name="option">
+                  <span class="avatar">{{ option['data']['initials'] }}</span>
+                  <span class="person">
+                    <span class="person-name">{{ option['label'] }}</span>
+                    <span class="person-mail">{{ option['data']['email'] }}</span>
+                  </span>
+                  <ui.Badge :kind="'primary' if active else 'neutral'">{{ option['data']['role'] }}</ui.Badge>
+                </Fill>
+                <Fill name="empty">Nobody matches "{{ query }}"</Fill>
+              </ui.Autocomplete>
+              <ui.Autocomplete label="City" placeholder="Searched as you type" hint="Results come from a (pretend) server"
+                               :options="cities" match="none" :loading="searching"
+                               @search="find_cities(event)" @bind="city" />
+            </ui.Grid>
+            <pre class="state">country={{ repr(country) }}  assignee={{ repr(assignee) }}  city={{ repr(city) }}</pre>
+            <pre class="code">{{ CODE['autocomplete'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
         <ui.Card title="Dates and menus" id="dates-and-menus">
           <ui.Column gap="lg">
             <ui.Grid min_width="16rem" gap="lg">
@@ -199,7 +225,7 @@ import asyncio
 import datetime
 from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Dates and menus", "Calendars", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Choices", "Autocomplete", "Dates and menus", "Calendars", "Feedback", "Dialog", "Tabs", "Table", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -245,6 +271,37 @@ last_action: str = ""
 picked_day = None
 picked_event: str = ""
 two_months: bool = False
+country = None
+assignee = None
+city = None
+cities: list = []
+searching: bool = False
+COUNTRIES = [("in", "India"), ("id", "Indonesia"), ("nl", "Netherlands"), ("nz", "New Zealand"),
+             ("no", "Norway"), ("pt", "Portugal"), ("jp", "Japan"), ("ke", "Kenya"),
+             ("br", "Brazil"), ("ca", "Canada"), ("us", "United States"), ("gb", "United Kingdom")]
+PEOPLE = [
+    {"value": "ada", "label": "Ada Lovelace", "email": "ada@engine.org", "initials": "AL", "role": "Owner"},
+    {"value": "grace", "label": "Grace Hopper", "email": "grace@cobol.net", "initials": "GH", "role": "Admin"},
+    {"value": "alan", "label": "Alan Turing", "email": "alan@bletchley.uk", "initials": "AT", "role": "Member"},
+    {"value": "katherine", "label": "Katherine Johnson", "email": "katherine@orbit.space", "initials": "KJ", "role": "Member"},
+]
+CITIES = ["Amsterdam", "Athens", "Auckland", "Bangalore", "Berlin", "Bogotá", "Cairo", "Chennai",
+          "Copenhagen", "Delhi", "Dublin", "Kyoto", "Lagos", "Lisbon", "London", "Madrid",
+          "Mumbai", "Nairobi", "Oslo", "Paris", "Porto", "Rotterdam", "Seoul", "Sydney",
+          "Tokyo", "Toronto", "Utrecht", "Vienna"]
+
+async def find_cities(self, query):
+    # A stand-in for http.get_json(...): a short wait, then the answer.
+    # Typing on starts a new search; only the newest one may land.
+    self._searches = getattr(self, "_searches", 0) + 1
+    mine = self._searches
+    self.searching = True
+    await asyncio.sleep(0.4)
+    if mine != self._searches:
+        return
+    low = query.strip().lower()
+    self.cities = [c for c in self.CITIES if low and low in c.lower()][:8]
+    self.searching = False
 added_events: list = []
 
 @property
@@ -343,6 +400,17 @@ def submit(self):
     '-',
     {'value': 'delete', 'label': 'Delete', 'icon': 'trash', 'danger': True},
 ]" />""",
+    "autocomplete": """<ui.Autocomplete label="Country" :options="countries" @bind="country" />
+
+<ui.Autocomplete label="Assign to" :options="people" @bind="assignee">
+  <Fill name="option">
+    <span class="avatar">{{ option['data']['initials'] }}</span>
+    {{ option['label'] }} <small>{{ option['data']['email'] }}</small>
+  </Fill>
+</ui.Autocomplete>
+
+<ui.Autocomplete label="City" :options="cities" match="none" :loading="searching"
+                 @search="find_cities(event)" @bind="city" />""",
     "calendars": """<ui.Calendar @bind="day" />
 
 <ui.EventCalendar :events="events" @select="open(event)" @day="add(event)" />
@@ -389,6 +457,15 @@ toast("Item deleted.", action="Undo", on_action=self.undo)""",
 </code>
 
 <style>
+.avatar {
+  flex-shrink: 0; width: 1.9rem; height: 1.9rem; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; font-weight: 700;
+  background: color-mix(in srgb, var(--ui-primary) 15%, transparent); color: var(--ui-primary);
+}
+.person { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.person-name { font-weight: 600; }
+.person-mail { font-size: 0.8rem; color: var(--ui-muted); overflow: hidden; text-overflow: ellipsis; }
 .intro { margin: 0; color: var(--ui-muted); }
 .note { margin: 0; color: var(--ui-muted); font-size: 0.9rem; }
 .note.below { margin-top: 12px; }

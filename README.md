@@ -108,7 +108,7 @@ height = 800
 ## Ready-made controls (no HTML or CSS needed)
 
 [`pyweft-ui`](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/README.md) gives you styled, accessible
-controls as components: buttons, menus, text fields, selects, date pickers,
+controls as components: buttons, menus, text fields, autocomplete, selects, date pickers,
 event calendars,
 checkboxes, switches, cards, tabs, sortable tables, dialogs, alerts, toasts,
 layout and light/dark
@@ -306,9 +306,9 @@ handlers and Web Worker background work; file and confirmation dialogs on
 both targets; the app's title and icon, and window settings; scoped styles
 and CSS framework support; the `pyweft` CLI with hot reload, static builds
 and pre-rendered first screens; calling web APIs and saving data between
-visits (`pyweft.http`, `pyweft.storage`); `pyweft-ui` with 27
-keyboard-accessible controls (date and date-range pickers, an event calendar
-and a menu among them), form
+visits (`pyweft.http`, `pyweft.storage`); `pyweft-ui` with 28
+keyboard-accessible controls (autocomplete, date and date-range pickers, an
+event calendar and a menu among them), form
 validation and a gallery; both released
 on PyPI.
 
