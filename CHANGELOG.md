@@ -8,6 +8,9 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- `scroll_to(ref, align="start")` brings the element to the top of the
+  window (also `"center"`, `"end"`), instead of scrolling just enough to
+  show it.
 - `keep_in_view(ref, vertical=True)` also shifts the element up or down
   to keep it inside the window, for popups placed at a point (a context
   menu at the pointer). Without it, only sideways, as before.

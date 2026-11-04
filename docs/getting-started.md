@@ -758,7 +758,7 @@ def save(self):
 |---|---|
 | `focus(ref)` | focuses the element (or the first focusable thing inside it) |
 | `focus_first(ref)`, `focus_last(ref)` | focuses the first or last focusable element inside |
-| `scroll_to(ref)` | scrolls the page just enough to show the element |
+| `scroll_to(ref)` | scrolls the page just enough to show the element; `scroll_to(ref, align="start")` brings it to the top of the window (or `"center"`, `"end"`), as a link to a section would |
 | `keep_in_view(ref)` | shifts the element sideways just enough to stay inside the window: for a popup opening near the edge. `keep_in_view(ref, vertical=True)` shifts it up or down too, for a popup placed at a point, such as a context menu at the pointer; `flip=True` moves a popup opened beside its parent (a submenu) to the parent's other side when it doesn't fit |
 | `save_focus()`, `restore_focus()` | remembers what has focus, and later puts it back, for popups |
 

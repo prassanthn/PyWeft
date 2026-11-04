@@ -396,7 +396,7 @@ const PyWeftRuntime = (() => {
           el && focusables(el).at(-1)?.focus();
           break;
         case "scroll_to":
-          el?.scrollIntoView({ block: "nearest" });
+          el?.scrollIntoView({ block: cmd.align || "nearest" });
           break;
         case "keep_in_view": {
           // Measured where its CSS put it, then nudged back inside the

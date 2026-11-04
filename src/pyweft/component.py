@@ -119,9 +119,16 @@ class Component:
         """Focus the last focusable element inside ``ref``."""
         self._pw_request("focus_last", ref)
 
-    def scroll_to(self, ref: str) -> None:
-        """Scroll the page so the element marked ``ref`` is in view."""
-        self._pw_request("scroll_to", ref)
+    def scroll_to(self, ref: str, align: str = "nearest") -> None:
+        """Scroll the page so the element marked ``ref`` is in view: just
+        enough (``nearest``), or with it at the ``start`` (top), ``center``
+        or ``end`` of the window, as when following a link to a section."""
+        if align not in ("nearest", "start", "center", "end"):
+            raise ValueError(f"scroll_to(align={align!r}): use nearest, start, center or end")
+        if align == "nearest":
+            self._pw_request("scroll_to", ref)
+        else:
+            self._pw_request("scroll_to", ref, align=align)
 
     def keep_in_view(self, ref: str, vertical: bool = False, flip: bool = False) -> None:
         """Shift the element marked ``ref`` sideways just enough to keep it

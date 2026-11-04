@@ -107,6 +107,18 @@ def test_keep_in_view_names_the_element():
     assert _node_at(to_dicts(tree), commands[0]["path"])["attrs"]["class"] == "field"
 
 
+def test_scroll_to_can_align():
+    import pytest as _pytest
+
+    app, renderer, tree = mount()
+    app.scroll_to("city", align="start")
+    app.scroll_to("city")
+    first, second = renderer.take_commands()
+    assert first["align"] == "start" and "align" not in second
+    with _pytest.raises(ValueError, match="nearest, start, center or end"):
+        app.scroll_to("city", align="top")
+
+
 def test_keep_in_view_vertically_on_request():
     app, renderer, tree = mount()
     app.keep_in_view("city", vertical=True)
