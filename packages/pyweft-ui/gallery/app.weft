@@ -326,6 +326,48 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['sheet'] }}</pre>
         </ui.Card>
 
+        <ui.Card title="Popover and tooltip" id="popover-and-tooltip" subtitle="Your own content beside a button; short labels on hover">
+          <ui.Column gap="lg">
+            <ui.Row align="center">
+              <ui.Popover label="Share" icon="send" title="Share this page" @bind="share_pop">
+                <ui.Column gap="sm">
+                  <ui.TextField label="Link" :value="SHARE_LINK" readonly="true" />
+                  <ui.Row justify="end">
+                    <ui.Button variant="primary" icon="copy" @click="copied()">Copy link</ui.Button>
+                  </ui.Row>
+                </ui.Column>
+              </ui.Popover>
+              <ui.Popover label="Details" icon="info" variant="ghost" position="end" align="center" width="16rem">
+                Popovers can sit below, above or to either side, and stay inside the window.
+              </ui.Popover>
+              <span class="note">
+                Made by
+                <ui.Popover open_on="hover" variant="link" label="Ada Lovelace" align="center" width="17rem">
+                  <Fill name="trigger">@ada</Fill>
+                  <div class="person-row">
+                    <span class="avatar">AL</span>
+                    <span class="person">
+                      <span class="person-name">Ada Lovelace</span>
+                      <span class="person-mail">Owner · 12 projects</span>
+                    </span>
+                  </div>
+                </ui.Popover>
+                (hover or Tab to it)
+              </span>
+            </ui.Row>
+            <ui.Row align="center">
+              <ui.Tooltip text="Bold (Ctrl+B)"><ui.Button variant="ghost" icon="bold" aria-label="Bold"></ui.Button></ui.Tooltip>
+              <ui.Tooltip text="Italic (Ctrl+I)"><ui.Button variant="ghost" icon="italic" aria-label="Italic"></ui.Button></ui.Tooltip>
+              <ui.Divider vertical="true" />
+              <ui.Tooltip text="Download as PDF" position="below"><ui.Button variant="ghost" icon="download" aria-label="Download"></ui.Button></ui.Tooltip>
+              <ui.Tooltip text="Delete forever: there is no undo" tip_id="delete-tip" position="end">
+                <ui.Button variant="ghost" icon="trash" aria-label="Delete" aria-describedby="delete-tip"></ui.Button>
+              </ui.Tooltip>
+            </ui.Row>
+            <pre class="code">{{ CODE['popover'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
         <ui.Card title="Tabs" id="tabs">
           <ui.Column gap="lg">
             <ui.Tabs label="Project" options="Overview, Activity, Settings" @bind="tab">
@@ -410,7 +452,7 @@ import asyncio
 import datetime
 from pyweft_ui import toast, ui
 
-SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Dialog", "Bottom sheet", "Tabs", "Table", "Tree", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Table", "Tree", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -456,6 +498,12 @@ stay = None
 last_action: str = ""
 menu_choice = None
 sharing: bool = False
+share_pop: bool = False
+SHARE_LINK = "https://prassanthn.github.io/PyWeft/"
+
+def copied(self):
+    self.share_pop = False
+    toast("Link copied", kind="success")
 filtering: bool = False
 shared = None
 sheet_closed = None
@@ -787,6 +835,19 @@ events = [
     "feedback": """<ui.Alert kind="success">Saved.</ui.Alert>
 <ui.Alert kind="danger" title="Failed" dismissible="true" @close="hide()">...</ui.Alert>
 <ui.Badge kind="success">active</ui.Badge>  <ui.Spinner />  <ui.Icon name="star" />""",
+    "popover": """<ui.Popover label="Share" icon="send" title="Share this page" @bind="open">
+  <ui.TextField label="Link" :value="link" readonly="true" />
+  <ui.Button variant="primary" @click="copy">Copy link</ui.Button>
+</ui.Popover>
+
+<ui.Popover open_on="hover" variant="link" label="Ada Lovelace">
+  <Fill name="trigger">@ada</Fill>
+  Ada Lovelace · Owner · 12 projects
+</ui.Popover>
+
+<ui.Tooltip text="Bold (Ctrl+B)">
+  <ui.Button variant="ghost" icon="bold" aria-label="Bold"></ui.Button>
+</ui.Tooltip>""",
     "sheet": """<ui.BottomSheet title="Share" @bind="sharing" :items="[
     {'value': 'link', 'label': 'Copy link', 'icon': 'copy'},
     {'value': 'email', 'label': 'Email', 'description': 'Opens your mail app'},

@@ -1,0 +1,60 @@
+<template>
+  <span :class="classes" @keydown.esc="_dismissed = True" @mouseleave="_dismissed = False" @focusout="_dismissed = False">
+    <Slot />
+    <If cond="text and not disabled">
+      <span role="tooltip" class="tip" :id="tip_id or _id">{{ text }}</span>
+    </If>
+  </span>
+</template>
+
+<code>
+# <ui.Tooltip text="Delete forever"><ui.Button icon="trash" aria-label="Delete" /></ui.Tooltip>
+# A short text label shown on hover or keyboard focus over what it wraps.
+# CSS shows it (no wait for Python), after a short delay on hover; Esc
+# hides it until the pointer or focus leaves. position: above, below,
+# start, end. Text only: nothing clickable goes in a tooltip.
+# For screen readers to read it as the wrapped control's description, give
+# that control aria-describedby with the tooltip's id: tip_id="del-tip" on
+# the Tooltip, aria-describedby="del-tip" on the button.
+import itertools
+
+text: str = ""
+position: str = "above"   # above, below, start, end
+tip_id: str = ""
+disabled: bool = False
+
+_ids = itertools.count(1)
+_dismissed = False
+
+def on_init(self):
+    self._id = f"ui-tooltip-{next(_ids)}"
+
+@property
+def classes(self):
+    names = ["tip-host", "pos-" + self.position]
+    if self._dismissed:
+        names.append("dismissed")
+    return " ".join(names)
+</code>
+
+<style>
+.tip-host { position: relative; display: inline-flex; }
+.tip {
+  position: absolute; z-index: 1001; pointer-events: none;
+  width: max-content; max-width: min(16rem, calc(100vw - 16px));
+  padding: 5px 9px; border-radius: 6px;
+  background: var(--ui-text, #1f2328); color: var(--ui-surface, #fff);
+  font-size: 0.8rem; font-weight: 500; line-height: 1.35; text-align: center; white-space: normal;
+  visibility: hidden; opacity: 0;
+  transition: opacity 0.1s ease, visibility 0s linear 0.1s;
+}
+.tip-host:hover > .tip { visibility: visible; opacity: 1; transition: opacity 0.12s ease 0.4s, visibility 0s linear 0.4s; }
+/* Keyboard focus shows it at once. */
+.tip-host:has(:focus-visible) > .tip { visibility: visible; opacity: 1; transition: opacity 0.12s ease; }
+.tip-host.dismissed > .tip { visibility: hidden; opacity: 0; transition: none; }
+.pos-above > .tip { bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); }
+.pos-below > .tip { top: calc(100% + 6px); left: 50%; transform: translateX(-50%); }
+.pos-start > .tip { right: calc(100% + 6px); top: 50%; transform: translateY(-50%); }
+.pos-end > .tip { left: calc(100% + 6px); top: 50%; transform: translateY(-50%); }
+@media (prefers-reduced-motion: reduce) { .tip, .tip-host:hover > .tip { transition: none; } }
+</style>

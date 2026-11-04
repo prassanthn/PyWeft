@@ -1,0 +1,219 @@
+<template>
+  <span :class="classes" @keydown.esc="dismiss_hover()" @mouseleave="_dismissed = False" @focusout="settle_hover()">
+    <button type="button" ref="trigger" :id="_id + '-button'"
+            :class="'trigger btn-' + variant + (' icon-only' if icon_only else '')"
+            :aria-haspopup="None if hover else 'dialog'"
+            :aria-expanded="None if hover else ('true' if is_open else 'false')"
+            :aria-controls="_id + '-panel' if is_open or hover else None"
+            :aria-label="label if icon_only or (has_slot('trigger') and label) else None"
+            :disabled="disabled" @click="toggle()">
+      <If cond="icon"><Icon :name="icon" size="1.15em" /></If>
+      <If cond="not icon_only"><Slot name="trigger">{{ label }}</Slot></If>
+      <If cond="caret and not icon_only and not hover"><Icon name="chevron-down" size="1em" /></If>
+    </button>
+    <If cond="hover">
+      <div class="panel" :id="_id + '-panel'" :style="panel_style">
+        <If cond="arrow"><span class="arrow" aria-hidden="true"></span></If>
+        <If cond="title"><div class="title">{{ title }}</div></If>
+        <Slot />
+      </div>
+    </If>
+    <ElseIf cond="is_open">
+      <div class="backdrop" @click="close(False)"></div>
+      <div class="panel" ref="panel" role="dialog" tabindex="-1" :id="_id + '-panel'"
+           :aria-label="title or label or None" :style="panel_style" @keydown.esc.stop="close(True)">
+        <If cond="arrow"><span class="arrow" aria-hidden="true"></span></If>
+        <If cond="title"><div class="title">{{ title }}</div></If>
+        <Slot />
+      </div>
+    </ElseIf>
+  </span>
+</template>
+
+<code>
+# <ui.Popover label="Share" icon="send" title="Share link" @bind="open"> ... </ui.Popover>
+# <ui.Popover open_on="hover" variant="link"><Fill name="trigger">@ada</Fill> ... </ui.Popover>
+# A button that opens a small panel of your own content beside it. The
+# button takes label, icon, icon_only, variant (primary, secondary, ghost,
+# link) and caret like Menu's; <Fill name="trigger"> puts your own content
+# in it (an avatar, a name: content, not another button).
+# Click mode (the default): @bind a bool, or leave it unbound. A click
+# outside or Esc closes it (Esc gives focus back to the button); focus
+# moves into the panel as it opens. Emits update, open and close.
+# open_on="hover": a preview card shown on hover or keyboard focus after a
+# short delay, kept open while the pointer is on the card; Esc hides it.
+# CSS does the showing, so @bind and the events don't apply.
+# position: below, above, start, end; align: start, center, end; arrow;
+# width (never wider than the window); title.
+import itertools
+
+from pyweft import effect
+
+label: str = ""
+icon: str = ""
+icon_only: bool = False
+variant: str = "secondary"   # primary, secondary, ghost, link
+caret: bool = False
+title: str = ""
+value = None              # click mode: open or not; None = its own state
+open_on: str = "click"    # click or hover
+position: str = "below"   # below, above, start, end
+align: str = "start"      # start, center, end
+arrow: bool = True
+width: str = "20rem"
+disabled: bool = False
+
+_ids = itertools.count(1)
+_open = False
+_shown = False            # what the effect last acted on
+_dismissed = False        # hover mode: Esc hid it until the pointer or focus leaves
+
+def on_init(self):
+    self._id = f"ui-popover-{next(_ids)}"
+
+@property
+def hover(self):
+    return self.open_on == "hover"
+
+@property
+def is_open(self):
+    if self.hover:
+        return False
+    return bool(self.value) if self.value is not None else self._open
+
+@property
+def classes(self):
+    names = ["popover", "pos-" + self.position, "align-" + self.align]
+    if self.hover:
+        names.append("hover")
+    if self._dismissed:
+        names.append("dismissed")
+    return " ".join(names)
+
+@property
+def panel_style(self):
+    return f"width: {self.width}"
+
+@effect
+def follow(self):
+    # However it opened (the button, or the bound field), focus goes in
+    # and it is kept inside the window.
+    if self.is_open and not self._shown:
+        self._shown = True
+        self.keep_in_view("panel")
+        self.focus("panel")
+        self.focus_first("panel")
+    elif not self.is_open and self._shown:
+        self._shown = False
+
+def toggle(self):
+    if self.hover or self.disabled:
+        return
+    if self.is_open:
+        self.close(True)
+    else:
+        self._open = True
+        self.emit("update", True)
+        self.emit("open", None)
+
+def close(self, refocus):
+    if not self.is_open:
+        return
+    self._open = False
+    self.emit("update", False)
+    self.emit("close", None)
+    if refocus:
+        self.focus("trigger")
+
+def dismiss_hover(self):
+    if self.hover:
+        self._dismissed = True
+
+def settle_hover(self):
+    # Leaving with the keyboard un-hides it for next time. (focusout also
+    # fires moving between things inside; the card is shown again by CSS
+    # only while focus or the pointer is still within.)
+    if self.hover:
+        self._dismissed = False
+</code>
+
+<style>
+.popover { position: relative; display: inline-block; }
+.trigger {
+  display: inline-flex; align-items: center; gap: 0.45em;
+  font: inherit; font-size: 0.95rem; font-weight: 550; line-height: 1.2;
+  padding: 0.5em 0.85em; border-radius: var(--ui-radius, 8px);
+  border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+  transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.trigger.icon-only { padding: 0.5em; }
+.trigger:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 35%, transparent); }
+.trigger:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-primary { background: var(--ui-primary, #4f46e5); color: var(--ui-on-primary, #fff); }
+.btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--ui-primary, #4f46e5) 88%, black); }
+.btn-secondary { background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328); border-color: var(--ui-border, #d1d9e0); }
+.btn-secondary:hover:not(:disabled), .btn-ghost:hover:not(:disabled) { background: var(--ui-subtle, #f6f8fa); }
+.btn-ghost { background: transparent; color: var(--ui-text, #1f2328); }
+.btn-link {
+  padding: 0; border: 0; background: none; font-weight: inherit; font-size: inherit;
+  color: var(--ui-primary, #4f46e5); text-decoration: underline; text-underline-offset: 2px;
+}
+.backdrop { position: fixed; inset: 0; z-index: 999; }
+.panel {
+  position: absolute; z-index: 1000; box-sizing: border-box; max-width: calc(100vw - 16px);
+  padding: 14px 16px; outline: none;
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+  border: 1px solid var(--ui-border, #d1d9e0); border-radius: var(--ui-radius, 8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  font-size: 0.93rem; font-weight: 400; white-space: normal; text-align: left;
+  animation: ui-popover-in 0.12s ease-out;
+}
+.title { font-weight: 650; margin-bottom: 8px; }
+/* Where it sits: 10px from the trigger, lined up by align. */
+.pos-below > .panel { top: calc(100% + 10px); }
+.pos-above > .panel { bottom: calc(100% + 10px); }
+.pos-below.align-start > .panel, .pos-above.align-start > .panel { left: 0; }
+.pos-below.align-end > .panel, .pos-above.align-end > .panel { right: 0; }
+.pos-below.align-center > .panel, .pos-above.align-center > .panel { left: 50%; transform: translateX(-50%); }
+.pos-start > .panel { right: calc(100% + 10px); }
+.pos-end > .panel { left: calc(100% + 10px); }
+.pos-start.align-start > .panel, .pos-end.align-start > .panel { top: 0; }
+.pos-start.align-end > .panel, .pos-end.align-end > .panel { bottom: 0; }
+.pos-start.align-center > .panel, .pos-end.align-center > .panel { top: 50%; transform: translateY(-50%); }
+/* The arrow: a turned square on the edge facing the trigger. */
+.arrow {
+  position: absolute; width: 10px; height: 10px; transform: rotate(45deg);
+  background: var(--ui-surface, #fff); border: 1px solid var(--ui-border, #d1d9e0);
+}
+.pos-below .arrow { top: -6px; border-right: 0; border-bottom: 0; }
+.pos-above .arrow { bottom: -6px; border-left: 0; border-top: 0; }
+.pos-start .arrow { right: -6px; border-left: 0; border-bottom: 0; }
+.pos-end .arrow { left: -6px; border-right: 0; border-top: 0; }
+.pos-below.align-start .arrow, .pos-above.align-start .arrow { left: 16px; }
+.pos-below.align-end .arrow, .pos-above.align-end .arrow { right: 16px; }
+.pos-below.align-center .arrow, .pos-above.align-center .arrow { left: calc(50% - 5px); }
+.pos-start.align-start .arrow, .pos-end.align-start .arrow { top: 14px; }
+.pos-start.align-end .arrow, .pos-end.align-end .arrow { bottom: 14px; }
+.pos-start.align-center .arrow, .pos-end.align-center .arrow { top: calc(50% - 5px); }
+/* Hover cards: always on the page, shown by CSS after a short delay;
+   the ::before bridge keeps :hover alive across the gap to the card. */
+.hover > .panel {
+  visibility: hidden; opacity: 0; animation: none;
+  transition: opacity 0.12s ease 0.15s, visibility 0s linear 0.27s;
+}
+.hover:hover > .panel, .hover:has(:focus-visible) > .panel {
+  visibility: visible; opacity: 1;
+  transition: opacity 0.12s ease 0.35s, visibility 0s linear 0.35s;
+}
+.hover.dismissed > .panel { visibility: hidden; opacity: 0; transition: none; }
+.hover > .panel::before { content: ""; position: absolute; }
+.hover.pos-below > .panel::before { left: 0; right: 0; top: -12px; height: 12px; }
+.hover.pos-above > .panel::before { left: 0; right: 0; bottom: -12px; height: 12px; }
+.hover.pos-start > .panel::before { top: 0; bottom: 0; right: -12px; width: 12px; }
+.hover.pos-end > .panel::before { top: 0; bottom: 0; left: -12px; width: 12px; }
+@keyframes ui-popover-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .panel { animation: none; }
+  .hover > .panel, .hover:hover > .panel, .hover:has(:focus-visible) > .panel { transition: none; }
+}
+</style>

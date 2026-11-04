@@ -148,6 +148,8 @@ function), `align` and `sortable`. Left out, they come from the first row.
 | `ContextMenu` | `items`, `label`, `disabled` | Wraps content; right-click (or the Menu key, Shift+F10) opens `items` at the pointer. Emits `select`, `open`. Fill: `item`. |
 | `Dialog` | `title`, `width`, `dismissible` | `@bind` to a `bool`: open while it is `True`. Esc, a click outside or the X close it. Keeps Tab inside while open and gives focus back when closed. Fill: `footer`. |
 | `BottomSheet` | `title`, `items` (dicts may add `icon`, `description`, `danger`, `disabled`), `max_width`, `dismissible`, `aria_label` | `@bind` to a `bool`. Slides up from the bottom; choosing an item emits `select` and closes it. Esc, a tap outside or a swipe down close it; emits `close` with how. Fill: `actions`. |
+| `Popover` | `label`, `icon`, `icon_only`, `variant` (primary, secondary, ghost, link), `caret`, `title`, `open_on` (click, hover), `position` (below, above, start, end), `align` (start, center, end), `arrow`, `width`, `disabled` | A button opening a panel of your content beside it. Click mode: `@bind` a bool, emits `open`/`close`; click outside or Esc closes. Hover mode: a preview card shown by CSS. Fill: `trigger`. |
+| `Tooltip` | `text`, `position` (above, below, start, end), `tip_id`, `disabled` | Wraps a control; shows `text` on hover or keyboard focus (CSS only). Pair `tip_id` with the control's `aria-describedby`. |
 | `Toaster` | `position` (bottom-right, bottom-left, bottom-center, top-left, top-center, top-right), `limit` | Put one on the page; it shows what `toast()` raises. |
 | `Alert` | `kind` (info, success, warning, danger), `title`, `dismissible` | Emits `close`. |
 | `Badge` | `kind` (neutral, primary, info, success, warning, danger) | |

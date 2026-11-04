@@ -14,6 +14,10 @@ releasing moves them under the new version (see
   `query`) and the empty state with `<Fill name="empty">`. For server
   results: `@search`, `match="none"` and `loading`. `free="true"` keeps
   whatever was typed.
+- **`Popover`**: a button opening a small panel of your own content,
+  placed on any side with an arrow; or, with `open_on="hover"`, a preview
+  card.
+- **`Tooltip`**: a short label on hover or keyboard focus, shown by CSS.
 - **`Divider`**: a line between things, inset, labelled ("or") or
   vertical between items in a row.
 - **`Tree`**: nested nodes that open and close, with selection,

@@ -31,6 +31,8 @@ fields; this guide is the how-to.
 6. [Messages, badges and loading](#6-messages-badges-and-loading)
 7. [Dialogs](#7-dialogs)
    - [Sheets from the bottom: BottomSheet](#sheets-from-the-bottom-bottomsheet)
+   - [Small panels beside a button: Popover](#small-panels-beside-a-button-popover)
+   - [Labels on hover: Tooltip](#labels-on-hover-tooltip)
 8. [Tabs](#8-tabs)
    - [A task in steps: Stepper](#a-task-in-steps-stepper)
 9. [Tables and trees](#9-tables-and-trees)
@@ -1080,6 +1082,65 @@ or a few settings such as filters.
 - Once opened, it stays on the page while closed (hidden and out of reach)
   so it can slide away; what was typed in it is kept until you clear it.
 
+### Small panels beside a button: Popover
+
+A popover is a button that opens a small panel of your own content beside
+it: a share link, a quick setting, a short explanation, a preview.
+
+```xml
+<ui.Popover label="Share" icon="send" title="Share this page" @bind="sharing">
+  <ui.TextField label="Link" :value="link" readonly="true" />
+  <ui.Button variant="primary" @click="copy">Copy link</ui.Button>
+</ui.Popover>
+
+<ui.Popover open_on="hover" variant="link" label="Ada Lovelace">
+  <Fill name="trigger">@ada</Fill>
+  Ada Lovelace · Owner · 12 projects
+</ui.Popover>
+```
+
+- **The button** takes `label`, `icon`, `icon_only`, `variant`
+  (`primary`, `secondary`, `ghost` or `link`) and `caret`, like `Menu`'s.
+  `<Fill name="trigger">` puts your own content in it, such as an avatar
+  or a name; the popover's own button wraps it, so don't put another
+  button there (`label` then names it for screen readers).
+- **Click mode** (the default): `@bind` a bool to open and close it from
+  code, or leave it unbound. A click outside or Esc closes it, and Esc
+  gives focus back to the button. As it opens, focus moves to its first
+  control. It emits `open` and `close`.
+- **`open_on="hover"`** makes a preview card that shows after a short
+  delay on hover or keyboard focus, and stays while the pointer is on the
+  card, so links in it can be clicked. Esc hides it. It is shown by CSS
+  alone, so `@bind` and the events don't apply.
+- **Placement:** `position` is `below` (the default), `above`, `start` or
+  `end`; `align` lines it up with the button's `start`, `center` or
+  `end`. A small arrow points at the button (`arrow="false"` hides it).
+  `width` defaults to `20rem` and never exceeds the window; `title` adds
+  a heading.
+
+### Labels on hover: Tooltip
+
+```xml
+<ui.Tooltip text="Bold (Ctrl+B)">
+  <ui.Button variant="ghost" icon="bold" aria-label="Bold"></ui.Button>
+</ui.Tooltip>
+
+<ui.Tooltip text="Delete forever: there is no undo" tip_id="delete-tip">
+  <ui.Button icon="trash" aria-label="Delete" aria-describedby="delete-tip"></ui.Button>
+</ui.Tooltip>
+```
+
+- A short text label over whatever it wraps, shown on hover (after a
+  short delay) and at once on keyboard focus. Esc hides it until the
+  pointer or focus moves away. `position`: `above` (the default),
+  `below`, `start`, `end`.
+- It is shown by CSS, with no wait for Python. Text only: anything
+  clickable belongs in a `Popover`.
+- An icon-only button still needs its own `aria-label`; the tooltip is
+  for sighted users. For screen readers to also read the tooltip as a
+  description, give the tooltip a `tip_id` and the control
+  `aria-describedby` with the same id.
+
 ## 8. Tabs
 
 `Tabs` shows a row of tabs. Bind it to a field, and put what each tab shows
@@ -1655,6 +1716,9 @@ readers and mobile devices work the way people expect:
   works with Space and Enter. Radio buttons move with the arrow keys.
 - **Alerts are announced:** `warning` and `danger` alerts interrupt, `info`
   and `success` wait politely.
+- **Popovers** say they open a dialog and whether it is open; focus moves
+  into one as it opens and Esc brings it back. **Tooltips** appear on
+  keyboard focus as well as hover, and Esc hides them.
 - **Bottom sheets** behave like dialogs for the keyboard and screen
   readers: focus moves in, Tab stays inside, Esc closes, and focus goes
   back to where it was.
