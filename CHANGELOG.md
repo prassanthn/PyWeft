@@ -11,6 +11,9 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 - `keep_in_view(ref, vertical=True)` also shifts the element up or down
   to keep it inside the window, for popups placed at a point (a context
   menu at the pointer). Without it, only sideways, as before.
+- `keep_in_view(ref, flip=True)`: a popup opened beside its positioned
+  parent (a submenu) moves to the parent's other side when it doesn't fit,
+  instead of sliding over it.
 - Fixed: an apostrophe in an HTML comment in a template (`<!-- the box's
   -->`) left every later `@event` and `:attr` unrewritten, so the template
   failed to parse. Comments are now passed through untouched, and

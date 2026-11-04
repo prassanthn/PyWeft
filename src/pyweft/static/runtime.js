@@ -410,7 +410,17 @@ const PyWeftRuntime = (() => {
           const height = document.documentElement.clientHeight;
           let dx = 0;
           let dy = 0;
-          if (box.right > width - 8) dx = width - 8 - box.right;
+          // Beside its anchor (the offset parent): try the anchor's other
+          // side first, keeping the same gap, before sliding over it.
+          const anchor = cmd.flip && el.offsetParent ? el.offsetParent.getBoundingClientRect() : null;
+          if (anchor && box.right > width - 8 && box.left >= anchor.right) {
+            const left = anchor.left - (box.left - anchor.right) - box.width;
+            if (left >= 8) dx = left - box.left;
+          } else if (anchor && box.left < 8 && box.right <= anchor.left) {
+            const left = anchor.right + (anchor.left - box.right);
+            if (left + box.width <= width - 8) dx = left - box.left;
+          }
+          if (box.right + dx > width - 8) dx = width - 8 - box.right;
           if (box.left + dx < 8) dx = 8 - box.left;
           if (cmd.vertical) {
             if (box.bottom > height - 8) dy = height - 8 - box.bottom;

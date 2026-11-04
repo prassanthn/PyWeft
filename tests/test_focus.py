@@ -114,3 +114,6 @@ def test_keep_in_view_vertically_on_request():
     first, second = renderer.take_commands()
     assert first["vertical"] is True and "vertical" not in second
     assert first["path"] == second["path"]
+    app.keep_in_view("city", flip=True)
+    (third,) = renderer.take_commands()
+    assert third["flip"] is True and "vertical" not in third
