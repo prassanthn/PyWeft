@@ -394,7 +394,7 @@ def browser_packages(app_dir: Path) -> list[str]:
 
 
 # Never shipped to the browser: they run where `pyweft` runs.
-_HOST_ONLY = {"cli.py", "__main__.py", "prerender.py", "desktop.py", "packaging.py"}
+_HOST_ONLY = {"cli.py", "__main__.py", "prerender.py", "desktop.py", "packaging.py", "check.py"}
 
 
 def pyweft_modules() -> list[str]:
@@ -663,6 +663,17 @@ def cmd_agents(app_dir: Path) -> None:
         raise CliError(f"{app_dir} has no app.weft: point at a pyweft app folder")
     written = write_agents_files(app_dir)
     print(f"wrote {', '.join(written)} in {app_dir}/ (a guide for AI coding assistants)")
+
+
+def cmd_check(app_dir: Path, as_json: bool = False) -> int:
+    from . import check
+
+    problems, files = check.check_app(app_dir)
+    if as_json:
+        print(json.dumps(check.as_json(problems, files), indent=2))
+    else:
+        print(check.format_report(problems, files))
+    return 1 if any(p.severity == "error" for p in problems) else 0
 
 
 def cmd_new(target: Path) -> None:
@@ -1014,6 +1025,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_agents.add_argument("app_dir", type=Path)
 
+    p_check = sub.add_parser(
+        "check",
+        help="find mistakes in an app's .weft files without running it (exit 1 on errors)",
+    )
+    p_check.add_argument("app_dir", type=Path)
+    p_check.add_argument("--json", action="store_true", help="print the problems as JSON")
+
     p_run = sub.add_parser("run", help="serve an app directory for the browser")
     p_run.add_argument("app_dir", type=Path)
     p_run.add_argument("--port", type=int, default=8642)
@@ -1047,6 +1065,8 @@ def main(argv: list[str] | None = None) -> int:
             cmd_new(args.path)
         elif args.command == "agents":
             cmd_agents(args.app_dir)
+        elif args.command == "check":
+            return cmd_check(args.app_dir, as_json=args.json)
         elif args.command == "run" and args.desktop:
             from .desktop import run_desktop
 

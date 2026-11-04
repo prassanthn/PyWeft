@@ -1473,6 +1473,52 @@ A few more details:
 Hot reload is a development feature only: `pyweft build` output contains none
 of it.
 
+### Checking an app: pyweft check
+
+```bash
+uv run pyweft check myapp
+```
+
+`check` finds mistakes without running the app in a browser. It loads every
+component as `pyweft run` would, then reads each template against what its
+component defines, and prints one line per problem with the file and line:
+
+```
+app.weft:12: error: {{ }}: unknown name 'cout' (did you mean 'count'?) [unknown-name]
+app.weft:20: warning: <ui.TextField>: 'lable' is not one of its props, so it goes to its root element as an attribute (did you mean 'label'?) [unknown-prop]
+1 error, 1 warning in 4 component files.
+```
+
+**Errors** (the app would fail, or something would silently not work):
+template and Python syntax errors, a code block that fails as it runs,
+missing modules, components that can't be found, unknown names in
+expressions, handlers and `@bind` fields that don't exist, slot content for
+a slot the component doesn't have, modifiers on a component's events, a
+keyed `<For>` whose body has more than one element, and generator
+expressions or lambdas in a template that use the component's names (they
+can't see them).
+
+**Warnings** (probably a mistake): an attribute on a component tag that
+isn't one of its props (it goes to the component's root element instead;
+`class`, `id`, `style`, `title`, `aria-*`, `data-*` and the like are
+expected there, so they don't count), an event the component never emits,
+a handler that sets state the component doesn't declare, `:class` next to
+`class` (it replaces it), a field named like a Python builtin that the same
+code block calls (`max: int` then `max(a, b)`), and list comprehensions in
+a template that fail on Python 3.10 and 3.11.
+
+It exits with 1 when there are errors, so it can guard a commit or a CI job.
+`--json` prints the problems as JSON (`file`, `line`, `severity`, `code`,
+`message`) for editors and other tools. AI coding assistants are told to
+run it after every change (see `AGENTS.md` above); its "did you mean"
+suggestions are what lets them fix their own mistakes.
+
+`check` runs your code blocks (and the modules they import) the way `run`
+does, but never your app's handlers, `on_init` or network calls.
+Browser-only modules (`js`, `pyodide`) are stood in for; a dependency that
+isn't installed where you run `check` is reported, so install the app's
+dependencies there first.
+
 ### The loading screen
 
 Starting Python in the browser takes a few seconds on the first visit (the

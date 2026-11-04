@@ -13,11 +13,19 @@ text: https://prassanthn.github.io/PyWeft/llms-full.txt).
 ## Commands
 
 ```bash
+uv run pyweft check .          # find mistakes without running it (exit 1 on errors)
 uv run pyweft run .            # dev server with hot reload: http://127.0.0.1:8642/
 uv run pyweft run . --desktop  # in a native window (needs: uv add "pyweft[desktop]")
 uv run pyweft build .          # static site in dist/ (any static host)
 uv add <package>               # a dependency, installed in the browser at load
 ```
+
+**After changing any `.weft` file, run `uv run pyweft check .` and fix
+what it reports** before saying you're done. It loads every component and
+reports, with file and line: template and Python errors, unknown names,
+handlers, `@bind` fields and components, props a component doesn't take,
+events it never emits, slots it doesn't have, and the traps below. It
+suggests the name you probably meant. `--json` gives the same as JSON.
 
 (`pip install`/`python -m pyweft` work too.) Dependencies go in
 `pyproject.toml`'s `[project].dependencies`, managed with `uv add`; in the
@@ -244,8 +252,11 @@ Pages = router("pages")         # one page per .weft file in pages/
    called `min`, `max`, `range`, `format`, `filter`, `type`, `id`, `sum`,
    `len` or `list` makes `max(...)` etc. call your field. Pick another name
    or keep a reference first (`_builtin_range = range`).
-2. **Comprehensions and lambdas inside `{{ }}` or `:attr` can't see template
-   variables** (loop variables, `event`). Put them in a method or property.
+2. **Generator expressions and lambdas inside `{{ }}`, `:attr` or a handler
+   can't see the component's names or template variables** (they run in a
+   scope of their own): `{{ sum(i['price'] for i in items) }}` fails. On
+   Python 3.10/3.11 list, set and dict comprehensions can't either. Put the
+   computation in a property or method: `{{ total }}`.
 3. **A keyed `<For>` renders one element per item** (see above).
 4. **`:class` replaces `class`** on the same element: write the whole class
    list in the expression (`:class="'row ' + ('active' if on else '')"`).

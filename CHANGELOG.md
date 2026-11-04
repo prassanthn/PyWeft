@@ -8,6 +8,14 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **`pyweft check APP`** finds mistakes without running the app: template
+  and Python errors, missing components, unknown names in expressions,
+  handlers and `@bind` fields that don't exist, props a component doesn't
+  take, events it never emits, slots it doesn't have, and known traps, each
+  with file, line and a "did you mean". Exit code 1 on errors; `--json`.
+- Template nodes know their line in the `.weft` file, and "not well-formed
+  XML" errors give the file's line and column (they counted from the
+  template block before).
 - **AI-friendly apps:** `pyweft new` writes an `AGENTS.md` (and a
   `CLAUDE.md` importing it) that teaches AI coding assistants how to write
   a PyWeft app: the file format, directives, components, async, routing,

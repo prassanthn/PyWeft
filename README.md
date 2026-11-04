@@ -76,8 +76,11 @@ myapp/
 
 **Using an AI coding assistant?** PyWeft is too new for it to know, so
 `AGENTS.md` (read by Claude Code, Codex, Cursor, Copilot and others) teaches
-it the file format, the directives and the usual mistakes;
-`uv run pyweft agents myapp` refreshes it after an upgrade. All the docs as
+it the file format, the directives and the usual mistakes, and
+`uv run pyweft check myapp` lets it (or you) find mistakes without opening
+a browser: unknown names, props and events, with the file, the line and
+the name you probably meant. `uv run pyweft agents myapp` refreshes
+`AGENTS.md` after an upgrade. All the docs as
 one text file, to paste or point a tool at:
 <https://prassanthn.github.io/PyWeft/llms-full.txt>.
 
