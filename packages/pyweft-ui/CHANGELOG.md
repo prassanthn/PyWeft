@@ -21,7 +21,8 @@ releasing moves them under the new version (see
   `Form`.
 - **`DatePicker`**: a field with a calendar that binds a `datetime.date`,
   with `min`/`max`, Monday- or Sunday-first weeks, Today and Clear, and the
-  full keyboard (arrows, Page Up/Down, Home/End, Esc).
+  full keyboard (arrows, Page Up/Down, Home/End, Esc). Click the month or
+  the year in its header to jump to another month or year.
 - **`Menu`**: a button that opens a list of actions (icons, dividers,
   disabled and danger items) and emits `select`; arrow keys, Esc, and a
   click outside to close.

@@ -162,7 +162,7 @@ def test_date_picker_opens_on_the_chosen_day_and_picks(tmp_path):
     _, a, r, tree = picker(tmp_path, day="datetime.date(2026, 11, 3)")
     r.dispatch(find(tree, cls("control")).events["click"], {})
     tree = cycle(r, tree)
-    assert text([find(tree, cls("month"))]) == "November 2026"
+    assert find(tree, attr("role", "grid")).attrs["aria-label"] == "November 2026"
     days = day_buttons(tree)
     assert len(days) == 42  # six weeks, Monday first
     assert [text([th]) for th in walk(find(tree, tag("thead"))) if th.tag == "th"][:2] == ["Mo", "Tu"]
@@ -176,7 +176,7 @@ def test_date_picker_opens_on_the_chosen_day_and_picks(tmp_path):
     assert focused(r, tree).attrs["aria-label"] == "Tuesday 10 November 2026"
     r.dispatch(grid.events["keydown.page-down.prevent"], {"key": "PageDown"})
     tree = cycle(r, tree)
-    assert text([find(tree, cls("month"))]) == "December 2026"
+    assert find(tree, attr("role", "grid")).attrs["aria-label"] == "December 2026"
     assert focused(r, tree).attrs["aria-label"] == "Thursday 10 December 2026"
     r.dispatch(grid.events["keydown.home.prevent"], {"key": "Home"})
     tree = cycle(r, tree)
@@ -198,7 +198,7 @@ def test_month_end_and_the_arrow_buttons(tmp_path):
     next_month = find(tree, attr("aria-label", "Next month"))
     r.dispatch(next_month.events["click"], {})
     tree = cycle(r, tree)
-    assert text([find(tree, cls("month"))]) == "February 2026"
+    assert find(tree, attr("role", "grid")).attrs["aria-label"] == "February 2026"
     r.after_render()
     assert r.take_commands() == []  # the arrow buttons keep focus where it is
     focus_day = next(b for b in day_buttons(tree) if b.attrs["tabindex"] == "0")
@@ -271,3 +271,83 @@ def test_date_picker_with_a_form(tmp_path):
     a.when = D(2026, 1, 1)
     tree = cycle(r, tree)
     assert find(tree, cls("error")) is None
+
+
+def test_months_and_years_views(tmp_path):
+    _, a, r, tree = picker(
+        tmp_path, day="datetime.date(2026, 11, 3)", low="datetime.date(2025, 3, 15)",
+        high="datetime.date(2031, 6, 1)",
+    )
+    r.dispatch(find(tree, cls("control")).events["click"], {})
+    tree = cycle(r, tree)
+    drain(r)
+    titles = [n for n in walk(find(tree, cls("month"))) if n.tag == "button"]
+    assert [label_of(b) for b in titles] == ["November", "2026"]
+
+    # The month name: a choice of the year's months, focus on the shown one.
+    r.dispatch(titles[0].events["click"], {})
+    tree = cycle(r, tree)
+    months = [b for b in walk(find(tree, attr("role", "grid"))) if b.tag == "button"]
+    assert [label_of(b) for b in months][:3] == ["Jan", "Feb", "Mar"] and len(months) == 12
+    assert focused(r, tree).attrs["aria-label"] == "November 2026"
+    assert months[10].attrs["aria-pressed"] == "true"  # the chosen date's month
+    grid = find(tree, attr("role", "grid"))
+    r.dispatch(grid.events["keydown.up.prevent"], {"key": "ArrowUp"})  # three back
+    tree = cycle(r, tree)
+    assert focused(r, tree).attrs["aria-label"] == "August 2026"
+    r.dispatch(find(tree, attr("aria-label", "Next year")).events["click"], {})
+    tree = cycle(r, tree)
+    drain(r)
+    months = [b for b in walk(find(tree, attr("role", "grid"))) if b.tag == "button"]
+    assert find(tree, attr("role", "grid")).attrs["aria-label"] == "Months of 2027"
+    r.dispatch(months[1].events["click"], {})  # February 2027: back to its days
+    tree = cycle(r, tree)
+    assert find(tree, attr("role", "grid")).attrs["aria-label"] == "February 2027"
+    assert focused(r, tree).attrs["aria-label"] == "Wednesday 3 February 2027"
+
+    # The year: twelve years; out-of-range ones can't be chosen; then months.
+    year_button = [n for n in walk(find(tree, cls("month"))) if n.tag == "button"][1]
+    r.dispatch(year_button.events["click"], {})
+    tree = cycle(r, tree)
+    years = {label_of(b): b for b in walk(find(tree, attr("role", "grid"))) if b.tag == "button"}
+    assert list(years)[0] == "2016" and list(years)[-1] == "2027"
+    assert "disabled" in years["2024"].attrs and "disabled" not in years["2025"].attrs
+    assert label_of(find(tree, cls("title-text"))) == "2016 – 2027"
+    assert focused(r, tree).attrs["aria-pressed"] == "false"  # 2027, not the chosen 2026
+    r.dispatch(find(tree, attr("aria-label", "Next twelve years")).events["click"], {})
+    tree = cycle(r, tree)
+    years = {label_of(b): b for b in walk(find(tree, attr("role", "grid"))) if b.tag == "button"}
+    assert list(years)[0] == "2028" and "disabled" in years["2032"].attrs
+    assert "disabled" in find(tree, attr("aria-label", "Next twelve years")).attrs
+    r.dispatch(years["2030"].events["click"], {})
+    tree = cycle(r, tree)
+    assert find(tree, attr("role", "grid")).attrs["aria-label"] == "Months of 2030"
+
+    # Esc goes back a step: months -> days; then it closes.
+    dialog = find(tree, attr("role", "dialog"))
+    r.dispatch(dialog.events["keydown.esc.stop"], {"key": "Escape"})
+    tree = cycle(r, tree)
+    assert find(tree, attr("role", "grid")).attrs["aria-label"] == "February 2030"
+    r.dispatch(dialog.events["keydown.esc.stop"], {"key": "Escape"})
+    tree = cycle(r, tree)
+    assert find(tree, attr("role", "dialog")) is None
+    assert a.day == D(2026, 11, 3)  # browsing never changes the value
+
+
+def test_months_outside_the_limits(tmp_path):
+    _, a, r, tree = picker(
+        tmp_path, day="datetime.date(2026, 5, 20)", low="datetime.date(2026, 3, 15)",
+        high="datetime.date(2026, 8, 1)",
+    )
+    r.dispatch(find(tree, cls("control")).events["click"], {})
+    tree = cycle(r, tree)
+    title = [n for n in walk(find(tree, cls("month"))) if n.tag == "button"][0]
+    r.dispatch(title.events["click"], {})
+    tree = cycle(r, tree)
+    months = [b for b in walk(find(tree, attr("role", "grid"))) if b.tag == "button"]
+    allowed = [label_of(b) for b in months if "disabled" not in b.attrs]
+    assert allowed == ["Mar", "Apr", "May", "Jun", "Jul", "Aug"]
+    assert "disabled" in find(tree, attr("aria-label", "Previous year")).attrs
+    r.dispatch(months[2].events["click"], {})  # March: the 20th is fine
+    tree = cycle(r, tree)
+    assert focused(r, tree).attrs["aria-label"] == "Friday 20 March 2026"

@@ -16,14 +16,55 @@
       <If cond="_open">
         <div class="backdrop" @click="close(False)"></div>
         <div class="popup" role="dialog" :aria-label="'Choose a date' + (', ' + label if label else '')"
-             @keydown.esc.stop="close(True)">
+             @keydown.esc.stop="escape">
           <div class="head">
-            <button type="button" class="nav" aria-label="Previous month" :disabled="not can_prev"
-                    @click="shift_month(-1)"><Icon name="chevron-left" size="1.1em" /></button>
-            <span class="month" aria-live="polite">{{ month_title }}</span>
-            <button type="button" class="nav" aria-label="Next month" :disabled="not can_next"
-                    @click="shift_month(1)"><Icon name="chevron-right" size="1.1em" /></button>
+            <button type="button" class="nav" :aria-label="'Previous ' + step_name" :disabled="not can_prev"
+                    @click="shift(-1)"><Icon name="chevron-left" size="1.1em" /></button>
+            <span class="month" aria-live="polite">
+              <If cond="_mode == 'days'">
+                <button type="button" class="title-btn" :aria-label="'Choose a month, ' + month_name"
+                        @click="show_months">{{ month_name }}</button>
+                <button type="button" class="title-btn" :aria-label="'Choose a year, ' + str(_view.year)"
+                        @click="show_years">{{ _view.year }}</button>
+              </If>
+              <ElseIf cond="_mode == 'months'">
+                <button type="button" class="title-btn" :aria-label="'Choose a year, ' + str(_view.year)"
+                        @click="show_years">{{ _view.year }}</button>
+              </ElseIf>
+              <Else><span class="title-text">{{ years_title }}</span></Else>
+            </span>
+            <button type="button" class="nav" :aria-label="'Next ' + step_name" :disabled="not can_next"
+                    @click="shift(1)"><Icon name="chevron-right" size="1.1em" /></button>
           </div>
+          <If cond="_mode == 'months'">
+            <div class="pick-grid" role="grid" :aria-label="'Months of ' + str(_view.year)"
+                 @keydown.left.prevent="move_month(-1)" @keydown.right.prevent="move_month(1)"
+                 @keydown.up.prevent="move_month(-3)" @keydown.down.prevent="move_month(3)"
+                 @keydown.home.prevent="move_month(1 - _month_focus)" @keydown.end.prevent="move_month(12 - _month_focus)">
+              <For each="cell in month_cells" key="cell['n']">
+                <button type="button" :ref="'m-' + str(cell['n'])" :class="cell['classes']"
+                        :tabindex="'0' if cell['focus'] else '-1'"
+                        :aria-pressed="'true' if cell['selected'] else 'false'"
+                        :aria-label="cell['long']" :disabled="cell['disabled']"
+                        @click="choose_month(cell['n'])">{{ cell['short'] }}</button>
+              </For>
+            </div>
+          </If>
+          <ElseIf cond="_mode == 'years'">
+            <div class="pick-grid" role="grid" :aria-label="'Years ' + years_title"
+                 @keydown.left.prevent="move_year(-1)" @keydown.right.prevent="move_year(1)"
+                 @keydown.up.prevent="move_year(-3)" @keydown.down.prevent="move_year(3)"
+                 @keydown.page-up.prevent="move_year(-12)" @keydown.page-down.prevent="move_year(12)">
+              <For each="cell in year_cells" key="cell['year']">
+                <button type="button" :ref="'y-' + str(cell['year'])" :class="cell['classes']"
+                        :tabindex="'0' if cell['focus'] else '-1'"
+                        :aria-pressed="'true' if cell['selected'] else 'false'"
+                        :disabled="cell['disabled']"
+                        @click="choose_year(cell['year'])">{{ cell['year'] }}</button>
+              </For>
+            </div>
+          </ElseIf>
+          <Else>
           <table class="grid" role="grid" :aria-label="month_title"
                  @keydown.left.prevent="step(-1)" @keydown.right.prevent="step(1)"
                  @keydown.up.prevent="step(-7)" @keydown.down.prevent="step(7)"
@@ -49,6 +90,7 @@
               </For>
             </tbody>
           </table>
+          </Else>
           <div class="foot">
             <button type="button" class="link" :disabled="not allowed(today)" @click="pick(today)">Today</button>
             <If cond="chosen and not required">
@@ -70,7 +112,9 @@
 # "update" (what @bind uses) and "blur" when the calendar closes.
 # Keyboard: Enter, Space or Down opens the calendar on the chosen day (or
 # today); arrows move by day and week, Page Up/Down by month, Home and End
-# to the week's ends; Enter picks; Esc closes.
+# to the week's ends; Enter picks; Esc closes. The month and the year in the
+# header open a choice of months and of years (year, then month, then day);
+# Esc there goes back a step.
 import datetime
 import itertools
 
@@ -95,6 +139,9 @@ _ids = itertools.count(1)
 _open = False
 _view = None              # the first day of the month showing
 _focus = None             # the day that takes Tab and the arrow keys
+_mode = "days"            # or "months" or "years": what the calendar shows
+_month_focus = 1          # the month that takes Tab, in the months view
+_year_focus = 2000        # the year that takes Tab, in the years view
 
 def on_init(self):
     self._id = f"ui-date-{next(_ids)}"
@@ -160,7 +207,18 @@ def open(self):
     if self.disabled:
         return
     self._open = True
+    self._mode = "days"
     self._show(self._clamp(self.chosen or self.today))
+
+def escape(self):
+    # Back a step from the months or years; from the days, close.
+    if self._mode == "years":
+        self.show_months()
+    elif self._mode == "months":
+        self._mode = "days"
+        self._show(self._focus)
+    else:
+        self.close(True)
 
 def close(self, refocus, *chosen):
     # chosen: the value just picked, which reaches `value` only on the next
@@ -184,6 +242,117 @@ def clear(self):
 def shift_month(self, delta):
     # The arrow buttons: show another month, keeping focus on the button.
     self._show(self._clamp(self._add_months(self._focus, delta)), focus=False)
+
+def shift(self, delta):
+    # The header's arrows: a month, a year or a page of years at a time.
+    if self._mode == "days":
+        self.shift_month(delta)
+    elif self._mode == "months":
+        self._focus = self._clamp(self._add_months(self._focus, 12 * delta))
+        self._view = self._view.replace(year=self._view.year + delta)
+    else:
+        self._year_focus += 12 * delta
+
+@property
+def step_name(self):
+    return {"days": "month", "months": "year"}.get(self._mode, "twelve years")
+
+@property
+def month_name(self):
+    return self._MONTHS[self._view.month - 1]
+
+def _month_open(self, year, month):
+    # Whether any day of that month is allowed.
+    first = datetime.date(year, month, 1)
+    last = self._add_months(first, 1) - datetime.timedelta(days=1)
+    low, high = self._as_date(self.min), self._as_date(self.max)
+    return (low is None or last >= low) and (high is None or first <= high)
+
+def _year_open(self, year):
+    low, high = self._as_date(self.min), self._as_date(self.max)
+    return (low is None or year >= low.year) and (high is None or year <= high.year)
+
+def show_months(self):
+    self._mode = "months"
+    self._month_focus = self._view.month
+    self.focus(f"m-{self._month_focus}")
+
+def show_years(self):
+    self._mode = "years"
+    self._year_focus = self._view.year
+    self.focus(f"y-{self._year_focus}")
+
+def choose_month(self, month):
+    if not self._month_open(self._view.year, month):
+        return
+    self._mode = "days"
+    day = self._focus.day
+    target = self._add_months(datetime.date(self._view.year, month, 1), 0)
+    last = (self._add_months(target, 1) - datetime.timedelta(days=1)).day
+    self._show(self._clamp(target.replace(day=day if day <= last else last)))
+
+def choose_year(self, year):
+    if not self._year_open(year):
+        return
+    self._view = self._view.replace(year=year)
+    self._focus = self._clamp(self._add_months(self._focus, 12 * (year - self._focus.year)))
+    self.show_months()
+
+def move_month(self, delta):
+    month = self._month_focus + delta
+    if 1 <= month <= 12 and self._month_open(self._view.year, month):
+        self._month_focus = month
+        self.focus(f"m-{month}")
+
+def move_year(self, delta):
+    year = self._year_focus + delta
+    if self._year_open(year):
+        self._year_focus = year
+        self.focus(f"y-{year}")
+
+@property
+def _year_page(self):
+    # The twelve years showing: the dozen holding the year in focus.
+    return self._year_focus - self._year_focus % 12
+
+@property
+def years_title(self):
+    return f"{self._year_page} – {self._year_page + 11}"
+
+@property
+def month_cells(self):
+    chosen, year = self.chosen, self._view.year
+    cells = []
+    for n in range(1, 13):
+        selected = chosen is not None and chosen.year == year and chosen.month == n
+        classes = ["pick"]
+        if selected:
+            classes.append("selected")
+        if self.today.year == year and self.today.month == n:
+            classes.append("today")
+        cells.append({
+            "n": n, "short": self._MONTHS[n - 1][:3], "long": f"{self._MONTHS[n - 1]} {year}",
+            "selected": selected, "focus": n == self._month_focus,
+            "disabled": not self._month_open(year, n), "classes": " ".join(classes),
+        })
+    return cells
+
+@property
+def year_cells(self):
+    chosen = self.chosen
+    cells = []
+    for year in range(self._year_page, self._year_page + 12):
+        selected = chosen is not None and chosen.year == year
+        classes = ["pick"]
+        if selected:
+            classes.append("selected")
+        if self.today.year == year:
+            classes.append("today")
+        cells.append({
+            "year": year, "selected": selected, "focus": year == self._year_focus,
+            "disabled": not self._year_open(year), "classes": " ".join(classes),
+        })
+    return cells
 
 def step(self, days):
     day = self._focus + datetime.timedelta(days=days)
@@ -213,12 +382,24 @@ def month_title(self):
 @property
 def can_prev(self):
     low = self._as_date(self.min)
-    return low is None or self._view - datetime.timedelta(days=1) >= low
+    if low is None:
+        return True
+    if self._mode == "months":
+        return self._view.year - 1 >= low.year
+    if self._mode == "years":
+        return self._year_page - 1 >= low.year
+    return self._view - datetime.timedelta(days=1) >= low
 
 @property
 def can_next(self):
     high = self._as_date(self.max)
-    return high is None or self._add_months(self._view, 1) <= high
+    if high is None:
+        return True
+    if self._mode == "months":
+        return self._view.year + 1 <= high.year
+    if self._mode == "years":
+        return self._year_page + 12 <= high.year
+    return self._add_months(self._view, 1) <= high
 
 @property
 def weeks(self):
@@ -284,7 +465,27 @@ def weeks(self):
 }
 .align-end .popup { left: auto; right: 0; }
 .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
-.month { font-weight: 650; font-size: 0.95rem; }
+.month { display: inline-flex; gap: 2px; font-weight: 650; font-size: 0.95rem; }
+.title-btn {
+  font: inherit; font-weight: 650; border: 0; background: transparent; color: var(--ui-text, #1f2328);
+  padding: 4px 8px; border-radius: calc(var(--ui-radius, 8px) - 2px); cursor: pointer;
+}
+.title-btn:hover { background: var(--ui-subtle, #f6f8fa); }
+.title-btn:focus-visible, .pick:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-primary, #4f46e5) 55%, transparent);
+}
+.title-text { padding: 4px 8px; }
+.pick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 16.2rem; padding: 4px 0; }
+.pick {
+  height: 2.6rem; font: inherit; font-size: 0.9rem;
+  border: 0; border-radius: calc(var(--ui-radius, 8px) - 2px);
+  background: transparent; color: var(--ui-text, #1f2328); cursor: pointer;
+}
+.pick:hover:not(:disabled) { background: var(--ui-subtle, #f6f8fa); }
+.pick.today { font-weight: 700; color: var(--ui-primary, #4f46e5); }
+.pick.selected, .pick.selected:hover { background: var(--ui-primary, #4f46e5); color: var(--ui-on-primary, #fff); }
+.pick:disabled { opacity: 0.3; cursor: not-allowed; text-decoration: line-through; }
 .nav, .link {
   font: inherit; border: 0; background: transparent; color: var(--ui-text, #1f2328);
   border-radius: calc(var(--ui-radius, 8px) - 2px); cursor: pointer;

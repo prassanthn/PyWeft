@@ -277,10 +277,16 @@ def today(self):
 - **With a form**, it works like any field:
   `:error="form.error('check_in')" @blur="form.touch('check_in')"`. It emits
   `blur` when the calendar closes.
+- **Jumping to another month or year:** click the month's name in the
+  calendar's header to choose from the year's months, or the year to choose
+  from twelve years at a time (the arrows then move a year, or twelve).
+  Choosing a year shows its months, and choosing a month shows its days.
+  Months and years outside `min` and `max` are crossed out.
 - **Keyboard:** Enter, Space or the down arrow opens the calendar on the
   chosen day (or today). The arrows move by day and week, Page Up and Page
   Down by month, Home and End to the ends of the week, Enter picks, and Esc
-  closes it.
+  closes it. In the months and years, the arrows move between them, and Esc
+  goes back a step.
 
 ### A complete form: validation and submitting
 
