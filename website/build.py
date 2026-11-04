@@ -20,7 +20,7 @@ import re
 import shutil
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from pymdownx.slugs import slugify
 
@@ -59,6 +59,48 @@ LIVE = {
     "todo": "examples/todo",
     "shop": "examples/shop",
 }
+# Plain text for AI tools (the llms.txt convention, https://llmstxt.org):
+# llms.txt indexes the site, llms-full.txt is the guide for coding
+# assistants (the AGENTS.md `pyweft new` writes) followed by these, whole.
+SITE_URL = "https://prassanthn.github.io/PyWeft/"
+LLMS_FULL = [GUIDE, "packages/pyweft-ui/README.md", "packages/pyweft-ui/docs/guide.md"]
+LLMS_INDEX = f"""\
+# PyWeft
+
+> A Python UI framework. Components are `.weft` files: an XML template,
+> a Python code block and scoped CSS. Apps run in the browser (Python on
+> WebAssembly via Pyodide) or as a desktop window, from one codebase.
+> `pyweft-ui` adds themeable, keyboard-accessible controls.
+
+PyWeft is new, so don't assume Vue, React, Blazor or Jinja syntax: control
+flow is `<If>`/`<For>` elements, templates are XML, and a component's code
+block is a plain Python class body. Read the guide for coding assistants
+first; it lists the mistakes generated code usually makes.
+
+## Docs
+
+- [Guide for coding assistants]({SITE_URL}agents.md): the file format,
+  directives, components, async, routing, data, common traps, the controls
+- [Full documentation as one text file]({SITE_URL}llms-full.txt): the
+  assistant guide, the framework guide and the pyweft-ui reference and guide
+- [Tutorial]({SITE_URL}tutorial/): a small app, step by step
+- [Guide]({SITE_URL}guide/): install, components, templates, composing
+  components, apps and building, testing without a browser
+
+## Controls
+
+- [pyweft-ui reference]({SITE_URL}controls/): every control's fields and events
+- [pyweft-ui guide]({SITE_URL}controls/guide/): forms and validation,
+  layout, dialogs, tables, trees, themes, accessibility
+- [Live gallery]({SITE_URL}live/gallery/): every control, running
+
+## Optional
+
+- [Changelog]({SITE_URL}changelog/)
+- [Source on GitHub]({GITHUB})
+- [pyweft on PyPI](https://pypi.org/project/pyweft/),
+  [pyweft-ui on PyPI](https://pypi.org/project/pyweft-ui/)
+"""
 # Examples styled with Tailwind's CLI, and the Tailwind they're built with
 TAILWIND_APPS = ["examples/todo", "examples/shop"]
 os.environ.setdefault("TAILWINDCSS_VERSION", "v4.3.3")
@@ -210,10 +252,50 @@ def assemble() -> None:
         write(page, linker.rewrite(text, src, page))
 
 
+def absolute_links(text: str, src: str) -> str:
+    """Relative links in a repository file, made absolute (GitHub), for text
+    read away from the repository."""
+    base = PurePosixPath(src).parent
+
+    def fix(match: re.Match) -> str:
+        target = match.group(1)
+        if re.match(r"[a-z][a-z0-9+.-]*:|#", target):
+            return match.group(0)
+        path, _, anchor = target.partition("#")
+        resolved = posixpath.normpath(str(base / path))
+        return f"]({GITHUB}/blob/main/{resolved}{'#' + anchor if anchor else ''})"
+
+    return _LINK.sub(fix, text)
+
+
+def write_llms() -> None:
+    from pyweft.cli import agents_guide
+
+    guide = agents_guide()
+    parts = [
+        "# PyWeft documentation, as plain text\n\n"
+        f"Everything in one file, for AI tools. The site: {SITE_URL}\n"
+        "Contents: the guide for coding assistants, the framework guide, the "
+        "pyweft-ui reference, the pyweft-ui guide.",
+        guide,
+    ]
+    for src in LLMS_FULL:
+        text = drop_contents((REPO / src).read_text(encoding="utf-8"))
+        parts.append(f"<!-- {src} -->\n\n" + absolute_links(text, src))
+    out = {
+        "llms.txt": LLMS_INDEX,
+        "llms-full.txt": "\n\n---\n\n".join(p.strip() for p in parts),
+        "agents.md": guide,
+    }
+    for name, text in out.items():
+        (SITE / name).write_text(text.rstrip() + "\n", encoding="utf-8", newline="\n")
+
+
 def main() -> None:
     assemble()
     run = lambda *args: subprocess.run([sys.executable, *args], check=True, cwd=REPO)  # noqa: E731
     run("-m", "mkdocs", "build", "--strict", "--config-file", str(HERE / "mkdocs.yml"))
+    write_llms()  # after mkdocs: it empties the site folder first
     for app in TAILWIND_APPS:
         # The committed tailwind.css could lag behind a template; the live
         # app gets one built from the classes it has now.
