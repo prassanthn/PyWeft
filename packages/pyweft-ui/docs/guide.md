@@ -237,6 +237,39 @@ A card shows a header only when it has a `title`, `subtitle`, or a
 - **`vertical="true"`** draws a vertical line as tall as the row, between
   items in a `Row` or a toolbar.
 
+### Slides: Carousel
+
+```xml
+<ui.Carousel label="Places" :items="photos" @bind="current" loop="true">
+  <Fill name="slide">
+    <img :src="slide['src']" :alt="slide['alt']" />
+  </Fill>
+</ui.Carousel>
+
+<ui.Carousel label="Products" :items="products" per_view="3" autoplay="5">
+  <Fill name="slide"><ProductCard :product="slide" /></Fill>
+</ui.Carousel>
+```
+
+- **`items`** is any list; `<Fill name="slide">` lays out each one. It gets
+  `slide` (the item), `index`, and `active` (visible now).
+- People move it with the **arrows** on its sides, the **dots** under it,
+  a **swipe** (or a mouse drag, decided when it's let go), or the arrow
+  keys on its buttons. `@bind` holds the index of the first slide shown;
+  it emits `change` too. `loop="true"` wraps at the ends.
+- **`per_view`** shows several slides side by side, moving one at a time,
+  with `gap` between them. It applies at every width, so choose a number
+  that suits the narrowest screen the app is for.
+- **`autoplay="5"`** advances every 5 seconds. It pauses while the pointer
+  is over it or focus is inside (a slide then gets its full time again),
+  and stops for good once someone moves it themselves. A play/stop button
+  is always shown with it: moving content must be stoppable.
+- `arrows="false"` and `indicators="none"` hide the controls;
+  `go_next()`, `go_prev()` and `go_to(i)` move it from code.
+- Screen readers hear a carousel named by `label`, with each slide as "3
+  of 8"; slides out of view can't be reached, and changes are announced
+  except while it plays by itself.
+
 ### Panels that open and close: Expansion and Accordion
 
 **`Expansion`** is a panel whose content opens and closes under its header,
@@ -1784,6 +1817,8 @@ readers and mobile devices work the way people expect:
 - **Tabs** are announced as tabs, with the chosen one marked, and their
   content as the chosen tab's panel. The tab row is one Tab stop: the arrow
   keys move between tabs, and Home and End jump to the first and last.
+- **Carousels** are announced as carousels, each slide as "3 of 8"; their
+  autoplay pauses on hover and focus, and has a stop button.
 - **Expansion panels** have a real button in a heading, saying whether
   it's open; closed content is out of reach. In an `Accordion`, Up and
   Down move between the headers.

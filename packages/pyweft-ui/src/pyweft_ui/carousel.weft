@@ -1,0 +1,254 @@
+<template>
+  <section :class="classes" role="region" aria-roledescription="carousel" :aria-label="label or None"
+           :style="'--per: ' + str(per) + '; --gap: ' + gap"
+           @mouseenter="_hover = True" @mouseleave="_hover = False"
+           @focusin="_focus_in = True" @focusout="_focus_in = False" @pointerup="drop(event)"
+           @pointercancel="_grab = None">
+    <div class="stage">
+      <div class="viewport" :aria-live="'off' if playing else 'polite'" @pointerdown="grab(event)">
+        <div class="track" :style="'--at: ' + str(current)" @dragstart.prevent="">
+          <For each="s in slides" key="s['key']">
+            <div class="slide" role="group" aria-roledescription="slide" :aria-label="s['spoken']"
+                 :inert="not s['shown']">
+              <Slot name="slide" :slide="s['item']" :index="s['index']" :active="s['shown']" />
+            </div>
+          </For>
+        </div>
+      </div>
+      <If cond="arrows and count &gt; per">
+        <button type="button" class="arrow prev" aria-label="Previous slide" :disabled="not can_prev"
+                @click="go_prev()" @keydown.left.prevent="go_prev()" @keydown.right.prevent="go_next()">
+          <Icon name="chevron-left" size="1.25em" />
+        </button>
+        <button type="button" class="arrow next" aria-label="Next slide" :disabled="not can_next"
+                @click="go_next()" @keydown.left.prevent="go_prev()" @keydown.right.prevent="go_next()">
+          <Icon name="chevron-right" size="1.25em" />
+        </button>
+      </If>
+    </div>
+    <If cond="count &gt; per and (indicators != 'none' or autoplay)">
+      <div class="controls">
+        <If cond="autoplay">
+          <button type="button" class="play" :aria-label="'Stop the slides' if playing else 'Play the slides'"
+                  @click="toggle_play()">
+            <If cond="playing"><span class="pause-icon" aria-hidden="true"></span></If>
+            <Else><span class="play-icon" aria-hidden="true"></span></Else>
+          </button>
+        </If>
+        <If cond="indicators != 'none'">
+          <div class="dots" role="group" aria-label="Choose a slide"
+               @keydown.left.prevent="go_prev(True)" @keydown.right.prevent="go_next(True)">
+            <For each="d in dots" key="d">
+              <button type="button" :ref="'dot-' + str(d)" :class="'dot on' if d == current else 'dot'"
+                      :aria-label="'Slide ' + str(d + 1)" :aria-current="'true' if d == current else None"
+                      :tabindex="'0' if d == current else '-1'" @click="go_to(d)"></button>
+            </For>
+          </div>
+        </If>
+      </div>
+    </If>
+  </section>
+</template>
+
+<code>
+# <ui.Carousel :items="photos" @bind="current" label="Featured">
+#   <Fill name="slide"><img :src="slide['src']" :alt="slide['alt']" /></Fill>
+# </ui.Carousel>
+# Slides you move through with arrows, dots, a swipe (or a mouse drag), or
+# the arrow keys on its buttons. items is any list; <Fill name="slide">
+# lays out each one (it gets slide, index and active: visible now).
+# @bind the index of the first slide shown, or leave it unbound.
+# per_view: slides side by side (moving one at a time); loop: wrap at the
+# ends; arrows / indicators="none" hide the controls; gap between slides.
+# autoplay="5": advance every 5 seconds, paused while the pointer or focus
+# is inside, stopped for good once someone moves it themselves; the
+# play/stop button is always there (as accessibility guidelines require).
+# Emits update (for @bind) and change. go_next(), go_prev(), go_to(i).
+import asyncio
+
+items: list = []
+value: int | None = None
+label: str = ""           # names the carousel for screen readers
+per_view: int = 1
+loop: bool = False
+arrows: bool = True
+indicators: str = "dots"  # dots or none
+autoplay: float = 0       # seconds between slides; 0 = off
+gap: str = "16px"
+
+_picked = 0
+_hover = False
+_focus_in = False
+_stopped = False          # moved by hand, or the stop button: no autoplay
+_grab = None              # where a swipe started (clientX)
+_SWIPE = 40               # pixels sideways that move it
+
+@property
+def count(self):
+    return len(self.items)
+
+@property
+def per(self):
+    return self.per_view if self.per_view > 0 else 1
+
+@property
+def last(self):
+    """The highest index the first visible slide can have."""
+    top = self.count - self.per
+    return top if top > 0 else 0
+
+@property
+def current(self):
+    at = self.value if self.value is not None else self._picked
+    try:
+        at = int(at)
+    except (TypeError, ValueError):
+        at = 0
+    return 0 if at < 0 else self.last if at > self.last else at
+
+@property
+def slides(self):
+    out = []
+    for i, item in enumerate(self.items):
+        out.append({
+            "key": str(i), "index": i, "item": item,
+            "shown": self.current <= i < self.current + self.per,
+            "spoken": f"{i + 1} of {self.count}",
+        })
+    return out
+
+@property
+def dots(self):
+    return list(range(self.last + 1))
+
+@property
+def can_prev(self):
+    return self.loop or self.current > 0
+
+@property
+def can_next(self):
+    return self.loop or self.current < self.last
+
+@property
+def playing(self):
+    return bool(self.autoplay) and not self._stopped and not self._hover and not self._focus_in
+
+@property
+def classes(self):
+    return "carousel" + (" multi" if self.per > 1 else "")
+
+# ------------------------------------------------------------- moving
+
+def go_to(self, index, by_hand=True):
+    if self.count <= self.per:
+        return
+    index = int(index)
+    if index > self.last:
+        index = 0 if self.loop or not by_hand else self.last
+    elif index < 0:
+        index = self.last if self.loop else 0
+    if by_hand:
+        self._stopped = True
+    if index != self.current:
+        self._picked = index
+        self.emit("update", index)
+        self.emit("change", index)
+
+def go_next(self, focus_dot=False):
+    self.go_to(self.current + 1)
+    if focus_dot:
+        self.focus(f"dot-{self.current}")
+
+def go_prev(self, focus_dot=False):
+    self.go_to(self.current - 1)
+    if focus_dot:
+        self.focus(f"dot-{self.current}")
+
+def toggle_play(self):
+    self._stopped = not self._stopped
+    if not self._stopped:
+        self._hover = self._focus_in = False   # the button has focus: play now
+
+# A swipe, decided on release: down on the slides, up anywhere inside.
+def grab(self, event):
+    self._grab = event.get("clientX")
+
+def drop(self, event):
+    start, self._grab = self._grab, None
+    end = event.get("clientX")
+    if start is None or end is None:
+        return
+    if end - start <= -self._SWIPE:
+        self.go_next()
+    elif end - start >= self._SWIPE:
+        self.go_prev()
+
+# ------------------------------------------------------------- autoplay
+
+def on_after_render(self, first):
+    if first and self.autoplay:
+        try:
+            self.start_task(self._play())
+        except RuntimeError:
+            pass            # no running loop (a plain test render): no autoplay
+
+async def _play(self):
+    waited = 0.0
+    while True:
+        await asyncio.sleep(0.25)
+        if not self.playing:
+            waited = 0.0    # paused: a slide gets its full time once it resumes
+            continue
+        waited += 0.25
+        if waited >= float(self.autoplay):
+            waited = 0.0
+            self.go_to(self.current + 1, by_hand=False)
+            self.state_has_changed()
+</code>
+
+<style>
+.carousel { position: relative; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.stage { position: relative; }
+.viewport { overflow: hidden; border-radius: var(--ui-radius, 8px); touch-action: pan-y; }
+.track {
+  display: flex; gap: var(--gap); user-select: none;
+  /* One slide is a (1/per) share of the width less the gaps; moving by
+     one is that plus a gap. */
+  --slide: calc((100% - (var(--per) - 1) * var(--gap)) / var(--per));
+  transform: translateX(calc(var(--at) * (var(--slide) + var(--gap)) * -1));
+  transition: transform 0.35s ease;
+}
+.slide { flex: 0 0 var(--slide); min-width: 0; box-sizing: border-box; }
+.arrow {
+  position: absolute; top: 50%; z-index: 1; transform: translateY(-50%);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.5rem; height: 2.5rem; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--ui-border, #d1d9e0);
+  background: color-mix(in srgb, var(--ui-surface, #fff) 90%, transparent); color: var(--ui-text, #1f2328);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: opacity 0.15s, background-color 0.15s;
+}
+.arrow.prev { left: 10px; }
+.arrow.next { right: 10px; }
+.arrow:hover:not(:disabled) { background: var(--ui-surface, #fff); }
+.arrow:disabled { opacity: 0; pointer-events: none; }
+.arrow:focus-visible, .dot:focus-visible, .play:focus-visible {
+  outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary, #4f46e5) 40%, transparent);
+}
+.controls { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+.dot {
+  width: 10px; height: 10px; padding: 0; margin: 4px; border: 0; border-radius: 999px; cursor: pointer;
+  background: color-mix(in srgb, var(--ui-text, #1f2328) 25%, transparent);
+  transition: width 0.2s, background-color 0.2s;
+}
+.dot.on { width: 22px; background: var(--ui-primary, #4f46e5); }
+.play {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.75rem; height: 1.75rem; padding: 0; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--ui-border, #d1d9e0); background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+}
+.pause-icon { width: 8px; height: 10px; border-left: 3px solid currentColor; border-right: 3px solid currentColor; box-sizing: border-box; }
+.play-icon { width: 0; height: 0; margin-left: 2px; border-left: 8px solid currentColor; border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+@media (prefers-reduced-motion: reduce) { .track, .dot { transition: none; } }
+</style>

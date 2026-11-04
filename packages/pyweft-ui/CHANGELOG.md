@@ -8,6 +8,9 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- **`Carousel`**: slides moved by arrows, dots, a swipe or a mouse drag;
+  several per view, looping, and autoplay that pauses on hover and focus,
+  stops when someone takes over, and has a stop button.
 - `TextField`, `TextArea` and `NumberField` take `readonly`. (The gallery's
   share popover used it before it existed, which `pyweft check` caught.)
 - **`AppShell`**: the sidebar's contents stay in view while the page

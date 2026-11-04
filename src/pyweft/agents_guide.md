@@ -284,7 +284,7 @@ Pages = router("pages")         # one page per .weft file in pages/
 lists take `"A, B, C"`, a list of values, `(value, label)` pairs or dicts.
 
 - Layout: `AppShell` (header, sticky `nav` fill), `Row`, `Column`, `Grid`,
-  `Card`, `Divider`, `Expansion`, `Accordion`, `Tabs`, `Stepper`.
+  `Card`, `Divider`, `Carousel`, `Expansion`, `Accordion`, `Tabs`, `Stepper`.
 - Fields: `TextField` (`mask="(999) 999-9999"`), `TextArea`, `NumberField`,
   `Select`, `Autocomplete`, `Chips`, `ChipInput`, `ButtonToggle`, `Slider`,
   `RadioGroup`, `Checkbox`, `Switch`, `DatePicker`, `DateRangePicker`,

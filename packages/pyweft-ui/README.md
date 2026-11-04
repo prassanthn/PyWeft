@@ -86,6 +86,7 @@ number 3 and `disabled="true"` is `True`.
 | `Column` | `gap`, `align` | Children stacked. |
 | `Grid` | `cols`, `min_width`, `gap` | Fixed columns, or as many as fit. |
 | `Card` | `title`, `subtitle` | Fills: `title`, `actions`, `footer`. |
+| `Carousel` | `items`, `label`, `per_view`, `gap`, `loop`, `autoplay` (seconds), `arrows`, `indicators` (dots, none) | Slides moved by arrows, dots, swipe or drag; `@bind` to the first shown slide's index; emits `change`. Fill: `slide` (with `slide`, `index`, `active`). |
 | `Divider` | `label`, `align` (center, start, end), `vertical`, `inset` (`"true"` or a length), `spacing` (none, sm, md, lg) | A thin line; with `label`, text on the line; `vertical` between items in a Row. |
 | `Expansion` | `title`, `description`, `icon`, `open`, `disabled`, `toggle` (after, before, none), `level`, `lazy` | `@bind` to a bool; emits `open`, `close`. Fills: `header`, `actions`. |
 | `Accordion` | `options` (dicts may add `description`, `icon`, `disabled`), `multiple`, `disabled`, `toggle`, `level`, `lazy` | `@bind` to the open panel's value (`multiple`: a list). The content between the tags is each panel's body; `panel` inside it is that panel's value. Up/Down, Home/End move between headers. |

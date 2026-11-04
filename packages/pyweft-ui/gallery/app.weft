@@ -433,6 +433,30 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['tree'] }}</pre>
         </ui.Card>
 
+        <ui.Card title="Carousel" id="carousel" ref="carousel" subtitle="Arrows, dots, a swipe or a drag; the second one plays by itself">
+          <ui.Column gap="lg">
+            <ui.Carousel label="Places" :items="PLACES" @bind="place" loop="true">
+              <Fill name="slide">
+                <div class="place" :style="'background: ' + slide['bg']">
+                  <span class="place-name">{{ slide['name'] }}</span>
+                  <span class="place-note">{{ slide['note'] }}</span>
+                </div>
+              </Fill>
+            </ui.Carousel>
+            <p class="note">Showing {{ PLACES[place]['name'] }} ({{ place + 1 }} of {{ len(PLACES) }})</p>
+            <ui.Carousel label="Products" :items="PRODUCTS" per_view="3" autoplay="4" gap="12px">
+              <Fill name="slide">
+                <div class="product">
+                  <span class="product-icon"><ui.Icon :name="slide['icon']" size="1.6em" /></span>
+                  <b>{{ slide['name'] }}</b>
+                  <span class="note">{{ slide['price'] }}</span>
+                </div>
+              </Fill>
+            </ui.Carousel>
+            <pre class="code">{{ CODE['carousel'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
         <ui.Card title="Toasts" id="toasts" ref="toasts" subtitle="Messages that go away by themselves">
           <ui.Column>
           <ui.ButtonToggle label="Look" :options="[('toast', 'Toast'), ('snackbar', 'Snackbar')]" @bind="toast_look"
@@ -513,10 +537,11 @@ SECTION_CONTROLS = {
     "Tabs": ["Tabs"],
     "Table": ["Table"],
     "Tree": ["Tree"],
+    "Carousel": ["Carousel", "slider", "slideshow"],
     "Toasts": ["Toaster", "toast", "Snackbar"],
     "Layout": ["Row", "Column", "Grid", "Card", "Divider", "AppShell"],
 }
-SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Progress", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Table", "Tree", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Progress", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Table", "Tree", "Carousel", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -564,6 +589,22 @@ menu_choice = None
 sharing: bool = False
 share_pop: bool = False
 toast_look: str = "toast"
+place: int = 0
+PLACES = [
+    {"name": "Mountains", "note": "Cold air, long views", "bg": "linear-gradient(135deg, #1e3a8a, #60a5fa)"},
+    {"name": "Desert", "note": "Dunes at sunset", "bg": "linear-gradient(135deg, #b45309, #fcd34d)"},
+    {"name": "Forest", "note": "Moss and quiet", "bg": "linear-gradient(135deg, #14532d, #4ade80)"},
+    {"name": "Coast", "note": "Salt and wind", "bg": "linear-gradient(135deg, #0e7490, #67e8f9)"},
+    {"name": "City", "note": "Lights all night", "bg": "linear-gradient(135deg, #581c87, #f472b6)"},
+]
+PRODUCTS = [
+    {"name": "Notebook", "price": "$12", "icon": "edit"},
+    {"name": "Backpack", "price": "$64", "icon": "upload"},
+    {"name": "Headphones", "price": "$89", "icon": "star"},
+    {"name": "Desk lamp", "price": "$35", "icon": "sun"},
+    {"name": "Water bottle", "price": "$18", "icon": "heart"},
+    {"name": "Calendar", "price": "$15", "icon": "calendar"},
+]
 nav_query: str = ""
 
 def _squash(self, text):
@@ -889,6 +930,15 @@ def submit(self):
 ]" />
 
 <ui.ButtonToggle label="Plan" options="Monthly, Yearly" full_width="true" @bind="plan" />""",
+    "carousel": """<ui.Carousel label="Places" :items="places" @bind="place" loop="true">
+  <Fill name="slide">
+    <img :src="slide['src']" :alt="slide['alt']" />
+  </Fill>
+</ui.Carousel>
+
+<ui.Carousel label="Products" :items="products" per_view="3" autoplay="4">
+  <Fill name="slide"><ProductCard :product="slide" /></Fill>
+</ui.Carousel>""",
     "tree": """<ui.Tree :nodes="files" @bind="selected" :filter="query"
          @load="load_folder(event)" @activate="open_file(event)" />
 
@@ -1006,6 +1056,18 @@ toast("Item deleted.", action="Undo", on_action=self.undo)""",
   font-size: 0.72rem; font-weight: 700;
   background: color-mix(in srgb, var(--ui-primary) 15%, transparent); color: var(--ui-primary);
 }
+.place {
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 2px;
+  height: 14rem; padding: 18px 20px; box-sizing: border-box; color: #fff;
+}
+.place-name { font-size: 1.5rem; font-weight: 700; }
+.place-note { opacity: 0.9; }
+.product {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; height: 100%;
+  padding: 14px; box-sizing: border-box;
+  border: 1px solid var(--ui-border); border-radius: var(--ui-radius, 8px); background: var(--ui-surface);
+}
+.product-icon { color: var(--ui-primary); }
 .sample { margin: 0; padding: 12px 14px; border-radius: var(--ui-radius, 8px); background: var(--ui-subtle); }
 .sample.bold { font-weight: 700; }
 .sample.italic { font-style: italic; }
