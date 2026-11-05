@@ -1,0 +1,36 @@
+<template>
+  <ChartView :build="layout" legend="none" :aria_label="aria_label" :clickable="clickable"
+             @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.Sparkline :data="[4, 6, 5, 9, 7, 11]" />
+# <ui.Sparkline :data="daily" x="day" y="visits" kind="area" height="48" points="minmax" />
+# A small chart with no axes for the shape of a series: in a table cell, a
+# stat card, beside a number. data: a list of numbers, or rows with y=
+# naming the value (x= names each one for its tooltip). kind: line, area
+# or bar (negative bars in the danger colour). points: last (default),
+# minmax, all or none. It takes the width it is given; height in pixels.
+# Hover or arrow keys show each value; screen readers hear a summary
+# ("from 4 to 11, low 4, high 11"). @select gets {index, label, value}.
+from pyweft_ui.charting import sparkline
+
+data = None
+x: str = ""
+y: str = ""
+kind: str = "line"        # line, area, bar
+color: str = ""
+height: int = 40
+points: str = "last"      # last, minmax, all, none
+format = ""
+aria_label: str = ""
+name: str = "Trend"       # how the summary starts: "Visits over 7 values ..."
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    return sparkline(self.data, width=width, height=self.height, y=self.y, x=self.x, kind=self.kind,
+                     color=self.color or None, fmt=self.format or None, points=self.points, name=self.name)
+</code>

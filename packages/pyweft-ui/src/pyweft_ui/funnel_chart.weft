@@ -1,0 +1,41 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" legend="none" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.FunnelChart :data="{'Visited': 12000, 'Signed up': 3100, 'Trial': 900, 'Paid': 240}" title="Sign-ups" />
+# <ui.FunnelChart :data="stages" label="stage" value="people" shape="funnel" />
+# How many make it through each stage. Each row is a stage, top to bottom,
+# written with its value and its share of the first; the tooltip adds the
+# share of the previous stage and how many were lost. shape: bars
+# (default, joined by shaded necks) or funnel (one tapering shape). data,
+# label, value and format work as on PieChart; one colour (color, default
+# the first chart colour) unless colors= gives a palette or a row has
+# "color". height: pixels, default 44 per stage. @select gets {index,
+# label, value, percent, conversion, row}.
+from pyweft_ui.charting import funnel, slices_input
+
+data = None
+label: str = ""
+value: str = ""
+title: str = ""
+subtitle: str = ""
+height: int = 0           # 0: 44 pixels per stage
+shape: str = "bars"       # bars, funnel
+color: str = ""
+colors = ""
+format = ""
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    stages = slices_input(self.data, self.label, self.value, self.colors)
+    own = bool(self.colors) or any(isinstance(s.row, dict) and s.row.get("color") for s in stages)
+    return funnel(stages, width=width, height=self.height, fmt=self.format or None, shape=self.shape,
+                  color=None if own else self.color, label_head=self.label, empty=self.empty)
+</code>

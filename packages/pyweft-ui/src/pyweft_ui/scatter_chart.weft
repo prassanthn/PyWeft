@@ -1,0 +1,61 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" :legend="legend" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.ScatterChart :data="people" x="height" y="weight" group="sex" trend="true" />
+# <ui.ScatterChart :data="countries" x="gdp" y="life" size="population" label="name" />
+# Points placed by two numbers. x and y name the fields (default: the
+# first number fields); y may name several, one series each, or group=
+# splits the rows into series by a field's value. size= makes it a bubble
+# chart: each bubble's area shows that field. label= names each point in
+# its tooltip. trend="true" draws a least-squares line per series with its
+# R². x_min/x_max/y_min/y_max fix the axes; format and x_format shape the
+# values in tooltips, tick_format and x_tick_format the axes. @select gets
+# {index, series, x, y, size, label, row} for a clicked point.
+from pyweft_ui.charting import scatter, xy_input
+from pyweft_ui.charting.data import readable as readable_name
+
+data = None
+x: str = ""
+y = ""
+group: str = ""
+size: str = ""
+label: str = ""
+title: str = ""
+subtitle: str = ""
+height: int = 320
+trend: bool = False
+radius: float = 4
+x_label: str = ""
+y_label: str = ""
+size_label: str = ""
+x_min: float | None = None
+x_max: float | None = None
+y_min: float | None = None
+y_max: float | None = None
+grid: bool = True
+format = ""
+x_format = ""
+tick_format = ""
+x_tick_format = ""
+legend: str = "auto"
+colors = ""
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    groups, x_key, y_keys = xy_input(self.data, self.x, self.y, self.group, self.size, self.label, self.colors)
+    return scatter(groups, width=width, height=self.height, hidden=hidden, x_name=readable_name(x_key),
+                   y_name=readable_name(y_keys[0] if y_keys else "y"),
+                   size_name=self.size_label or readable_name(self.size), x_label=self.x_label,
+                   y_label=self.y_label, x_min=self.x_min, x_max=self.x_max, y_min=self.y_min, y_max=self.y_max,
+                   grid=self.grid, fmt=self.format or None, x_fmt=self.x_format or None,
+                   tick_fmt=self.tick_format or None, x_tick_fmt=self.x_tick_format or None, trend=self.trend,
+                   radius=self.radius, kind="Bubble" if self.size else "Scatter", empty=self.empty)
+</code>

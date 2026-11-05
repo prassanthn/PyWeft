@@ -151,9 +151,14 @@ function), `align` and `sortable`. Left out, they come from the first row.
 | `PieChart` | `data`, `label`, `value`, `donut`, `hole`, `half`, `labels` (percent, value, label, none), `center`, `center_label` | Pie, doughnut or half circle; `center="total"` writes the sum in the hole. |
 | `PolarAreaChart` | `data`, `label`, `value` | Equal angles, each slice as long as its value. |
 | `RadarChart` | `data`, `x`, `y`, `series`, `points` | One shape per series over three or more spokes. |
+| `ScatterChart` | `data`, `x`, `y`, `group`, `size`, `label`, `trend`, `radius`, `x_min`, `x_max`, `y_min`, `y_max`, `x_format`, `x_tick_format`, `size_label` | Points by two numbers; `size` makes bubbles (area shows the value); `trend="true"` adds least-squares lines with R². |
+| `Sparkline` | `data` (numbers or rows), `x`, `y`, `kind` (line, area, bar), `points` (last, minmax, all, none), `color`, `height`, `name` | A small chart with no axes, for stat cards and table cells. |
+| `Gauge` | `value`, `min`, `max`, `label`, `format`, `bands`, `color`, `half`, `needle`, `show_range` | A 270° dial or half circle, coloured by `bands` (`"60:success, 85:warning, 100:danger"`); a meter for screen readers. |
+| `FunnelChart` | `data`, `label`, `value`, `shape` (bars, funnel), `color`, `colors`, `height` | Stages with their share of the first; tooltips add the step's conversion and how many were lost. |
+| `WaterfallChart` | `data`, `label`, `value`, `total`, `totals`, `labels`, `up_color`, `down_color`, `total_color` | Each bar starts where the last ended; totals stand on zero. |
 
-All five take `title`, `subtitle`, `height`, `legend` (auto, top, bottom,
-right, none), `format`, `tick_format`, `x_label`, `y_label`, `colors`,
+The charts (all but `Gauge` and `Sparkline`) take `title`, `subtitle`,
+`height`, `legend` (auto, top, bottom, right, none), `format`, `tick_format`, `x_label`, `y_label`, `colors`,
 `aria_label` and `empty`, and emit `select` with what was clicked. `data`
 is rows (dicts or objects), a dict of columns, a pandas or polars
 DataFrame, a `{label: value}` dict or Chart.js's `{"labels", "datasets"}`.

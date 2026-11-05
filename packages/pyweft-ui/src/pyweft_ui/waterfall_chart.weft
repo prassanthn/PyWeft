@@ -1,0 +1,51 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" legend="none" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.WaterfallChart :data="bridge" label="item" value="amount" totals="Opening, Closing" />
+# How a total is made up: each bar starts where the last one ended, up in
+# the success colour, down in the danger colour, joined by dashed lines.
+# A total stands on zero: a row whose "total" field (total= names another)
+# is true, or whose label is in totals ("Opening, Closing" or a list). A
+# total with no value shows the running total; with one, it restarts from
+# it. labels="false" hides the values on the bars. up_color, down_color,
+# total_color change the colours. data, label, value, format, tick_format,
+# x_label, y_label as on BarChart. @select gets {index, label, value,
+# total (running), is_total, row}.
+from pyweft_ui.charting import slices_input, waterfall
+
+data = None
+label: str = ""
+value: str = ""
+total: str = "total"
+totals = ""
+title: str = ""
+subtitle: str = ""
+height: int = 300
+labels: bool = True
+format = ""
+tick_format = ""
+x_label: str = ""
+y_label: str = ""
+up_color: str = ""
+down_color: str = ""
+total_color: str = ""
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    names = self.totals
+    if isinstance(names, str):
+        names = [t.strip() for t in names.split(",") if t.strip()]
+    return waterfall(slices_input(self.data, self.label, self.value), width=width, height=self.height,
+                     totals=names, total_field=self.total, fmt=self.format or None,
+                     tick_fmt=self.tick_format or None, labels=self.labels, x_label=self.x_label,
+                     y_label=self.y_label, up=self.up_color or None, down=self.down_color or None,
+                     total_color=self.total_color or None, empty=self.empty)
+</code>

@@ -5,6 +5,25 @@
       <ui.ButtonToggle label="Lines" :options="CURVES" @bind="curve" />
       <ui.Button icon="star" @click="shuffle">New numbers</ui.Button>
     </ui.Row>
+    <ui.Grid min_width="12rem" gap="md">
+      <For each="stat in stats" key="stat['name']">
+        <div class="box stat">
+          <span class="stat-name">{{ stat['name'] }}</span>
+          <span class="stat-value">{{ stat['value'] }}</span>
+          <span :class="'delta up' if stat['up'] else 'delta down'">{{ stat['delta'] }}</span>
+          <ui.Sparkline :data="stat['trend']" :kind="stat['kind']" :name="stat['name']" height="36"
+                        :color="'' if stat['up'] else 'danger'" points="last" />
+        </div>
+      </For>
+    </ui.Grid>
+    <ui.Grid min_width="14rem" gap="md">
+      <div class="box gauge-box"><ui.Gauge :value="cpu" label="CPU" format="{:.0f}%"
+                                            bands="60:success, 85:warning, 100:danger" /></div>
+      <div class="box gauge-box"><ui.Gauge :value="memory" max="32" label="Memory" format="{:.1f} GB"
+                                            half="true" /></div>
+      <div class="box gauge-box"><ui.Gauge :value="score" max="10" label="Satisfaction" format="{:.1f}"
+                                            needle="true" bands="4:danger, 7:warning, 10:success" /></div>
+    </ui.Grid>
     <ui.Grid min_width="20rem" gap="lg">
       <div class="box">
         <ui.BarChart :data="sales" x="month" y="online, store" title="Sales" subtitle="Click a bar"
@@ -45,6 +64,25 @@
         <ui.PolarAreaChart :data="TICKETS" title="Tickets by day" legend="bottom" />
       </div>
       <div class="box">
+        <ui.ScatterChart :data="PEOPLE" x="height" y="weight" group="group" label="name" trend="true"
+                         title="Height and weight" x_label="Height (cm)" y_label="Weight (kg)" />
+      </div>
+      <div class="box">
+        <ui.ScatterChart :data="COUNTRIES" x="income" y="life" size="people" label="name" title="Countries"
+                         subtitle="Bubble size: population (millions)" x_label="Income per person ($k)"
+                         y_label="Life expectancy" size_label="Population (m)" legend="none" />
+      </div>
+      <div class="box">
+        <ui.FunnelChart :data="FUNNEL" title="Sign-up funnel" />
+      </div>
+      <div class="box">
+        <ui.FunnelChart :data="FUNNEL" title="As a funnel" shape="funnel" colors="#0d9488, #0284c7, #9333ea, #db2777, #dc2626" />
+      </div>
+      <div class="box">
+        <ui.WaterfallChart :data="BRIDGE" label="item" value="amount" totals="Revenue, Profit" title="Revenue to profit"
+                           format="${:,.0f}" tick_format="${:,.0f}" />
+      </div>
+      <div class="box">
         <ui.RadarChart :data="SKILLS" x="skill" y="ada, grace" :series="SKILL_NAMES" title="Skills" />
       </div>
     </ui.Grid>
@@ -81,12 +119,36 @@ SEATS = {"Green": 42, "Blue": 35, "Red": 23, "Other": 10}
 TICKETS = {"Mon": 18, "Tue": 25, "Wed": 12, "Thu": 9, "Fri": 21}
 SKILLS = [{"skill": s, "ada": a, "grace": g} for s, a, g in zip(
     ["Python", "SQL", "Design", "Testing", "Ops", "Writing"], [9, 7, 5, 8, 4, 7], [6, 8, 7, 6, 9, 5])]
+PEOPLE = [{"name": f"Person {i + 1}", "height": h, "weight": w, "group": g} for i, (h, w, g) in enumerate([
+    (152, 49, "Under 30"), (158, 55, "Under 30"), (163, 54, "Under 30"), (167, 63, "Under 30"),
+    (171, 64, "Under 30"), (176, 70, "Under 30"), (181, 73, "Under 30"), (186, 79, "Under 30"),
+    (155, 58, "30 and over"), (160, 63, "30 and over"), (165, 66, "30 and over"), (170, 74, "30 and over"),
+    (174, 77, "30 and over"), (178, 79, "30 and over"), (183, 88, "30 and over"), (189, 92, "30 and over")])]
+COUNTRIES = [{"name": n, "income": i, "life": l, "people": p} for n, i, l, p in [
+    ("Aland", 52, 82.1, 38), ("Borovia", 31, 78.4, 120), ("Cerulea", 8, 67.2, 210), ("Dunmore", 14, 72.5, 64),
+    ("Estria", 44, 81.3, 9), ("Faro", 3, 61.8, 95), ("Galen", 23, 76.9, 330), ("Hollin", 61, 83.0, 6)]]
+FUNNEL = {"Visited the site": 12400, "Started sign-up": 4100, "Confirmed email": 2650, "Started a trial": 980,
+          "Paid": 310}
+BRIDGE = [{"item": "Revenue", "amount": 48000}, {"item": "Cost of goods", "amount": -19500},
+          {"item": "Salaries", "amount": -14200}, {"item": "Marketing", "amount": -4100},
+          {"item": "Other income", "amount": 2300}, {"item": "Tax", "amount": -3100}, {"item": "Profit"}]
 SKILL_NAMES = [{"key": "ada", "label": "Ada"}, {"key": "grace", "label": "Grace"}]
 
 sales: list = [{"month": m, "online": o, "store": s} for m, o, s in zip(
     MONTHS, [4200, 5100, 4800, 6100, 7000, 6600], [3100, 2900, 3500, 3300, 3600, 4100])]
 visits: list = [{"day": d, "desktop": a, "mobile": b, "tablet": c} for d, a, b, c in zip(
     DAYS, [820, 932, 901, 934, 1290, 610, 520], [620, 732, 801, 1034, 990, 1120, 1210], [120, 132, 101, 134, 190, 230, 210])]
+cpu: float = 68
+memory: float = 21.5
+score: float = 7.8
+stats: list = [
+    {"name": "Revenue", "value": "$48.2k", "delta": "+12% this month", "up": True, "kind": "area",
+     "trend": [31, 33, 32, 36, 38, 37, 41, 44, 43, 48]},
+    {"name": "Orders", "value": "1,284", "delta": "+4% this month", "up": True, "kind": "bar",
+     "trend": [102, 118, 96, 131, 125, 140, 133, 129, 147, 152]},
+    {"name": "Refunds", "value": "37", "delta": "+9 this month", "up": False, "kind": "line",
+     "trend": [21, 25, 24, 22, 28, 30, 27, 33, 35, 37]},
+]
 bar_mode: str = ""
 curve: str = "linear"
 picked = None
@@ -103,6 +165,9 @@ def picked_text(self):
 def shuffle(self):
     self.sales = [{"month": m, "online": random.randint(3000, 8000), "store": random.randint(2000, 5000)}
                   for m in MONTHS]
+    self.cpu = random.uniform(20, 98)
+    self.memory = random.uniform(4, 31)
+    self.score = random.uniform(2, 10)
     self.visits = [{"day": d, "desktop": random.randint(400, 1400), "mobile": random.randint(400, 1400),
                     "tablet": random.randint(80, 300)} for d in DAYS]
 </code>
@@ -114,5 +179,12 @@ def shuffle(self):
   border-radius: var(--ui-radius, 8px);
   min-width: 0;
 }
+.stat { display: flex; flex-direction: column; gap: 0.125rem; }
+.stat-name { color: var(--ui-muted, #59636e); font-size: 0.8125rem; }
+.stat-value { font-size: 1.5rem; font-weight: 600; line-height: 1.2; }
+.delta { font-size: 0.8125rem; margin-bottom: 0.25rem; }
+.delta.up { color: var(--ui-success, #1a7f37); }
+.delta.down { color: var(--ui-danger, #d1242f); }
+.gauge-box { display: flex; justify-content: center; align-items: center; }
 .note { margin: 0.5rem 0 0; color: var(--ui-muted, #59636e); font-size: 0.875rem; }
 </style>

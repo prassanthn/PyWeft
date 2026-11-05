@@ -8,6 +8,12 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- **Dashboard charts:** `ScatterChart` (groups, bubbles sized by area,
+  least-squares trend lines with R²), `Sparkline` (line, area or bars, for
+  stat cards and table cells), `Gauge` (270° or half dial, coloured bands,
+  a needle, read as a meter), `FunnelChart` (share of the first stage,
+  conversion between stages) and `WaterfallChart` (running totals,
+  subtotals).
 - **Charts:** `BarChart` (grouped, stacked, 100%, horizontal, value
   labels), `LineChart` (smooth, stepped, dashed, areas, stacked areas,
   gaps), `PieChart` (doughnut, half circle, a total in the middle),

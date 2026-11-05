@@ -456,7 +456,7 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['table'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Charts" id="charts" ref="charts" subtitle="Bars, lines, areas, pies, polar and radar: hover, use the arrow keys, click the legend">
+        <ui.Card title="Charts" id="charts" ref="charts" subtitle="Dashboards, bars, lines, pies, scatter, funnels and more: hover, use the arrow keys, click the legend">
           <Charts />
           <pre class="code">{{ CODE['charts'] }}</pre>
         </ui.Card>
@@ -570,8 +570,9 @@ SECTION_CONTROLS = {
     "Popover and tooltip": ["Popover", "Tooltip"],
     "Tabs": ["Tabs"],
     "Table": ["Table"],
-    "Charts": ["BarChart", "LineChart", "PieChart", "PolarAreaChart", "RadarChart", "chart", "graph",
-               "doughnut", "donut", "area", "combo"],
+    "Charts": ["BarChart", "LineChart", "PieChart", "PolarAreaChart", "RadarChart", "ScatterChart",
+               "Sparkline", "Gauge", "FunnelChart", "WaterfallChart", "chart", "graph", "doughnut", "donut",
+               "area", "combo", "bubble", "dashboard", "kpi"],
     "Breadcrumbs": ["Breadcrumbs", "trail", "navigation"],
     "Tree": ["Tree"],
     "Carousel": ["Carousel", "slider", "slideshow"],
@@ -1048,6 +1049,13 @@ places = [
 <ui.PieChart :data="spend" label="category" value="amount" donut="true" center="total" />
 <ui.PolarAreaChart :data="tickets" />
 <ui.RadarChart :data="skills" x="skill" y="ada, grace" />
+
+<ui.ScatterChart :data="people" x="height" y="weight" group="group" trend="true" />
+<ui.ScatterChart :data="countries" x="income" y="life" size="people" label="name" />
+<ui.Sparkline :data="[31, 33, 32, 36, 38, 41]" kind="area" />
+<ui.Gauge :value="cpu" label="CPU" format="{:.0f}%" bands="60:success, 85:warning, 100:danger" />
+<ui.FunnelChart :data="{'Visited': 12400, 'Signed up': 4100, 'Paid': 310}" />
+<ui.WaterfallChart :data="bridge" label="item" value="amount" totals="Revenue, Profit" />
 
 sales = [{"month": "Jan", "online": 4200, "store": 3100}, ...]   # or a DataFrame""",
     "tree": """<ui.Tree :nodes="files" @bind="selected" :filter="query"

@@ -7,14 +7,18 @@ as SVG. So every chart shares one renderer, and layout is tested without a
 browser.
 """
 
+from .business import funnel, gauge, waterfall
 from .cartesian import cartesian
 from .data import Series, Slice, cartesian_input, color_of, field, number, rows_of, slices_input
 from .radial import pie, polar, radar
 from .scales import LinearScale, fmt_tick, fmt_value, nice, ticks
 from .scene import LegendItem, Mark, Scene, Tip
+from .stats import Fit, linear_fit
+from .xy import Point, XYSeries, scatter, sparkline, xy_input
 
 __all__ = [
-    "cartesian", "pie", "polar", "radar",
+    "cartesian", "pie", "polar", "radar", "scatter", "sparkline", "gauge", "funnel", "waterfall",
+    "xy_input", "Point", "XYSeries", "linear_fit", "Fit",
     "Series", "Slice", "cartesian_input", "slices_input", "rows_of", "field", "number", "color_of",
     "LinearScale", "ticks", "nice", "fmt_value", "fmt_tick",
     "Scene", "Mark", "Tip", "LegendItem",

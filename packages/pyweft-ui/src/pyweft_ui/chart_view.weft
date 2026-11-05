@@ -36,7 +36,8 @@
                       @mouseenter="enter(m)" @click="pick(m)" />
               </ElseIf>
               <ElseIf cond="m.kind == 'circle'">
-                <circle :cx="m.cx" :cy="m.cy" :r="m.r" :class="m.cls" :style="m.style" />
+                <circle :cx="m.cx" :cy="m.cy" :r="m.r" :class="m.cls" :style="m.style"
+                        @mouseenter="enter(m)" @click="pick(m)" />
               </ElseIf>
               <ElseIf cond="m.kind == 'line'">
                 <line :x1="m.x1" :y1="m.y1" :x2="m.x2" :y2="m.y2" :class="m.cls" :style="m.style" />
@@ -62,7 +63,8 @@
         </div>
       </div>
       <div class="sr-only" aria-live="polite">{{ spoken(scene) }}</div>
-      <table class="sr-only">
+      <div class="sr-only">
+      <table>
         <caption>{{ title or scene.summary }}</caption>
         <thead><tr><For each="h in scene.head"><th scope="col">{{ h }}</th></For></tr></thead>
         <tbody>
@@ -71,6 +73,7 @@
           </For>
         </tbody>
       </table>
+      </div>
     </For>
   </figure>
 </template>
@@ -239,6 +242,17 @@ def toggle(self, key):
 .hover-spoke { stroke: var(--ui-muted, #59636e); stroke-width: 1.5; }
 .hover-slice { filter: drop-shadow(0 2px 4px rgb(0 0 0 / 0.25)); }
 .empty { fill: var(--ui-muted, #59636e); font-size: 13px; }
+.dot { fill-opacity: 0.75; stroke-width: 1.5; }
+.dot.bubble { fill-opacity: 0.45; }
+.hover-ring { fill: none; stroke-width: 2; }
+.trend { stroke-width: 1.5; stroke-dasharray: 6 4; }
+.trend-label { font-size: 10px; font-weight: 600; }
+.line.spark { stroke-width: 1.5; }
+.spark-dot { stroke: var(--ui-surface, #ffffff); stroke-width: 1; }
+.neck { fill-opacity: 0.15; }
+.stage-value { fill: var(--ui-text, #1f2328); font-size: 12px; font-weight: 600; }
+.connector { stroke: var(--ui-muted, #59636e); stroke-width: 1; stroke-dasharray: 3 3; }
+.swatch.dot { border-radius: 50%; }
 .tip {
   position: absolute;
   z-index: 5;

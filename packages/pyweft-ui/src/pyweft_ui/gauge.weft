@@ -1,0 +1,92 @@
+<template>
+  <div class="gauge" role="meter" :aria-label="label or aria_label or 'Gauge'" :aria-valuemin="num(min)"
+       :aria-valuemax="num(max)" :aria-valuenow="None if value is None else num(value)" :aria-valuetext="text">
+    <For each="g in [layout()]">
+      <svg :viewBox="g['view']" aria-hidden="true">
+        <For each="b in g['bands']"><path class="band" :d="b[0]" :style="'stroke: ' + b[1]" /></For>
+        <path class="track" :d="g['track']" :style="'stroke-width: ' + str(g['width'])" />
+        <If cond="g['frac'] > 0">
+          <path class="fill" :d="g['track']" pathLength="100" :stroke-dasharray="g['dash']"
+                :style="'stroke: ' + g['color'] + '; stroke-width: ' + str(g['width'])" />
+        </If>
+        <If cond="needle">
+          <g class="needle" :style="g['needle']">
+            <line :x1="g['cx']" :y1="g['cy']" :x2="g['needle_tip']" :y2="g['cy']" />
+            <circle :cx="g['cx']" :cy="g['cy']" r="6" />
+          </g>
+        </If>
+        <If cond="not needle or half">
+          <text class="value" x="100" :y="g['value_y']" text-anchor="middle">{{ g['text'] }}</text>
+        </If>
+        <If cond="label">
+          <text class="label" x="100" :y="g['label_y']" text-anchor="middle">{{ label }}</text>
+        </If>
+        <If cond="show_range">
+          <text class="end" :x="g['min_xy'][0]" :y="g['min_xy'][1]" text-anchor="middle">{{ g['min_text'] }}</text>
+          <text class="end" :x="g['max_xy'][0]" :y="g['max_xy'][1]" text-anchor="middle">{{ g['max_text'] }}</text>
+        </If>
+      </svg>
+      <If cond="needle and not half"><div class="below">{{ g['text'] }}</div></If>
+    </For>
+  </div>
+</template>
+
+<code>
+# <ui.Gauge :value="cpu" label="CPU" format="{:.0f}%" bands="60:success, 85:warning, 100:danger" />
+# <ui.Gauge :value="score" max="10" half="true" needle="true" label="Score" />
+# One value against its range, on a 270° dial (half="true": a half
+# circle). min and max set the range (0 to 100). The arc is the colour of
+# the band the value is in: bands are "upto:colour" pairs in a string,
+# (upto, colour) tuples or dicts with "to" and "color" (and "from"), drawn
+# as a thin ring outside; colours are CSS or primary/success/warning/
+# danger/info. Without bands it uses color (default: the first chart
+# colour). needle="true" adds a pointer. format shapes the number. It
+# scales to its container's width (max-width in CSS: 16rem by default).
+# Screen readers hear it as a meter with its value.
+from pyweft_ui.charting import fmt_value, gauge
+
+value: float | None = None
+min: float = 0
+max: float = 100
+label: str = ""
+aria_label: str = ""
+format = ""
+bands = ""
+color: str = ""
+half: bool = False
+needle: bool = False
+show_range: bool = True
+
+def num(self, v):
+    v = float(v)
+    return str(int(v)) if v.is_integer() else str(v)
+
+@property
+def text(self):
+    return "" if self.value is None else fmt_value(self.value, self.format or None)
+
+def layout(self):
+    return gauge(self.value, self.min, self.max, half=self.half, bands=self.bands, color=self.color or None,
+                 fmt=self.format or None)
+</code>
+
+<style>
+.gauge {
+  width: 100%;
+  max-width: 16rem;
+  font-family: var(--ui-font, system-ui, sans-serif);
+  color: var(--ui-text, #1f2328);
+}
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+.track { fill: none; stroke: var(--ui-subtle, #f6f8fa); stroke-linecap: round; }
+.fill { fill: none; stroke-linecap: round; transition: stroke-dasharray 0.4s ease, stroke 0.4s ease; }
+.band { fill: none; stroke-width: 4; opacity: 0.85; }
+.needle { transition: transform 0.4s ease; }
+.needle line { stroke: var(--ui-text, #1f2328); stroke-width: 3; stroke-linecap: round; }
+.needle circle { fill: var(--ui-text, #1f2328); }
+.value { fill: var(--ui-text, #1f2328); font-size: 30px; font-weight: 600; }
+.label { fill: var(--ui-muted, #59636e); font-size: 14px; }
+.end { fill: var(--ui-muted, #59636e); font-size: 12px; }
+.below { text-align: center; font-size: 1.5rem; font-weight: 600; line-height: 1.2; margin-top: -0.5rem; }
+@media (prefers-reduced-motion: reduce) { .fill, .needle { transition: none; } }
+</style>

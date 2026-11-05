@@ -1646,6 +1646,46 @@ is your row), `{"index", "label", "value", "percent", "row"}` for pies.
 Pressing Enter picks the category under the keyboard, with `series` and
 `value` set to `None`.
 
+#### Dashboards: Sparkline, Gauge, ScatterChart, FunnelChart, WaterfallChart
+
+```xml
+<ui.Card>
+  <span class="name">Revenue</span> <b>$48.2k</b>
+  <ui.Sparkline :data="[31, 33, 32, 36, 38, 41]" kind="area" name="Revenue" />
+</ui.Card>
+<ui.Gauge :value="cpu" label="CPU" format="{:.0f}%" bands="60:success, 85:warning, 100:danger" />
+<ui.ScatterChart :data="people" x="height" y="weight" group="group" trend="true" />
+<ui.ScatterChart :data="countries" x="income" y="life" size="population" label="name" />
+<ui.FunnelChart :data="{'Visited': 12400, 'Signed up': 4100, 'Paid': 310}" />
+<ui.WaterfallChart :data="bridge" label="item" value="amount" totals="Revenue, Profit" />
+```
+
+- **`Sparkline`** is a word-sized chart for a stat card or a table cell: a
+  list of numbers (or rows with `y=`), `kind` line, area or bar (negative
+  bars in red), a dot on the `last` value (or `minmax`, `all`, `none`). It
+  takes the width it's given; screen readers hear "Revenue over 6 values:
+  from 31 to 41, low 31, high 41" (`name` starts the sentence).
+- **`Gauge`** shows one value against `min` and `max` on a 270° dial, or a
+  half circle with `half="true"`. `bands` colour ranges
+  (`"60:success, 85:warning, 100:danger"`, or `(upto, colour)` pairs); the
+  arc takes the colour of the band the value is in. `needle="true"` adds a
+  pointer. It animates when the value changes and is read as a meter.
+- **`ScatterChart`** places points by two numbers: `x` and `y` fields
+  (several `y`s are several series), or `group=` to split rows into series
+  by a field. `size=` makes a **bubble chart** (a bubble's area shows the
+  value), `label=` names points in tooltips and `trend="true"` draws a
+  least-squares line with its R². Both axes take `_min`/`_max`, labels and
+  formats (`x_format`, `x_tick_format`).
+- **`FunnelChart`** shows how many make it through each stage, with each
+  stage's share of the first; the tooltip adds the share of the previous
+  stage and how many were lost. `shape="funnel"` draws one tapering shape.
+- **`WaterfallChart`** shows how a total is made up: each bar starts where
+  the last ended, increases in green, decreases in red. Rows whose `total`
+  field is true, or whose label is in `totals`, stand on zero; a total with
+  no value shows the running total.
+
+All of them report clicks with `@select` like the other charts.
+
 ## 10. Calendars of events
 
 `EventCalendar` shows events in a month, a week, or a list by day, the way
@@ -2005,6 +2045,7 @@ readers and mobile devices work the way people expect:
   that is loading says it is busy.
 - **Tables** use real table headings, and tell screen readers which column
   is sorted and which way.
+- **Gauges** are read as meters, with their value and range.
 - **Charts** are one Tab stop, read as a picture with a summary ("Bar
   chart of Online, Store over 6 categories"), and carry their data as a
   table for screen readers. The arrow keys move from category to
