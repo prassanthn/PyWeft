@@ -8,6 +8,8 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+## 0.5.0
+
 - **Data-science charts:** `Histogram` (round bins, overlapping groups, a
   KDE curve, means), `BoxPlot` (quartiles, outliers, violins, all points),
   `Heatmap`, `CorrelationMatrix` (Pearson or Spearman), `CandlestickChart`

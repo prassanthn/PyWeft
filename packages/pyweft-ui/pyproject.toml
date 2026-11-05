@@ -13,7 +13,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Prassanth Nicholas" }]
 # Below 1.0 a minor release may change things, so pin to the one this was
 # tested with; raise it with each toolkit release.
-dependencies = ["pyweft>=0.5,<0.6"]
+dependencies = ["pyweft>=0.6,<0.7"]
 keywords = ["ui", "components", "controls", "pyweft", "pyodide"]
 classifiers = [
     "Development Status :: 3 - Alpha",

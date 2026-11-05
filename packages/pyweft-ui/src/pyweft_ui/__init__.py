@@ -19,7 +19,7 @@ from . import rules
 from .forms import BoundForm, Form
 from .toasts import Toast, clear_toasts, toast
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 ui = ComponentLibrary(Path(__file__).parent, prefix="ui")
 

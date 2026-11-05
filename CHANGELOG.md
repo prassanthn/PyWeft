@@ -8,6 +8,8 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+## 0.6.0
+
 - **`@resize`** on any element: `event.width` and `event.height` when it is
   first laid out and whenever its size changes, so a component can lay
   itself out for the space it has.
