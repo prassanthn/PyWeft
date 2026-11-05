@@ -456,6 +456,26 @@ def _convert_fill(el: ET.Element) -> TFill:
     return TFill(name=_slot_name(el, required=True), children=_convert_children(el), line=_line(el))
 
 
+# transition= / in= / out= / animate= become data-pw-* attributes that the
+# runtime reads when it inserts, removes or moves the element: they travel
+# through renders and diffs like any attribute, so no patch op changes.
+_MOTION = {
+    "transition": ("data-pw-in", "data-pw-out"),
+    "in": ("data-pw-in",),
+    "out": ("data-pw-out",),
+    "animate": ("data-pw-animate",),
+}
+
+
+def _motion(tag: str, table: dict) -> None:
+    for name, targets in _MOTION.items():
+        # SVG filter primitives (<feBlend in="SourceGraphic">) own "in".
+        if name in table and not (name == "in" and tag.startswith("fe")):
+            value = table.pop(name)
+            for target in targets:
+                table[target] = value
+
+
 def _convert_element(el: ET.Element) -> TElement:
     attrs: dict[str, list[tuple[str, str]]] = {}
     events: dict[str, str] = {}
@@ -485,6 +505,9 @@ def _convert_element(el: ET.Element) -> TElement:
                 raise TemplateError(f"<{el.tag}> {exc}") from None
         else:
             attrs[name] = parse_interpolation(value)
+
+    _motion(el.tag, attrs)
+    _motion(el.tag, expr_attrs)
 
     if el.tag == "Dynamic" and "is" not in expr_attrs:
         raise TemplateError(

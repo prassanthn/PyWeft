@@ -35,12 +35,12 @@
 
         <ul class="divide-y divide-slate-100 p-3 dark:divide-white/5">
           <For each="item in shown" key="item['id']">
-            <TodoItem :item="item" @toggle="toggle(event)" @remove="remove(event)" />
+            <TodoItem :item="item" @toggle="toggle(event)" @remove="remove(event)" transition="slide" animate="flip" />
           </For>
         </ul>
 
         <If cond="not shown">
-          <div class="flex flex-col items-center px-6 pt-4 pb-12 text-center">
+          <div class="flex flex-col items-center px-6 pt-4 pb-12 text-center" in="fade duration=300">
             <div class="mb-4 flex size-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500 dark:bg-indigo-400/10 dark:text-indigo-300">
               <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M9 11l3 3L22 4" />
@@ -53,7 +53,7 @@
         </If>
 
         <If cond="done_count">
-          <footer class="flex items-center justify-between border-t border-slate-100 px-6 py-3 text-sm text-slate-500 dark:border-white/5 dark:text-slate-400">
+          <footer transition="slide" class="flex items-center justify-between border-t border-slate-100 px-6 py-3 text-sm text-slate-500 dark:border-white/5 dark:text-slate-400">
             <span>{{ done_count }} done</span>
             <button type="button" @click="clear_done" class="font-medium text-slate-500 transition hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400">
               Clear done

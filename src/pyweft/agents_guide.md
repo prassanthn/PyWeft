@@ -126,6 +126,7 @@ def remove(self, item):
 | `@bind.number` / `.lazy` / `.trim` | parse as a number / update on change, not each key / strip spaces |
 | `@keydown.enter.ctrl.prevent="send"` | modifiers: key names (`enter`, `esc`, `up`, `page-down`, `a`), `ctrl alt shift meta exact`, `prevent stop self once capture passive`; `click.right` |
 | `@resize="fit"` | not a DOM event: the element's `event.width`/`event.height` when laid out and on every size change (never in tests or pre-rendering). Mouse events carry `event.localX`/`localY`, the position inside the handler's element |
+| `transition="fade"`, `in=`, `out=`, `animate="flip"` | animate an element appearing/leaving (`fade`, `fly y=-20`, `slide`, `scale`, `blur`; `duration=300`) and keyed-list moves; also on component tags |
 | `ref="name"` | name an element for `self.focus("name")`, `self.scroll_to("name")` |
 | `key="..."` | identity for a `<For>` row (or a component) |
 

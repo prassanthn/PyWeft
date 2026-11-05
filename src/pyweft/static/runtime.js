@@ -6,7 +6,9 @@
  * The container element acts as the virtual root: patch paths index into
  * childNodes exactly as they index into the dict tree, which holds because the
  * runtime alone builds and mutates the container's subtree (the parser already
- * dropped formatting whitespace, so there are no stray text nodes).
+ * dropped formatting whitespace, so there are no stray text nodes). An element
+ * playing its out-transition is still on screen but no longer counts: every
+ * index goes through kids(), which skips it.
  */
 "use strict";
 
@@ -110,9 +112,133 @@ const PyWeftRuntime = (() => {
   function nodeAt(path) {
     let node = container;
     for (const index of path) {
-      node = node.childNodes[index];
+      node = kids(node)[index];
     }
     return node;
+  }
+
+  /* ----------------------------------------------------------- transitions
+   * data-pw-in / data-pw-out (transition=, in=, out= in a template) hold
+   * "fade", "fly y=-20 duration=300" and so on. An element that leaves stays
+   * on screen until its out-animation ends, but leaves the tree the patch
+   * paths index at once: kids() skips it, so the structure is still exactly
+   * dommodel.py's. data-pw-animate="flip" slides elements to where a
+   * render moved them. Animations play for elements an op inserts, removes
+   * or replaces itself, not for their descendants, and not on first mount. */
+  const kids = (parent) => Array.prototype.filter.call(parent.childNodes, (n) => !n._pyweftLeaving);
+
+  const reducedMotion = () =>
+    typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function parseMotion(spec) {
+    const [name, ...rest] = String(spec).trim().split(/\s+/);
+    const opts = {};
+    for (const part of rest) {
+      const [key, value] = part.split("=");
+      if (value === undefined) continue;
+      opts[key] = value !== "" && !isNaN(value) ? Number(value) : value;
+    }
+    return { name, opts };
+  }
+
+  const MOTIONS = {
+    fade: () => [{ opacity: 0 }, { opacity: 1 }],
+    fly: (o) => [
+      { opacity: o.opacity ?? 0, transform: `translate(${o.x ?? 0}px, ${o.y ?? 16}px)` },
+      { opacity: 1, transform: "none" },
+    ],
+    scale: (o) => [{ opacity: o.opacity ?? 0, transform: `scale(${o.start ?? 0.9})` }, { opacity: 1, transform: "none" }],
+    blur: (o) => [{ opacity: 0, filter: `blur(${o.amount ?? 6}px)` }, { opacity: 1, filter: "none" }],
+    slide: (o, el) => {
+      // Height (or width, axis=x) from nothing to what the element measures.
+      const cs = getComputedStyle(el);
+      const [size, a, b] = o.axis === "x" ? ["width", "Left", "Right"] : ["height", "Top", "Bottom"];
+      const zero = { [size]: "0px", overflow: "hidden", opacity: 0 };
+      const full = { [size]: cs[size], overflow: "hidden", opacity: 1 };
+      for (const box of ["padding", "margin"]) {
+        zero[box + a] = zero[box + b] = "0px";
+        full[box + a] = cs[box + a];
+        full[box + b] = cs[box + b];
+      }
+      return [zero, full];
+    },
+  };
+
+  // Plays a motion on el; resolves when done (at once when nothing plays).
+  function play(el, spec, entering) {
+    if (!spec || reducedMotion() || typeof el.animate !== "function") return Promise.resolve();
+    const { name, opts } = parseMotion(spec);
+    const duration = opts.duration ?? 200;
+    const delay = opts.delay ?? 0;
+    const easing = opts.easing ?? "cubic-bezier(0.2, 0, 0, 1)";
+    const make = MOTIONS[name];
+    if (make) {
+      const frames = make(opts, el);
+      const anim = el.animate(entering ? frames : frames.slice().reverse(), {
+        duration, delay, easing, fill: entering ? "backwards" : "forwards",
+      });
+      return anim.finished.catch(() => {});
+    }
+    // Any other name is the app's own CSS @keyframes (they aren't scoped):
+    // forwards to enter, backwards to leave.
+    return new Promise((done) => {
+      const finish = () => {
+        el.removeEventListener("animationend", finish);
+        done();
+      };
+      el.addEventListener("animationend", finish);
+      el.style.animation = `${name} ${duration}ms ${easing} ${delay}ms ${entering ? "both" : "reverse both"}`;
+      setTimeout(finish, duration + delay + 50); // no such keyframes: don't wait forever
+    });
+  }
+
+  function enter(node) {
+    if (node.nodeType === 1 && node.hasAttribute("data-pw-in")) play(node, node.getAttribute("data-pw-in"), true);
+  }
+
+  function leave(node) {
+    const spec = node.nodeType === 1 && node.getAttribute("data-pw-out");
+    if (!spec || reducedMotion()) {
+      node.remove();
+      return;
+    }
+    node._pyweftLeaving = true;
+    node.setAttribute("inert", ""); // nothing to click or focus on its way out
+    // In a list that slides (animate="flip"), take it out of the flow so
+    // the others move into place while it goes.
+    if (node.hasAttribute("data-pw-animate") && node instanceof HTMLElement) {
+      const { offsetLeft, offsetTop, offsetWidth, offsetHeight } = node;
+      Object.assign(node.style, {
+        position: "absolute", left: `${offsetLeft}px`, top: `${offsetTop}px`,
+        width: `${offsetWidth}px`, height: `${offsetHeight}px`, margin: "0",
+      });
+    }
+    play(node, spec, false).then(() => node.remove());
+  }
+
+  // FLIP: where every animate="flip" element was before a batch of ops...
+  function measureFlips() {
+    const before = new Map();
+    for (const el of container.querySelectorAll("[data-pw-animate]")) {
+      if (!el._pyweftLeaving) before.set(el, el.getBoundingClientRect());
+    }
+    return before;
+  }
+
+  // ... and, after it, a slide from there to where each one is now.
+  function playFlips(before) {
+    if (reducedMotion()) return;
+    for (const [el, was] of before) {
+      if (!el.isConnected || el._pyweftLeaving || typeof el.animate !== "function") continue;
+      const now = el.getBoundingClientRect();
+      const dx = was.left - now.left;
+      const dy = was.top - now.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
+      const { opts } = parseMotion(el.getAttribute("data-pw-animate") || "flip");
+      el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], {
+        duration: opts.duration ?? 250, easing: opts.easing ?? "cubic-bezier(0.2, 0, 0, 1)",
+      });
+    }
   }
 
   const SVG_NS = "http://www.w3.org/2000/svg";
@@ -353,30 +479,36 @@ const PyWeftRuntime = (() => {
   }
 
   function applyOps(ops) {
+    const flips = container.querySelector("[data-pw-animate]") ? measureFlips() : null;
     for (const op of ops) {
       switch (op.op) {
         case "insert": {
           const parent = nodeAt(op.path);
           const node = createNode(op.node, childNamespace(parent));
-          parent.insertBefore(node, parent.childNodes[op.index] || null);
+          parent.insertBefore(node, kids(parent)[op.index] || null);
+          enter(node);
           break;
         }
         case "remove": {
-          nodeAt(op.path).childNodes[op.index].remove();
+          leave(kids(nodeAt(op.path))[op.index]);
           break;
         }
         case "replace": {
           const parent = nodeAt(op.path);
-          parent.replaceChild(createNode(op.node, childNamespace(parent)), parent.childNodes[op.index]);
+          const old = kids(parent)[op.index];
+          const node = createNode(op.node, childNamespace(parent));
+          parent.insertBefore(node, old);
+          leave(old);
+          enter(node);
           break;
         }
         case "move": {
           // Pop then insert, exactly like dommodel.py: removal happens first,
           // so `to` indexes the list *after* the node has come out.
           const parent = nodeAt(op.path);
-          const node = parent.childNodes[op.from];
+          const node = kids(parent)[op.from];
           node.remove();
-          parent.insertBefore(node, parent.childNodes[op.to] || null);
+          parent.insertBefore(node, kids(parent)[op.to] || null);
           break;
         }
         case "set_text": {
@@ -399,6 +531,7 @@ const PyWeftRuntime = (() => {
           throw new Error(`unknown op ${op.op}`);
       }
     }
+    if (flips && flips.size) playFlips(flips);
   }
 
   // Elements the keyboard can reach. Focus guards (a dialog's Tab-wrapping

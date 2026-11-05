@@ -822,6 +822,45 @@ Two rules of thumb:
 
 ---
 
+### Transitions and animations
+
+Give an element `transition` and it animates when it appears and when it
+goes, instead of jumping in and out:
+
+```xml
+<If cond="saved">
+  <p class="notice" transition="fade">Saved</p>
+</If>
+
+<ul>
+  <For each="item in items" key="item['id']">
+    <li transition="slide" animate="flip">{{ item['text'] }}</li>
+  </For>
+</ul>
+```
+
+| Attribute | Plays |
+|---|---|
+| `transition="..."` | when the element appears and when it leaves |
+| `in="..."` / `out="..."` | only when it appears / only when it leaves (use both for different ones) |
+| `animate="flip"` | when a render moves it (a keyed list reordered, a row above removed): it slides to its new place |
+
+The built-in transitions are `fade`, `fly` (fades and moves in from
+`x`/`y` pixels away; default `y=16`), `slide` (grows from nothing to its
+height, `axis=x` for width), `scale` (from `start=0.9`) and `blur`. Options
+follow the name: `transition="fly y=-20 duration=300 delay=50"`, plus
+`easing=ease-out` or any CSS easing. Durations are in milliseconds (200 by
+default). Any other name plays the app's own CSS `@keyframes` of that
+name, forwards to appear and backwards to leave.
+
+A leaving element stays on screen until its animation ends, and can't be
+clicked or focused meanwhile; the next render already treats it as gone.
+Transitions play for the element that appears or leaves itself, not for
+everything inside a block that does, and not on the page's first render.
+Anyone who asks their system for reduced motion gets none. On a component
+tag, they apply to the component's root element; `:transition="..."`
+works too (`None` for no transition).
+
 ## 4. Composing components
 
 Any capitalized tag is a child component. PyWeft resolves `<TodoItem>` to

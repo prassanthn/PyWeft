@@ -8,6 +8,13 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **Transitions and animations:** `transition="fade"` (or `in=` / `out=`)
+  animates an element appearing and leaving, with `fade`, `fly`, `slide`,
+  `scale` and `blur` built in, options such as `duration=300 y=-20`, or the
+  app's own CSS `@keyframes`; `animate="flip"` slides elements to where a
+  render moved them, as in a reordered keyed list. A leaving element stays
+  on screen until its animation ends. Reduced-motion settings are honoured.
+
 ## 0.6.0
 
 - **`@resize`** on any element: `event.width` and `event.height` when it is
