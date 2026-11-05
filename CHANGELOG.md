@@ -8,6 +8,12 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **`class:` and `style:` directives:** `class:active="item == chosen"`
+  adds a class while the condition holds, and `style:width="f'{pct}%'"`
+  sets one CSS property (custom properties too) unless it is `None` or
+  `False`. Both add to the element's `class`/`style`, so fixed classes no
+  longer have to be repeated in a `:class` expression. On a component tag
+  they reach its root element. `pyweft check` checks their expressions.
 - **`<Window>` and `<Document>`:** handlers for the whole page, such as
   `<Window @keydown.ctrl.k.prevent="open_search" />`, `@scroll` or
   `<Document @visibilitychange=...>`. They listen while the component that

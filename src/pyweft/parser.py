@@ -66,6 +66,10 @@ class TElement:
     # ``:name="expr"`` bindings -- evaluated as Python, unlike ``attrs`` which
     # interpolate to strings. On components these become typed props.
     expr_attrs: dict[str, str] = field(default_factory=dict)
+    # class:active="expr" (the class is added while expr is true) and
+    # style:width="expr" (the property is set unless expr is None/False).
+    class_toggles: dict[str, str] = field(default_factory=dict)
+    style_props: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -185,6 +189,7 @@ def split_source(src: str) -> tuple[str, str, str]:
 
 _AT_ATTR = re.compile(r"@([A-Za-z_][\w.\-]*)\s*=")
 _COLON_ATTR = re.compile(r":([A-Za-z_][\w.\-]*)\s*=")
+_TOGGLE_ATTR = re.compile(r"(class|style):([A-Za-z_\-][\w\-]*)\s*=")
 
 
 def rewrite_at_directives(src: str) -> str:
@@ -236,6 +241,14 @@ def rewrite_at_directives(src: str) -> str:
             match = _AT_ATTR.match(src, i)
             if match:
                 out.append("py-at-" + match.group(1) + "=")
+                i = match.end()
+                continue
+        # class:active= / style:width= at an attribute-name position: XML
+        # would read "class" as a namespace prefix.
+        if ch in "cs" and out and out[-1].isspace():
+            match = _TOGGLE_ATTR.match(src, i)
+            if match:
+                out.append(f"py-{match.group(1)}-{match.group(2)}=")
                 i = match.end()
                 continue
         # Only after whitespace: an attribute-name position. A ':' elsewhere in
@@ -492,7 +505,8 @@ def _convert_global(el: ET.Element) -> TElement:
     node = _convert_element(el)
     if node.children:
         raise TemplateError(f"<{el.tag}> takes no content: it only listens for events")
-    other = [*node.attrs, *node.expr_attrs] + (["@bind"] if node.bind else []) + (["key"] if node.key_expr else [])
+    other = [*node.attrs, *node.expr_attrs] + [f"class:{n}" for n in node.class_toggles] + \
+        [f"style:{n}" for n in node.style_props] + (["@bind"] if node.bind else []) + (["key"] if node.key_expr else [])
     if other:
         raise TemplateError(
             f"<{el.tag}> takes only event handlers (@keydown=..., @scroll=...), not {', '.join(other)}"
@@ -511,10 +525,16 @@ def _convert_element(el: ET.Element) -> TElement:
     bind: str | None = None
     bind_mods: tuple[str, ...] = ()
     key_expr: str | None = None
+    class_toggles: dict[str, str] = {}
+    style_props: dict[str, str] = {}
 
     for name, value in el.attrib.items():
         if name == "key":
             key_expr = value
+        elif name.startswith("py-class-"):
+            class_toggles[name[len("py-class-") :]] = value
+        elif name.startswith("py-style-"):
+            style_props[name[len("py-style-") :]] = value
         elif name.startswith("py-colon-"):
             expr_attrs[name[len("py-colon-") :]] = value
         elif name.startswith("py-at-"):
@@ -551,5 +571,7 @@ def _convert_element(el: ET.Element) -> TElement:
         key_expr=key_expr,
         children=_convert_children(el),
         expr_attrs=expr_attrs,
+        class_toggles=class_toggles,
+        style_props=style_props,
         line=_line(el),
     )

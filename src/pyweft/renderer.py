@@ -112,6 +112,25 @@ def _merge_attrs(attrs: dict[str, str], extra: dict[str, str]) -> None:
             attrs[name] = value
 
 
+def _apply_toggles(tnode: TElement, scope: Scope, attrs: dict[str, str]) -> None:
+    """class:name="expr" adds the class while expr is true; style:prop="expr"
+    sets the property unless expr is None or False. Both add to whatever
+    class/style (written or :bound) the element already has."""
+    if tnode.class_toggles:
+        names = [name for name, expr in tnode.class_toggles.items() if eval_expr(expr, scope)]
+        if names:
+            attrs["class"] = " ".join([*attrs.get("class", "").split(), *names])
+    if tnode.style_props:
+        declarations = []
+        for prop, expr in tnode.style_props.items():
+            value = eval_expr(expr, scope)
+            if value is not None and value is not False:
+                declarations.append(f"{prop}: {value}")
+        if declarations:
+            own = attrs.get("style", "").strip().rstrip(";")
+            attrs["style"] = "; ".join([own, *declarations] if own else declarations)
+
+
 def set_title(text: str) -> None:
     """Set the title of the browser tab, or of the window in a desktop app:
     ``set_title(f"Order #{self.id} - Acme")`` in a page's ``on_init``. It
@@ -522,6 +541,7 @@ class Renderer:
                 props[name] = value
             elif value is not None and value is not False:
                 passthrough[name] = "" if value is True else str(value)
+        _apply_toggles(tnode, scope, passthrough)  # onto the component's root, like class=
         for event, expr in tnode.events.items():
             if "." in event:
                 raise TemplateError(
@@ -663,6 +683,7 @@ class Renderer:
             if value is None or value is False:
                 continue
             attrs[name] = "" if value is True else str(value)
+        _apply_toggles(tnode, scope, attrs)
         # Scoped <style> support: mark the element as belonging to its
         # component so the rewritten selectors can find it.
         scope_id = getattr(type(scope.component), "__scope__", None)

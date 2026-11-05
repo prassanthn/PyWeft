@@ -340,6 +340,10 @@ class _Checker:
     def _element(self, node: TElement, scope: frozenset[str], line: int) -> None:
         where = f"<{node.tag}>"
         self._attrs(node.attrs, node.expr_attrs, line, scope, where)
+        for name, src in node.class_toggles.items():
+            self._expr(src, line, scope, f"{where} class:{name}=")
+        for name, src in node.style_props.items():
+            self._expr(src, line, scope, f"{where} style:{name}=")
         if node.key_expr:
             self._expr(node.key_expr, line, scope, f"{where} key=")
         for spec, handler in node.events.items():
@@ -365,7 +369,8 @@ class _Checker:
         elif "class" in node.attrs and "class" in node.expr_attrs:
             self.add(line, "warning", "class-replaced",
                      f"{where}: :class replaces class on the same element, so the static "
-                     "classes are lost: write them all in the :class expression")
+                     "classes are lost: keep class= and add the conditional ones with "
+                     "class:name=\"condition\"")
         self._walk(node.children, scope, line)
 
     def _child(self, tag: str) -> type | None:

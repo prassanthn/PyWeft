@@ -539,6 +539,8 @@ So, in practice:
 |---|---|
 | `{{ expr }}` | Interpolate a Python expression in text or attribute values |
 | `:attr="expr"` | Bind an attribute to an expression. `None`/`False` drop the attribute, `True` keeps it valueless (`:disabled="busy"`), anything else is stringified. On a component, passes the **typed** value as a prop |
+| `class:name="expr"` | Add the class `name` while `expr` is true, on top of `class` (or `:class`): `<li class="row" class:active="item == chosen">` |
+| `style:prop="expr"` | Set one CSS property (custom properties too: `style:--progress`) unless `expr` is `None`/`False`, on top of `style`: `style:width="f'{pct}%'"` |
 | `@click="handler"` | A bare name calls that method; an expression is evaluated, so `@click="remove(item)"` works; simple statements run inline, so `@click="count += 1"` and `@click="show = not show"` work without a method. Any DOM event works the same way (`@input`, `@keydown`, `@submit` ...) |
 | `@event.modifier` | `@submit.prevent`, `@keydown.enter`, `@click.stop`, `@keydown.ctrl.s.prevent`: see [event modifiers](#event-modifiers) |
 | `@bind="field"` | Two-way binding on inputs, textareas, selects, checkboxes and radio buttons, converting to the field's declared type. `@bind.lazy`, `.trim`, `.number`: see [binding form controls](#binding-form-controls) |
@@ -1890,16 +1892,21 @@ page:
 `@apply` works in `_tailwind/input.css`, but not in a component's `<style>`
 block, which Tailwind never reads.
 
-**Classes that depend on state.** A `:class` sets the whole attribute, so
-an element with both `class` and `:class` gets only the `:class` one. Put
-the fixed classes in the expression too:
+**Classes that depend on state.** Keep the fixed classes in `class` and
+add each conditional one with `class:name="condition"`:
 
 ```xml
-<button @click="show = name"
-        :class="'rounded-lg px-3 py-1.5 ' + ('bg-slate-900 text-white' if name == show else 'text-slate-500')">
+<button @click="show = name" class="rounded-lg px-3 py-1.5"
+        class:bg-slate-900="name == show" class:text-white="name == show"
+        class:text-slate-500="name != show">
   {{ name }}
 </button>
 ```
+
+A class name with a `:` or `/` in it (`dark:bg-white`, `w-1/2`) can't be
+written that way: put those in a `:class` expression. `:class` sets the
+whole attribute, so an element with both `class` and `:class` gets only
+the `:class` one; write the fixed classes in the expression too.
 
 The todo and shop examples (`examples/todo`, `examples/shop`) are styled
 with Tailwind's CLI exactly as above: see each one's `_tailwind/input.css`

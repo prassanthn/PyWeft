@@ -122,6 +122,7 @@ def remove(self, item):
 | `@click="save"` | call the method (it gets the event if it takes an argument) |
 | `@click="remove(item)"` | an expression; `event` is the event (`event.value`, `event.key`) |
 | `@click="count += 1"` | a statement; assigning a bare name sets component state |
+| `class:active="on"`, `style:width="f'{pct}%'"` | add a class while true / set one CSS property unless None/False, on top of `class`/`style` |
 | `@bind="name"` | two-way binding for input, textarea, select, checkbox, radio; converts to the field's declared type |
 | `@bind.number` / `.lazy` / `.trim` | parse as a number / update on change, not each key / strip spaces |
 | `@keydown.enter.ctrl.prevent="send"` | modifiers: key names (`enter`, `esc`, `up`, `page-down`, `a`), `ctrl alt shift meta exact`, `prevent stop self once capture passive`; `click.right` |
@@ -268,8 +269,10 @@ Pages = router("pages")         # one page per .weft file in pages/
    Python 3.10/3.11 list, set and dict comprehensions can't either. Put the
    computation in a property or method: `{{ total }}`.
 3. **A keyed `<For>` renders one element per item** (see above).
-4. **`:class` replaces `class`** on the same element: write the whole class
-   list in the expression (`:class="'row ' + ('active' if on else '')"`).
+4. **`:class` replaces `class`** on the same element. For conditional
+   classes keep `class="row"` and add `class:active="on"` (or
+   `style:width="f'{pct}%'"` for one property); names with `:` or `/`
+   (Tailwind's `dark:`) need the whole list in a `:class` expression.
 5. **State changed outside a handler doesn't show** until you call
    `self.state_has_changed()` (timers, callbacks, after awaits).
 6. **Don't copy a prop into a field of the same name** or edit a prop to
