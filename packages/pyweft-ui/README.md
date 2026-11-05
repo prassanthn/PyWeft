@@ -2,7 +2,7 @@
 
 Ready-made controls for [PyWeft](https://github.com/prassanthn/PyWeft):
 buttons, menus, chips, sliders, form fields with validation, autocomplete and input masks, date and
-date-range pickers, an event calendar, cards, layout, tabs, tables,
+date-range pickers, an event calendar, charts, cards, layout, tabs, tables,
 dialogs, toasts and more, styled and accessible out of the box. Build a good-looking app in Python without writing HTML or
 CSS.
 
@@ -141,6 +141,25 @@ that field's message.
 or dicts with `key` and optionally `label`, `format` (`",.2f"` or a
 function), `align` and `sortable`. Left out, they come from the first row.
 `sort="-total"` starts sorted by `total`, largest first.
+
+### Charts
+
+| Control | Fields | Notes |
+|---|---|---|
+| `BarChart` | `data`, `x`, `y`, `series`, `horizontal`, `stacked` (true, percent), `labels`, `y_min`, `y_max`, `y2_label` | Grouped, stacked or 100% bars, across or up; with `series` of `type` line or area, a combo chart, and `axis="right"`, a second scale. |
+| `LineChart` | `data`, `x`, `y`, `series`, `curve` (linear, smooth, step, step-before, step-after), `fill`, `stacked`, `points`, `connect_gaps`, `labels` | Lines, or areas with `fill="true"`; series can be dashed (`dash`), on a second scale or bars. |
+| `PieChart` | `data`, `label`, `value`, `donut`, `hole`, `half`, `labels` (percent, value, label, none), `center`, `center_label` | Pie, doughnut or half circle; `center="total"` writes the sum in the hole. |
+| `PolarAreaChart` | `data`, `label`, `value` | Equal angles, each slice as long as its value. |
+| `RadarChart` | `data`, `x`, `y`, `series`, `points` | One shape per series over three or more spokes. |
+
+All five take `title`, `subtitle`, `height`, `legend` (auto, top, bottom,
+right, none), `format`, `tick_format`, `x_label`, `y_label`, `colors`,
+`aria_label` and `empty`, and emit `select` with what was clicked. `data`
+is rows (dicts or objects), a dict of columns, a pandas or polars
+DataFrame, a `{label: value}` dict or Chart.js's `{"labels", "datasets"}`.
+Charts are SVG drawn in Python: themed, sized to their container, with
+tooltips, a legend that hides series, arrow-key reading and a data table
+for screen readers.
 
 ### Actions and feedback
 

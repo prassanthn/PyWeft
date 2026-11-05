@@ -38,7 +38,7 @@ fields; this guide is the how-to.
 8. [Tabs](#8-tabs)
    - [A task in steps: Stepper](#a-task-in-steps-stepper)
    - [Where you are: Breadcrumbs](#where-you-are-breadcrumbs)
-9. [Tables and trees](#9-tables-and-trees)
+9. [Tables, trees and charts](#9-tables-trees-and-charts)
    - [Trees: Tree](#trees-tree)
 10. [Calendars of events](#10-calendars-of-events)
 11. [Toasts](#11-toasts)
@@ -1407,7 +1407,7 @@ Each level is labelled by its page's `crumb` (route parameters fill in),
 else its URL segment made readable; `home` (default "Home") names `/`, and
 a level with no page of its own is shown as text.
 
-## 9. Tables and trees
+## 9. Tables, trees and charts
 
 `Table` shows a list of dicts (or objects) as rows. Name the fields to show
 as columns:
@@ -1558,6 +1558,93 @@ the list that aren't in the tree (yet) are kept.
 node or moves to its first child, Left closes it or moves to its parent,
 Home and End jump to the ends, `*` opens all the siblings, and typing a
 letter jumps to the next node starting with it.
+
+### Charts
+
+Five charts cover the everyday cases: `BarChart`, `LineChart` (with areas),
+`PieChart` (and doughnuts), `PolarAreaChart` and `RadarChart`. They are
+drawn in Python as SVG, so they work the same in the browser, in the
+desktop app and in tests, follow the `Theme` (dark mode included) and lay
+themselves out for the width they really have, a phone's too.
+
+```xml
+<ui.BarChart :data="sales" x="month" y="online, store" title="Sales"
+             format="${:,.0f}" @select="open_month(event)" />
+<ui.LineChart :data="visits" x="day" y="desktop, mobile" curve="smooth" />
+<ui.PieChart :data="{'Chrome': 64.7, 'Safari': 18.6, 'Other': 16.7}" />
+```
+
+```python
+sales = [
+    {"month": "Jan", "online": 4200, "store": 3100},
+    {"month": "Feb", "online": 5100, "store": 2900},
+]
+
+def open_month(self, picked):
+    print(picked["label"], picked["series"], picked["value"])   # Feb store 2900
+```
+
+**Data** can be a list of dicts or objects, a dict of columns
+(`{"month": [...], "online": [...]}`), a pandas or polars DataFrame, or, for
+pies, a plain `{label: value}` dict. `x` names the field for the categories
+and `y` the fields to plot (`"online, store"` or a list); left out, `x` is
+the first text field and `y` every number field. Data in Chart.js's shape
+(`{"labels": [...], "datasets": [{"label": ..., "data": [...]}]}`) works
+as it is, dataset settings such as `type`, `fill`, `tension`, `stepped`,
+`borderDash` and `yAxisID` included.
+
+**Bars.** Series sit side by side; `stacked="true"` piles them up and
+`stacked="percent"` shows each as a share of 100%. `horizontal="true"`
+turns the bars sideways (good for long names), and `labels="true"` writes
+each value on its bar.
+
+**Lines and areas.** `curve` is `linear`, `smooth` (it never overshoots
+the data: no dips below zero that aren't there), `step`, `step-before` or
+`step-after`. `fill="true"` makes an area chart; with `stacked="true"` the
+areas pile up. A missing value (`None`) breaks the line, unless
+`connect_gaps="true"`. Dots mark each value when there are 40 or fewer;
+`points` turns them on or off.
+
+**Per series**, `series` takes dicts with a `key` and any of `label`,
+`color` (a CSS colour, or `primary`, `success`, `warning`, `danger`,
+`info`), `type` (`bar`, `line` or `area`: mix them for a **combo chart**),
+`axis="right"` (a **second scale**, named with `y2_label`), `stack` (bars
+with the same stack name pile up), `dash` (`True` or a pattern like
+`"2 4"`), `curve`, `points` and `width`:
+
+```xml
+<ui.BarChart :data="weather" x="month" y="rain" y_label="Rain (mm)"
+             y2_label="Temperature (°C)" :series="[
+    {'key': 'temp', 'type': 'line', 'axis': 'right', 'curve': 'smooth', 'color': 'warning'}]" />
+```
+
+**Pies.** `label` and `value` name the fields when the data is rows (a
+`color` field colours a slice). `donut="true"` leaves a hole (`hole` sets
+its size, 0.6 of the radius) and `center` writes in it, `"total"` for the
+sum, above `center_label`. `half="true"` draws a half circle. `labels`
+on the slices are `percent`, `value`, `label` or `none`.
+
+**Polar area and radar.** A `PolarAreaChart` takes the same data as a pie
+but gives every slice the same angle and lets its length show the value.
+A `RadarChart` takes the same data as a bar chart and draws one outlined
+shape per series, with a spoke per category (three or more).
+
+**Everywhere:** `title` and `subtitle`; `height` in pixels (the width is
+the space the chart gets); `legend` is `auto` (when there's more than one
+series), `top`, `bottom`, `right` or `none`, and clicking a legend entry
+hides or shows that series; `format` shapes the values in tooltips and
+labels (a format spec like `",.1f"`, a template like `"${:,.0f}"` or
+`"{} kg"`, or a function) and `tick_format` the axis labels, which are
+short by default (`12k`, `1.5M`); `x_label`, `y_label`, `y_min`, `y_max`,
+`grid="false"`; `colors` replaces the palette (`"#0d9488, #f59e0b"` or a
+list); `empty` is the text shown with no data.
+
+**Clicking:** with `@select`, the chart reports the bar, point or slice
+clicked: `{"index", "label", "series", "value", "values", "row"}` for bar,
+line and radar charts (`values` has every series at that category, `row`
+is your row), `{"index", "label", "value", "percent", "row"}` for pies.
+Pressing Enter picks the category under the keyboard, with `series` and
+`value` set to `None`.
 
 ## 10. Calendars of events
 
@@ -1755,6 +1842,7 @@ Every colour the controls use is a CSS variable. Set any of them on the
 | `--ui-subtle` | hover backgrounds, card footers |
 | `--ui-border` | borders and dividers |
 | `--ui-info`, `--ui-success`, `--ui-warning`, `--ui-danger` | alerts, badges, errors |
+| `--ui-chart-1` ... `--ui-chart-10` | chart series, in order (the first is `--ui-primary`) |
 | `--ui-radius` | corner rounding |
 | `--ui-font` | the font family |
 
@@ -1917,6 +2005,12 @@ readers and mobile devices work the way people expect:
   that is loading says it is busy.
 - **Tables** use real table headings, and tell screen readers which column
   is sorted and which way.
+- **Charts** are one Tab stop, read as a picture with a summary ("Bar
+  chart of Online, Store over 6 categories"), and carry their data as a
+  table for screen readers. The arrow keys move from category to
+  category (Home and End to the ends), and each one's values are read
+  out; Enter picks it. Legend entries are buttons saying whether their
+  series is shown.
 - **Menus** are announced as menus, with the button saying whether it's
   open, and items with a submenu saying so too. Focus moves into the list
   when it opens, into a submenu with the right arrow and back with the

@@ -1,0 +1,60 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" :legend="legend" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.LineChart :data="visits" x="day" y="desktop, mobile" title="Visits" />
+# <ui.LineChart :data="visits" x="day" y="desktop, mobile" curve="smooth" fill="true" stacked="true" />
+# <ui.LineChart :data="temps" x="hour" y="inside, outside" :series="[{'key': 'outside', 'dash': True}]" />
+# <ui.LineChart :data="stock" x="date" y="price" :series="[{'key': 'volume', 'type': 'bar', 'axis': 'right'}]" />
+# Lines through values per category. fill="true" shades the area under
+# each line (an area chart); with stacked="true" (or "percent") the areas
+# pile up. curve: linear, smooth (never overshoots the data), step,
+# step-before, step-after. A missing value (None) breaks the line unless
+# connect_gaps="true". points: dots on each value (default: up to 40).
+# data, x, y, series, labels, format and @select work as on BarChart;
+# series take "dash" (True, or a pattern "2 3"), "curve", "width",
+# "axis": "right" for a second scale, and "type": "bar" for a combo.
+from pyweft_ui.charting import cartesian, cartesian_input
+
+data = None
+x: str = ""
+y = ""
+series: list = []
+title: str = ""
+subtitle: str = ""
+height: int = 300
+curve: str = "linear"     # linear, smooth, step, step-before, step-after
+fill: bool = False
+stacked: str = ""
+points: bool | None = None
+connect_gaps: bool = False
+labels: bool = False
+format = ""
+tick_format = ""
+x_label: str = ""
+y_label: str = ""
+y2_label: str = ""
+y_min: float | None = None
+y_max: float | None = None
+grid: bool = True
+legend: str = "auto"
+colors = ""
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    kind = "area" if self.fill else "line"
+    categories, lines, rows = cartesian_input(self.data, self.x, self.y, self.series, kind, self.colors)
+    return cartesian(categories, lines, width=width, height=self.height, hidden=hidden, stacked=self.stacked,
+                     labels=self.labels, fmt=self.format or None, tick_fmt=self.tick_format or None,
+                     x_label=self.x_label, y_label=self.y_label, y2_label=self.y2_label, y_min=self.y_min,
+                     y_max=self.y_max, grid=self.grid, curve=self.curve, points=self.points,
+                     connect_gaps=self.connect_gaps, rows=rows, kind="Area" if self.fill else "Line",
+                     empty=self.empty)
+</code>

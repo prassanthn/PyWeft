@@ -299,6 +299,13 @@ lists take `"A, B, C"`, a list of values, `(value, label)` pairs or dicts.
   `Calendar`.
 - Data and navigation: `Table` (sortable), `Tree`, `EventCalendar`,
   `Breadcrumbs`.
+- Charts (SVG, themed, sized to their container): `BarChart`
+  (`stacked="true"`/`"percent"`, `horizontal`), `LineChart` (`curve="smooth"`,
+  `fill` for areas), `PieChart` (`donut`, `center="total"`), `PolarAreaChart`,
+  `RadarChart`. `:data` = rows, a dict of columns or a DataFrame; `x=` the
+  category field, `y="a, b"` the series; `:series` dicts add `type`
+  (line/bar/area: combo), `axis="right"`, `dash`, `color`. `@select` gets
+  `{index, label, series, value, values, row}`. Don't hand-draw SVG charts.
 - Actions and feedback: `Button`, `Menu`, `ContextMenu`, `Dialog`,
   `BottomSheet`, `Popover`, `Tooltip`, `Alert`, `Badge`, `Spinner`,
   `Progress`, `Icon`, and toasts: `<ui.Toaster />` once, then

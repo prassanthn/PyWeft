@@ -1,0 +1,62 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" :legend="legend" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.BarChart :data="sales" x="month" y="online, store" title="Sales" />
+# <ui.BarChart :data="sales" x="month" y="online, store" stacked="true" labels="true" />
+# <ui.BarChart :data="share" x="region" :y="['a', 'b']" stacked="percent" horizontal="true" />
+# <ui.BarChart :data="sales" x="month" y="revenue" :series="[{'key': 'margin', 'type': 'line', 'axis': 'right'}]" />
+# Bars per category, grouped side by side, stacked ("true") or stacked to
+# 100% ("percent"); horizontal="true" lays them sideways.
+# data: rows (dicts or objects), a dict of columns, a pandas or polars
+# DataFrame, a {label: value} dict, or Chart.js's {"labels", "datasets"}.
+# x: the field naming each category (default: the first text field).
+# y: the fields to plot, as "a, b" or a list (default: every number field).
+# series: per-series settings, dicts with "key" and any of "label", "color"
+# (a CSS colour or primary/success/warning/danger/info), "type" ("line",
+# "area": a combo chart), "axis" ("right": a second scale), "stack" (bars
+# with the same stack name pile up), "dash", "curve", "points".
+# labels="true" writes each value on its bar. format shapes values in
+# tooltips and labels (",.0f", "${:,.2f}", or a function); tick_format the
+# axis (default: short, 12k). Hover or arrow keys show the values; click
+# the legend to hide a series; @select gets {index, label, series, value,
+# values, row} for a clicked bar.
+from pyweft_ui.charting import cartesian, cartesian_input
+
+data = None
+x: str = ""
+y = ""
+series: list = []
+title: str = ""
+subtitle: str = ""
+height: int = 300
+horizontal: bool = False
+stacked: str = ""         # "true", or "percent" for shares of 100%
+labels: bool = False
+format = ""
+tick_format = ""
+x_label: str = ""
+y_label: str = ""
+y2_label: str = ""
+y_min: float | None = None
+y_max: float | None = None
+grid: bool = True
+legend: str = "auto"      # auto, top, bottom, right, none
+colors = ""               # the palette to use instead: "#0a7, #f60" or a list
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    categories, lines, rows = cartesian_input(self.data, self.x, self.y, self.series, "bar", self.colors)
+    return cartesian(categories, lines, width=width, height=self.height, hidden=hidden,
+                     horizontal=self.horizontal, stacked=self.stacked, labels=self.labels,
+                     fmt=self.format or None, tick_fmt=self.tick_format or None, x_label=self.x_label,
+                     y_label=self.y_label, y2_label=self.y2_label, y_min=self.y_min, y_max=self.y_max,
+                     grid=self.grid, rows=rows, kind="Bar", empty=self.empty)
+</code>

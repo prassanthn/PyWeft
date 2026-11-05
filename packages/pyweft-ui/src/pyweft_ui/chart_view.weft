@@ -1,0 +1,278 @@
+<template>
+  <figure :class="classes">
+    <For each="scene in [current()]">
+      <If cond="title or subtitle">
+        <figcaption class="head">
+          <If cond="title"><span class="title">{{ title }}</span></If>
+          <If cond="subtitle"><span class="subtitle">{{ subtitle }}</span></If>
+        </figcaption>
+      </If>
+      <div class="body">
+        <If cond="legend_shown(scene)">
+          <div class="legend">
+            <For each="item in scene.legend" key="item.key">
+              <button type="button" :class="'item off' if item.hidden else 'item'"
+                      :aria-pressed="'false' if item.hidden else 'true'" @click="toggle(item.key)">
+                <span :class="'swatch ' + item.shape" :style="'background: ' + item.color"></span>{{ item.label }}
+              </button>
+            </For>
+          </div>
+        </If>
+        <div class="plot" tabindex="0" role="img" :aria-label="aria_label or scene.summary"
+             @resize="fit" @mouseleave="leave" @blur="leave" @keydown.esc="leave"
+             @keydown.right.prevent="move(1)" @keydown.down.prevent="move(1)"
+             @keydown.left.prevent="move(-1)" @keydown.up.prevent="move(-1)"
+             @keydown.home.prevent="move_to(0)" @keydown.end.prevent="move_to(-1)"
+             @keydown.enter.prevent="choose" @keydown.space.prevent="choose">
+          <svg class="svg" :width="scene.width" :height="scene.height"
+               :viewBox="'0 0 ' + str(scene.width) + ' ' + str(scene.height)" aria-hidden="true">
+            <For each="m in marks(scene)" key="m.key">
+              <If cond="m.kind == 'rect'">
+                <rect :x="m.x" :y="m.y" :width="m.w" :height="m.h" :rx="m.rx" :class="m.cls" :style="m.style"
+                      @mouseenter="enter(m)" @click="pick(m)" />
+              </If>
+              <ElseIf cond="m.kind == 'path'">
+                <path :d="m.d" :class="m.cls" :style="m.style" :transform="m.transform"
+                      @mouseenter="enter(m)" @click="pick(m)" />
+              </ElseIf>
+              <ElseIf cond="m.kind == 'circle'">
+                <circle :cx="m.cx" :cy="m.cy" :r="m.r" :class="m.cls" :style="m.style" />
+              </ElseIf>
+              <ElseIf cond="m.kind == 'line'">
+                <line :x1="m.x1" :y1="m.y1" :x2="m.x2" :y2="m.y2" :class="m.cls" :style="m.style" />
+              </ElseIf>
+              <Else>
+                <text :x="m.x" :y="m.y" :text-anchor="m.anchor" :dominant-baseline="m.baseline"
+                      :transform="m.transform" :class="m.cls" :style="m.style">{{ m.text }}</text>
+              </Else>
+            </For>
+          </svg>
+          <For each="tip in tips_of(scene)">
+            <div :class="'tip ' + tip.side" :style="tip_place(scene, tip)" aria-hidden="true">
+              <If cond="tip.title"><div class="tip-title">{{ tip.title }}</div></If>
+              <For each="row in tip.rows" key="row[0]">
+                <div class="tip-row">
+                  <span :class="'dot' if row[1] else 'dot none'" :style="'background: ' + row[1] if row[1] else None"></span>
+                  <If cond="row[2]"><span class="name">{{ row[2] }}</span></If>
+                  <span class="val">{{ row[3] }}</span>
+                </div>
+              </For>
+            </div>
+          </For>
+        </div>
+      </div>
+      <div class="sr-only" aria-live="polite">{{ spoken(scene) }}</div>
+      <table class="sr-only">
+        <caption>{{ title or scene.summary }}</caption>
+        <thead><tr><For each="h in scene.head"><th scope="col">{{ h }}</th></For></tr></thead>
+        <tbody>
+          <For each="r in scene.rows">
+            <tr><For each="c in r"><td>{{ c }}</td></For></tr>
+          </For>
+        </tbody>
+      </table>
+    </For>
+  </figure>
+</template>
+
+<code>
+# Internal: draws a chart's Scene (charting/scene.py) as SVG. The public
+# charts (BarChart, LineChart, PieChart ...) pass `build`, a function
+# (width, hidden series keys) -> Scene, so layout happens for the width the
+# chart really has (@resize) and for the series the legend leaves visible.
+# Hover, the legend, keyboard reading and the data table live here.
+build = None
+title: str = ""
+subtitle: str = ""
+legend: str = "auto"      # auto (when there is more than one series), top, bottom, right, none
+aria_label: str = ""
+clickable: bool = False
+
+_width = 0                # the plot's width in pixels; 0 until the page lays it out
+_hidden: set = set()
+_hover = None             # index of the tooltip showing
+_keys = False             # the hover came from the keyboard: say it aloud
+_scene = None
+
+@property
+def classes(self):
+    where = "top" if self.legend in ("auto", "") else self.legend
+    return f"chart legend-{where}" + (" clickable" if self.clickable else "")
+
+def current(self):
+    # Laid out once per render (the For above binds it); handlers read the
+    # copy kept here, which is what the user saw.
+    self._scene = self.build(self._width or 640, frozenset(self._hidden))
+    return self._scene
+
+def legend_shown(self, scene):
+    if self.legend == "none" or not scene.legend:
+        return False
+    return self.legend != "auto" or len(scene.legend) > 1
+
+def marks(self, scene):
+    tips = self.tips_of(scene)
+    return scene.marks + tips[0].marks if tips else scene.marks
+
+def tips_of(self, scene):
+    at = self._hover
+    return [scene.tips[at]] if at is not None and 0 <= at < len(scene.tips) else []
+
+def tip_place(self, scene, tip):
+    # Percentages: right before the page reports its width the SVG is
+    # scaled. The box may be as wide as the room on its side of the point,
+    # never past the plot (a tooltip sticking out widens a phone's page).
+    left = tip.x / scene.width * 100
+    top = tip.y / scene.height * 100
+    room = left if tip.side.startswith("left") else 100 - left
+    return f"left: {left:.2f}%; top: {top:.2f}%; max-width: min(16rem, calc({room:.2f}% - 16px))"
+
+def spoken(self, scene):
+    tips = self.tips_of(scene)
+    return tips[0].spoken() if tips and self._keys else ""
+
+def fit(self, event):
+    width = int(event.width)
+    if width > 0 and width != self._width:
+        self._width = width
+
+def enter(self, m):
+    if m.hit is not None:
+        self._hover, self._keys = m.hit, False
+
+def leave(self):
+    self._hover, self._keys = None, False
+
+def pick(self, m):
+    if m.hit is not None and self.clickable:
+        self.emit("select", self._scene.pick(m.hit, m.series))
+
+def move(self, by):
+    count = len(self._scene.tips) if self._scene else 0
+    if count:
+        self._hover = 0 if self._hover is None else (self._hover + by) % count
+        self._keys = True
+
+def move_to(self, index):
+    count = len(self._scene.tips) if self._scene else 0
+    if count:
+        self._hover, self._keys = index % count, True
+
+def choose(self):
+    if self._hover is not None and self.clickable and self._scene and self._scene.tips:
+        self.emit("select", self._scene.pick(self._hover, None))
+
+def toggle(self, key):
+    self._hidden ^= {key}
+    self._hover = None
+</code>
+
+<style>
+.chart {
+  position: relative;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-family: var(--ui-font, system-ui, sans-serif);
+  color: var(--ui-text, #1f2328);
+}
+.head { display: flex; flex-direction: column; gap: 0.125rem; }
+.title { font-weight: 600; font-size: 0.95rem; }
+.subtitle { color: var(--ui-muted, #59636e); font-size: 0.8125rem; }
+.body { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.125rem 0.625rem; }
+.legend-bottom .legend { order: 2; }
+.legend-right .body { flex-direction: row; align-items: center; }
+.legend-right .plot { flex: 1 1 0; }
+.legend-right .legend { order: 2; flex-direction: column; flex-wrap: nowrap; align-items: flex-start; }
+@media (max-width: 480px) {
+  .legend-right .body { flex-direction: column; align-items: stretch; }
+  .legend-right .legend { flex-direction: row; flex-wrap: wrap; align-items: center; }
+}
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem 0.25rem;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.item:hover { background: var(--ui-subtle, #f6f8fa); }
+.item:focus-visible { outline: 2px solid var(--ui-primary, #4f46e5); outline-offset: 1px; }
+.item.off { color: var(--ui-muted, #59636e); text-decoration: line-through; }
+.item.off .swatch { opacity: 0.35; }
+.swatch { width: 0.75rem; height: 0.75rem; border-radius: 3px; flex: none; }
+.swatch.line { width: 1rem; height: 3px; border-radius: 2px; }
+.plot { position: relative; min-width: 0; border-radius: 4px; outline: none; }
+.plot:focus-visible { outline: 2px solid var(--ui-primary, #4f46e5); outline-offset: 2px; }
+.svg { display: block; width: 100%; height: auto; overflow: visible; font-family: inherit; }
+.svg * { pointer-events: none; }
+.hit { pointer-events: all; fill: transparent; }
+.clickable .hit { cursor: pointer; }
+.grid { stroke: var(--ui-border, #d1d9e0); stroke-width: 1; opacity: 0.75; fill: none; }
+.grid.zero { stroke: var(--ui-muted, #59636e); opacity: 0.6; }
+.axis { stroke: var(--ui-border, #d1d9e0); stroke-width: 1; }
+.tick { fill: var(--ui-muted, #59636e); font-size: 11px; }
+.ring-tick { font-size: 10px; paint-order: stroke; stroke: var(--ui-surface, #ffffff); stroke-width: 3px; stroke-linejoin: round; }
+.axis-title { fill: var(--ui-muted, #59636e); font-size: 12px; font-weight: 500; }
+.line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.area { fill-opacity: 0.2; }
+.point { fill: var(--ui-surface, #ffffff); stroke-width: 2; }
+.value-label { fill: var(--ui-text, #1f2328); font-size: 11px; }
+.value-label.inside { fill: #ffffff; font-weight: 600; }
+.slice { stroke: var(--ui-surface, #ffffff); stroke-width: 2; stroke-linejoin: round; }
+.slice-label { fill: #ffffff; font-size: 12px; font-weight: 600; }
+.center-value { fill: var(--ui-text, #1f2328); font-size: 22px; font-weight: 600; }
+.center-label { fill: var(--ui-muted, #59636e); font-size: 12px; }
+.polar { fill-opacity: 0.55; stroke-width: 1.5; }
+.hover-polar { fill-opacity: 0.85; }
+.radar-area { fill-opacity: 0.15; stroke-width: 2; stroke-linejoin: round; }
+.hover-band { fill: var(--ui-text, #1f2328); opacity: 0.06; }
+.hover-point { stroke: var(--ui-surface, #ffffff); stroke-width: 2; }
+.hover-spoke { stroke: var(--ui-muted, #59636e); stroke-width: 1.5; }
+.hover-slice { filter: drop-shadow(0 2px 4px rgb(0 0 0 / 0.25)); }
+.empty { fill: var(--ui-muted, #59636e); font-size: 13px; }
+.tip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  box-sizing: border-box;
+  width: max-content;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: var(--ui-radius, 8px);
+  background: var(--ui-surface, #ffffff);
+  color: var(--ui-text, #1f2328);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.12);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+.tip.right { transform: translate(8px, 0); }
+.tip.left { transform: translate(calc(-100% - 8px), 0); }
+.tip.right.mid { transform: translate(12px, -50%); }
+.tip.left.mid { transform: translate(calc(-100% - 12px), -50%); }
+.tip-title { font-weight: 600; margin-bottom: 0.25rem; overflow-wrap: break-word; }
+.tip-row { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 0.5rem; }
+.dot { width: 0.625rem; height: 0.625rem; border-radius: 50%; flex: none; align-self: center; }
+.dot.none { visibility: hidden; }
+.name { flex: 1 1 auto; color: var(--ui-muted, #59636e); overflow-wrap: break-word; }
+.val { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+</style>

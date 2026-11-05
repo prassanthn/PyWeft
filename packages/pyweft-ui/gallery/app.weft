@@ -456,6 +456,11 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['table'] }}</pre>
         </ui.Card>
 
+        <ui.Card title="Charts" id="charts" ref="charts" subtitle="Bars, lines, areas, pies, polar and radar: hover, use the arrow keys, click the legend">
+          <Charts />
+          <pre class="code">{{ CODE['charts'] }}</pre>
+        </ui.Card>
+
         <ui.Card title="Tree" id="tree" ref="tree" subtitle="Folders load as they open; search; checkboxes with partly checked parents">
           <Trees />
           <pre class="code">{{ CODE['tree'] }}</pre>
@@ -565,13 +570,15 @@ SECTION_CONTROLS = {
     "Popover and tooltip": ["Popover", "Tooltip"],
     "Tabs": ["Tabs"],
     "Table": ["Table"],
+    "Charts": ["BarChart", "LineChart", "PieChart", "PolarAreaChart", "RadarChart", "chart", "graph",
+               "doughnut", "donut", "area", "combo"],
     "Breadcrumbs": ["Breadcrumbs", "trail", "navigation"],
     "Tree": ["Tree"],
     "Carousel": ["Carousel", "slider", "slideshow"],
     "Toasts": ["Toaster", "toast", "Snackbar"],
     "Layout": ["Row", "Column", "Grid", "Card", "Divider", "AppShell"],
 }
-SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Cascade select", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Progress", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Breadcrumbs", "Table", "Tree", "Carousel", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Cascade select", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Progress", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Breadcrumbs", "Table", "Charts", "Tree", "Carousel", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -1029,6 +1036,20 @@ places = [
 <ui.Carousel label="Products" :items="products" per_view="3" autoplay="4">
   <Fill name="slide"><ProductCard :product="slide" /></Fill>
 </ui.Carousel>""",
+    "charts": """<ui.BarChart :data="sales" x="month" y="online, store" title="Sales"
+             stacked="true" format="${:,.0f}" @select="open_month(event)" />
+
+<ui.LineChart :data="visits" x="day" y="desktop, mobile" curve="smooth" fill="true" />
+
+<ui.BarChart :data="weather" x="month" y="rain" :series="[
+    {'key': 'temp', 'type': 'line', 'axis': 'right', 'color': 'warning'}]" />
+
+<ui.PieChart :data="{'Chrome': 64.7, 'Safari': 18.6, 'Other': 16.7}" />
+<ui.PieChart :data="spend" label="category" value="amount" donut="true" center="total" />
+<ui.PolarAreaChart :data="tickets" />
+<ui.RadarChart :data="skills" x="skill" y="ada, grace" />
+
+sales = [{"month": "Jan", "online": 4200, "store": 3100}, ...]   # or a DataFrame""",
     "tree": """<ui.Tree :nodes="files" @bind="selected" :filter="query"
          @load="load_folder(event)" @activate="open_file(event)" />
 

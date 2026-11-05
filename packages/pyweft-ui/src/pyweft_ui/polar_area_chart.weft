@@ -1,0 +1,35 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" :legend="legend" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.PolarAreaChart :data="{'Mon': 11, 'Tue': 16, 'Wed': 7, 'Thu': 3, 'Fri': 14}" title="Tickets" />
+# Like a pie whose slices all get the same angle: each one reaches out as
+# far as its value, against rings of a scale. data, label, value, format,
+# colors and @select ({index, label, value, row}) work as on PieChart;
+# tick_format shapes the ring labels.
+from pyweft_ui.charting import polar, slices_input
+
+data = None
+label: str = ""
+value: str = ""
+title: str = ""
+subtitle: str = ""
+height: int = 300
+format = ""
+tick_format = ""
+legend: str = "auto"
+colors = ""
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    slices = slices_input(self.data, self.label, self.value, self.colors)
+    return polar(slices, width=width, height=self.height, hidden=hidden, fmt=self.format or None,
+                 tick_fmt=self.tick_format or None, label_head=self.label, empty=self.empty)
+</code>

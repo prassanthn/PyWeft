@@ -1,0 +1,39 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" :legend="legend" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.RadarChart :data="skills" x="skill" y="alice, bob" title="Skills" />
+# Several values per item compared at a glance: one spoke per category
+# (three or more), one outlined shape per series. data, x, y, series,
+# format and @select ({index, label, series, value, values, row}) work as
+# on BarChart; points="false" leaves out the dots; tick_format shapes the
+# ring labels.
+from pyweft_ui.charting import cartesian_input, radar
+
+data = None
+x: str = ""
+y = ""
+series: list = []
+title: str = ""
+subtitle: str = ""
+height: int = 320
+points: bool | None = None
+format = ""
+tick_format = ""
+legend: str = "auto"
+colors = ""
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    categories, lines, rows = cartesian_input(self.data, self.x, self.y, self.series, "line", self.colors)
+    return radar(categories, lines, width=width, height=self.height, hidden=hidden, fmt=self.format or None,
+                 tick_fmt=self.tick_format or None, rows=rows, x_label=self.x, points=self.points,
+                 empty=self.empty)
+</code>

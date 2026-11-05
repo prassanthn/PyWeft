@@ -8,6 +8,18 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- **Charts:** `BarChart` (grouped, stacked, 100%, horizontal, value
+  labels), `LineChart` (smooth, stepped, dashed, areas, stacked areas,
+  gaps), `PieChart` (doughnut, half circle, a total in the middle),
+  `PolarAreaChart` and `RadarChart`. Mix bars and lines in one chart, and
+  put series on a second scale. Data can be rows, columns, a DataFrame, a
+  `{label: value}` dict or Chart.js's `{"labels", "datasets"}`. Drawn as
+  SVG in Python, so they follow the theme (new `--ui-chart-1` ...
+  `--ui-chart-10` colours) and work on the desktop and in tests; they lay
+  themselves out for their real width with PyWeft 0.6's `@resize`.
+  Tooltips, a legend that hides series, arrow keys to read values aloud,
+  a data table for screen readers, and `@select` for clicks.
+
 ## 0.4.0
 
 - **`CascadeSelect`**: choose from nested options one level at a time,

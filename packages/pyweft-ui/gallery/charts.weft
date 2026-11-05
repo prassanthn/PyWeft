@@ -1,0 +1,118 @@
+<template>
+  <ui.Column gap="lg">
+    <ui.Row align="center">
+      <ui.ButtonToggle label="Bars" :options="BAR_MODES" @bind="bar_mode" />
+      <ui.ButtonToggle label="Lines" :options="CURVES" @bind="curve" />
+      <ui.Button icon="star" @click="shuffle">New numbers</ui.Button>
+    </ui.Row>
+    <ui.Grid min_width="20rem" gap="lg">
+      <div class="box">
+        <ui.BarChart :data="sales" x="month" y="online, store" title="Sales" subtitle="Click a bar"
+                     :stacked="bar_mode" format="${:,.0f}" @select="picked = event" />
+        <p class="note">{{ picked_text }}</p>
+      </div>
+      <div class="box">
+        <ui.BarChart :data="LANGUAGES" horizontal="true" labels="true" title="Languages used" format="{}%"
+                     legend="none" colors="#0d9488" />
+      </div>
+      <div class="box">
+        <ui.LineChart :data="visits" x="day" y="desktop, mobile, tablet" :curve="curve" title="Visits"
+                      y_label="Visitors" />
+      </div>
+      <div class="box">
+        <ui.LineChart :data="visits" x="day" y="desktop, mobile, tablet" :curve="curve" fill="true"
+                      stacked="true" title="Stacked area" legend="bottom" />
+      </div>
+      <div class="box">
+        <ui.BarChart :data="WEATHER" x="month" y="rain" title="Weather" subtitle="Two scales: a combo chart"
+                     :series="WEATHER_SERIES" y_label="Rain (mm)" y2_label="Temperature (°C)" />
+      </div>
+      <div class="box">
+        <ui.LineChart :data="STYLES" x="week" title="Line styles" :series="STYLE_SERIES" />
+      </div>
+      <div class="box">
+        <ui.PieChart :data="BROWSERS" title="Browsers" format="{}%" legend="right" />
+      </div>
+      <div class="box">
+        <ui.PieChart :data="SPEND" label="category" value="amount" donut="true" center="total"
+                     center_label="spent" title="Spending" format="${:,.0f}" labels="none" legend="bottom" />
+      </div>
+      <div class="box">
+        <ui.PieChart :data="SEATS" donut="true" half="true" height="190" title="Seats" center="total"
+                     center_label="seats" labels="value" legend="bottom" />
+      </div>
+      <div class="box">
+        <ui.PolarAreaChart :data="TICKETS" title="Tickets by day" legend="bottom" />
+      </div>
+      <div class="box">
+        <ui.RadarChart :data="SKILLS" x="skill" y="ada, grace" :series="SKILL_NAMES" title="Skills" />
+      </div>
+    </ui.Grid>
+  </ui.Column>
+</template>
+
+<code>
+# Every chart, with data a real app would have; the toggles restyle the
+# first ones live and "New numbers" changes the data.
+import random
+
+from pyweft_ui import ui
+
+BAR_MODES = [("", "Grouped"), ("true", "Stacked"), ("percent", "100%")]
+CURVES = [("linear", "Straight"), ("smooth", "Smooth"), ("step", "Steps")]
+MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+LANGUAGES = {"JavaScript": 62, "Python": 51, "SQL": 51, "TypeScript": 38, "Java": 30, "C#": 27, "Go": 14}
+WEATHER = [{"month": m, "rain": r, "temp": t} for m, r, t in zip(
+    MONTHS, [78, 52, 61, 45, 50, 46], [4.2, 5.1, 8.3, 11.6, 15.2, 18.4])]
+WEATHER_SERIES = [{"key": "rain", "label": "Rain"},
+                  {"key": "temp", "label": "Temperature", "type": "line", "axis": "right", "curve": "smooth",
+                   "color": "warning"}]
+STYLES = [{"week": f"W{i + 1}", "plan": p, "actual": a, "forecast": f}
+          for i, (p, a, f) in enumerate(zip([40, 45, 50, 55, 60, 65, 70], [38, 47, 49, 58, None, None, None],
+                                            [None, None, None, 58, 63, 66, 72]))]
+STYLE_SERIES = [{"key": "plan", "label": "Plan", "dash": "2 4", "points": False, "color": "muted"},
+                {"key": "actual", "label": "Actual"},
+                {"key": "forecast", "label": "Forecast", "dash": True, "curve": "smooth"}]
+BROWSERS = {"Chrome": 64.7, "Safari": 18.6, "Edge": 5.2, "Firefox": 2.8, "Other": 8.7}
+SPEND = [{"category": "Rent", "amount": 1450}, {"category": "Food", "amount": 520},
+         {"category": "Travel", "amount": 310}, {"category": "Fun", "amount": 190}]
+SEATS = {"Green": 42, "Blue": 35, "Red": 23, "Other": 10}
+TICKETS = {"Mon": 18, "Tue": 25, "Wed": 12, "Thu": 9, "Fri": 21}
+SKILLS = [{"skill": s, "ada": a, "grace": g} for s, a, g in zip(
+    ["Python", "SQL", "Design", "Testing", "Ops", "Writing"], [9, 7, 5, 8, 4, 7], [6, 8, 7, 6, 9, 5])]
+SKILL_NAMES = [{"key": "ada", "label": "Ada"}, {"key": "grace", "label": "Grace"}]
+
+sales: list = [{"month": m, "online": o, "store": s} for m, o, s in zip(
+    MONTHS, [4200, 5100, 4800, 6100, 7000, 6600], [3100, 2900, 3500, 3300, 3600, 4100])]
+visits: list = [{"day": d, "desktop": a, "mobile": b, "tablet": c} for d, a, b, c in zip(
+    DAYS, [820, 932, 901, 934, 1290, 610, 520], [620, 732, 801, 1034, 990, 1120, 1210], [120, 132, 101, 134, 190, 230, 210])]
+bar_mode: str = ""
+curve: str = "linear"
+picked = None
+
+@property
+def picked_text(self):
+    p = self.picked
+    if not p:
+        return "Nothing picked yet."
+    if p["series"] is None:  # a whole month, from the keyboard (Enter)
+        return f"{p['label']}: " + ", ".join(f"{k} ${v:,.0f}" for k, v in p["values"].items() if v is not None)
+    return f"{p['label']}: {p['series']} ${p['value']:,.0f}"
+
+def shuffle(self):
+    self.sales = [{"month": m, "online": random.randint(3000, 8000), "store": random.randint(2000, 5000)}
+                  for m in MONTHS]
+    self.visits = [{"day": d, "desktop": random.randint(400, 1400), "mobile": random.randint(400, 1400),
+                    "tablet": random.randint(80, 300)} for d in DAYS]
+</code>
+
+<style>
+.box {
+  padding: 0.875rem;
+  border: 1px solid var(--ui-border, #d1d9e0);
+  border-radius: var(--ui-radius, 8px);
+  min-width: 0;
+}
+.note { margin: 0.5rem 0 0; color: var(--ui-muted, #59636e); font-size: 0.875rem; }
+</style>

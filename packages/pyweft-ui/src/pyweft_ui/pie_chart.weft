@@ -1,0 +1,49 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" :legend="legend" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.PieChart :data="{'Chrome': 64, 'Safari': 19, 'Firefox': 7}" title="Browsers" />
+# <ui.PieChart :data="spend" label="category" value="amount" donut="true" center="total" center_label="spent" />
+# <ui.PieChart :data="votes" donut="true" half="true" height="180" />
+# Shares of a whole. data: a {label: value} dict, or rows with a label and
+# a value field (label= and value= name them; default: "label"/"value",
+# else the first text and number fields). A row's "color" field colours
+# its slice. donut="true" leaves a hole (hole: its size, 0.6 of the
+# radius); center writes text in it ("total" sums the values) above
+# center_label. half="true" draws a half circle. labels on the slices:
+# percent, value, label or none (only where they fit). Hover or arrow keys
+# show value and share; the legend hides slices; @select gets {index,
+# label, value, percent, row}.
+from pyweft_ui.charting import pie, slices_input
+
+data = None
+label: str = ""
+value: str = ""
+title: str = ""
+subtitle: str = ""
+height: int = 280
+donut: bool = False
+hole: float = 0.6
+half: bool = False
+labels: str = "percent"   # percent, value, label, none
+center: str = ""
+center_label: str = ""
+format = ""
+legend: str = "auto"
+colors = ""
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    slices = slices_input(self.data, self.label, self.value, self.colors)
+    return pie(slices, width=width, height=self.height, hidden=hidden, hole=self.hole if self.donut else 0.0,
+               half=self.half, labels=self.labels, center=self.center, center_label=self.center_label,
+               fmt=self.format or None, label_head=self.label, kind="Doughnut" if self.donut else "Pie",
+               empty=self.empty)
+</code>
