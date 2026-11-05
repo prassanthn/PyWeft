@@ -106,7 +106,7 @@ indentation gymnastics).
 <template>
   <div class="hello">
     <h1>Hello, {{ name or "stranger" }}!</h1>
-    <input @bind="name" placeholder="your name" />
+    <input @bind="name" placeholder="your name" aria-label="Your name" />
     <button @click="cheer">cheer</button>
     <p>{{ cheers }} cheers so far</p>
   </div>
@@ -1613,6 +1613,33 @@ a template that fail on Python 3.10 and 3.11.
 it needs, must be pure Python or built into Pyodide, in a version that fits.
 That part asks PyPI (answers are kept for a day); offline, it says it
 couldn't check rather than failing, and `--no-deps` skips it.
+
+**Accessibility.** `check` also warns (codes starting `a11y-`) about
+markup that shuts out keyboard and screen-reader users:
+
+| Code | What it means |
+|---|---|
+| `a11y-missing-alt` | an `<img>` without `alt` (write `alt=""` for a decorative one) |
+| `a11y-click-without-keyboard` | `@click` on a `<div>`, `<span>`, `<li>` ... with no keyboard way to do it: use a `<button>` |
+| `a11y-not-focusable` | it handles keys or has a widget role, but Tab never reaches it: add `tabindex="0"` |
+| `a11y-anchor-no-href` | `<a @click>` without `href` is not a link: use `<button type="button">` |
+| `a11y-missing-label` | an input, select or textarea with no label (a placeholder is not one) |
+| `a11y-empty-button` | a button with nothing to read out: add text or `aria-label` (icon buttons) |
+| `a11y-positive-tabindex` | `tabindex` above 0, which jumbles the Tab order |
+| `a11y-unknown-role`, `a11y-unknown-aria` | a misspelt `role` or `aria-*` attribute, with a "did you mean" |
+
+A click target marked `aria-hidden="true"` (a backdrop that closes a popup,
+while Esc does the same from the keyboard) is fine. When something is
+right as it is, say so above the element and that warning goes away (any
+`check` warning or error can be silenced this way; with no codes, all of
+them are):
+
+```xml
+<!-- pyweft-ignore: a11y-click-without-keyboard (the arrow keys do this) -->
+<div class="cell" @click="pick(cell)"></div>
+```
+
+`--no-a11y` skips these checks altogether.
 
 It exits with 1 when there are errors, so it can guard a commit or a CI job.
 `--json` prints the problems as JSON (`file`, `line`, `severity`, `code`,

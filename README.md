@@ -17,7 +17,7 @@ running on your machine. No JavaScript to write, no build step.
 <template>
   <div>
     <h1>Hello, {{ name or "stranger" }}!</h1>
-    <input @bind="name" placeholder="your name" />
+    <input @bind="name" placeholder="your name" aria-label="Your name" />
     <button @click="count += 1">Clicked {{ count }} times</button>
   </div>
 </template>

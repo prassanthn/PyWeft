@@ -17,7 +17,7 @@ def make(tmp_path, files):
 
 
 def found(tmp_path, files):
-    problems, _ = check_app(make(tmp_path, files))
+    problems, _ = check_app(make(tmp_path, files), a11y=False)  # test_a11y.py covers those
     return [(p.file, p.line, p.severity, p.code) for p in problems], problems
 
 
@@ -29,8 +29,8 @@ GOOD = {
               <Fill name="extra"><b>{{ note }} {{ item_count }}</b></Fill>
               <i>{{ label_text }}</i>
             </Row>
-            <For each="n in numbers" key="n" index="i"><p @click="pick(n)">{{ i }}: {{ n * 2 }}</p></For>
-            <input @bind="text" @keydown.enter="save" />
+            <For each="n in numbers" key="n" index="i"><button type="button" @click="pick(n)">{{ i }}: {{ n * 2 }}</button></For>
+            <input @bind="text" @keydown.enter="save" aria-label="Note" />
             <p>{{ [x for x in numbers if x > 1] }}</p>
           </div>
         </template>
@@ -52,10 +52,10 @@ GOOD = {
         """,
     "row.weft": """
         <template>
-          <div @click="emit('pick', item)">
+          <button type="button" @click="emit('pick', item)">
             <Slot name="extra" :item_count="len(item)" :note="'n'" />
             <Slot />
-          </div>
+          </button>
         </template>
         <code>
         item = None

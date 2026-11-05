@@ -36,6 +36,7 @@ from .component import (
     load_component,
     split_source,
 )
+from .a11y import audit, ignored
 from .parser import TElement, TemplateError, TFill, TFor, TIf, TSlot, TStatic
 
 BUILTINS = frozenset(dir(builtins))
@@ -62,10 +63,12 @@ class Problem:
         return f"{where}: {self.severity}: {self.message} [{self.code}]"
 
 
-def check_app(app_dir: Path, deps: bool = True, fetch: Any = None) -> tuple[list[Problem], int]:
+def check_app(app_dir: Path, deps: bool = True, fetch: Any = None,
+              a11y: bool = True) -> tuple[list[Problem], int]:
     """Every problem found in the app's components (and, with ``deps``, in
-    whether its dependencies install in the browser), and how many
-    component files were checked. ``fetch`` stands in for PyPI in tests."""
+    whether its dependencies install in the browser; with ``a11y``, in
+    accessibility), and how many component files were checked. ``fetch``
+    stands in for PyPI in tests."""
     from .cli import app_pyweft_files
 
     app_dir = app_dir.resolve()
@@ -73,7 +76,7 @@ def check_app(app_dir: Path, deps: bool = True, fetch: Any = None) -> tuple[list
     problems: list[Problem] = []
     with _app_on_path(app_dir):
         for rel in files:
-            problems += _Checker(app_dir, rel).run()
+            problems += _Checker(app_dir, rel, a11y).run()
     if deps:
         problems += _browser_dependencies(app_dir, fetch)
     # One file's failure shows again in every component that uses it.
@@ -151,14 +154,18 @@ class _Stub(types.ModuleType):
 
 
 class _Checker:
-    def __init__(self, app_dir: Path, rel: str):
+    def __init__(self, app_dir: Path, rel: str, a11y: bool = True):
+        self.a11y = a11y
         self.app_dir = app_dir
         self.rel = rel
         self.path = app_dir / rel
         self.src = self.path.read_text(encoding="utf-8")
+        self.lines = self.src.splitlines()
         self.problems: list[Problem] = []
 
     def add(self, line: int, severity: str, code: str, message: str, file: str | None = None) -> None:
+        if (file is None or file == self.rel) and line and ignored(self.lines, line, code):
+            return  # <!-- pyweft-ignore: code --> just above the element
         self.problems.append(Problem(file or self.rel, line, severity, code, message))
 
     def run(self) -> list[Problem]:
@@ -167,6 +174,8 @@ class _Checker:
             self.cls = cls
             self.known = self._known_names(cls)
             self._walk(cls.__template__, frozenset(), 0)
+            if self.a11y:
+                audit(cls.__template__, self.add, is_component_tag)
             self._shadowed_builtins()
         return self.problems
 

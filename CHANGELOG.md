@@ -8,6 +8,13 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **Accessibility checks in `pyweft check`:** warnings (`a11y-*`) for
+  images without alt text, clicks with no keyboard way to do them, links
+  without `href`, unlabelled form fields, buttons with nothing to read
+  out, positive `tabindex`, and misspelt roles or `aria-*` attributes.
+  `<!-- pyweft-ignore: code -->` above an element silences a warning
+  there (for any check, not only these); `--no-a11y` skips them. The app
+  `pyweft new` writes now labels its input.
 - **`class:` and `style:` directives:** `class:active="item == chosen"`
   adds a class while the condition holds, and `style:width="f'{pct}%'"`
   sets one CSS property (custom properties too) unless it is `None` or

@@ -26,6 +26,11 @@ reports, with file and line: template and Python errors, unknown names,
 handlers, `@bind` fields and components, props a component doesn't take,
 events it never emits, slots it doesn't have, and the traps below. It
 suggests the name you probably meant. `--json` gives the same as JSON.
+Its `a11y-*` warnings are real problems for keyboard and screen-reader
+users: fix them (a `<button>` instead of `<div @click>`, `alt` on images,
+a label or `aria-label` on fields) rather than silencing them; use
+`<!-- pyweft-ignore: code (why) -->` above an element only when a keyboard
+way to do the same really exists.
 
 (`pip install`/`python -m pyweft` work too.) Dependencies go in
 `pyproject.toml`'s `[project].dependencies`, managed with `uv add`; in the
