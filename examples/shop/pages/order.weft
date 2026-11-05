@@ -1,5 +1,9 @@
 <template>
   <div class="mx-auto max-w-3xl space-y-6">
+    <Head>
+      <title>Order #{{ id }} - Shop</title>
+      <meta name="description" :content="f'Order #{id} in the PyWeft shop example'" />
+    </Head>
     <button type="button" @click="back()"
             class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
       <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -79,7 +83,7 @@
 <code>
 # route sets this page's URL; {id} arrives as the int declared below.
 import asyncio
-from pyweft import Link, set_title
+from pyweft import Link
 from pyweft.routing import back
 import orders_data
 from orders_data import initials, money, nice_date
@@ -87,9 +91,6 @@ from pins import pins
 
 route = "/orders/{id}"
 id: int = 0
-
-def on_init(self):
-    set_title(f"Order #{self.id} - Shop")   # the tab, or the window
 
 async def load(self):
     # <Await task="load()"> shows the skeleton until this returns, then its

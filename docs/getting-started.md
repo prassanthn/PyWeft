@@ -593,6 +593,7 @@ async def load_user(self, uid):
 | `<If cond="...">` / `<ElseIf cond="...">` / `<Else>` | Conditional rendering. Branch elements must be adjacent siblings |
 | `<For each="item in items" key="item['id']" index="i">` | Loop. `key` gives rows stable identity across reorders (always use it for dynamic lists); `index` is optional |
 | `<Await task="load(id)" key="id">` ... `<Then as="data">` ... `<Catch as="error">` | Wait for an async call: the content shown while it runs, then the `<Then>` or `<Catch>` block. See [waiting in the template](#waiting-in-the-template-await) |
+| `<Head>...</Head>` | `<title>`, `<meta>`, `<link>` and `<style>` for the page's head while the component is shown. See [per-page tags](#per-page-tags-head) |
 | `<Html :content="expr" />` | Show an HTML string (rendered Markdown, say) as markup, sanitized. See [showing HTML](#showing-html-from-elsewhere-html) |
 | `<PascalCaseTag ... />` | Renders a child component (see below) |
 
@@ -1582,9 +1583,9 @@ Calling `navigate()` in a page's `on_init` redirects: the new page replaces
 it before anything is shown. Use `replace=True` there so Back doesn't land on
 the redirect again.
 
-**Page titles:** call `set_title(f"Order #{self.id} - Acme")` in a page's
-`on_init` to name the browser tab or window after it (see
-[the app's title and icon](#the-apps-title-and-icon)).
+**Page titles:** a `<Head><title>Order #{{ id }} - Acme</title></Head>` in
+the page's template names the browser tab or window after it, or call
+`set_title(...)` in its `on_init` (see [per-page tags](#per-page-tags-head)).
 
 **Breadcrumbs:** give a page a `crumb` in its code block (`crumb = "Orders"`,
 or `crumb = "Order #{id}"` to fill in route parameters), and
@@ -1929,7 +1930,8 @@ def on_init(self):
 
 It updates the browser tab, or the window in a desktop app. A title stays
 until the next `set_title()`, so with [pages](#pages-and-navigation), give
-each page its own in its `on_init`.
+each page its own in its `on_init`. A `<title>` in a [`<Head>`
+block](#per-page-tags-head) does the same from the template.
 
 ### The page head and the assets folder
 
@@ -1959,6 +1961,35 @@ link your file in `head.html` at the point where it should load:
 
 A `.css` file linked this way is not added a second time, and hot reload
 still swaps it in place when you save it.
+
+### Per-page tags: Head
+
+`head.html` is the same for every page. For tags that depend on what is
+shown, a description or a link preview for this order, write a `<Head>`
+block in the component's template:
+
+```xml
+<Head>
+  <title>Order #{{ id }} - Acme</title>
+  <meta name="description" :content="f'{order_count} items for {customer}'" />
+  <meta property="og:title" :content="f'Order #{id}'" />
+  <link rel="canonical" :href="f'https://acme.example/#/orders/{id}'" />
+</Head>
+```
+
+- It renders nothing where it is written: its tags go into the page's
+  `<head>` while the component is shown, update when the values change, and
+  leave when the component does. `<If>` and `<For>` work inside it.
+- It holds `<title>`, `<meta>`, `<link>` and `<style>`. A `<title>` names
+  the browser tab (or the desktop window), and the app's own title comes
+  back once no `<Head>` has one. Scripts go in `head.html`.
+- Several components can have one; their tags add up, and the last
+  `<title>` wins.
+- **Link previews and search engines** read the HTML before any Python
+  runs. The first screen is [rendered ahead of time](#the-first-screen-before-python-starts)
+  with its `<Head>` tags, so the app's start page carries them in the HTML
+  that `pyweft build` writes. Other pages of a single-page app share that
+  file, so their tags are only seen by visitors' browsers.
 
 **The `assets/` folder** holds files the page uses as-is: images, fonts,
 icons, a vendored stylesheet or script. They are served at `assets/...`, so
@@ -2659,7 +2690,7 @@ Working today:
   inline statements) with modifiers (`@submit.prevent`, `@keydown.enter`)
   and a detailed event object (keys, modifier keys, mouse, form fields),
   `<If>`/`<For>` with keyed lists, `<Await>` for async data, `<Html>` for
-  sanitized HTML, `class:`/`style:` toggles, transitions and list
+  sanitized HTML, `<Head>` for per-page tags, `class:`/`style:` toggles, transitions and list
   animations, `<Window>`/`<Document>` events, checkbox groups bound to a
   list, `@property` computed values, `ref=` with `focus()`, `scroll_to()`
   and `keep_in_view()`, and input masks (`data-mask`).

@@ -543,7 +543,8 @@ def render_shell(
         .replace("__PYWEFT_APP_ATTRS__", app_attrs)
     )
     leftover = re.search(
-        r"__PYWEFT_(?!TITLE__|HEAD__|LOADING__|PRERENDER__|PRERENDER_CSS__)[A-Z_]+?__", html
+        r"__PYWEFT_(?!TITLE__|PAGE_TITLE__|HEAD__|LOADING__|PRERENDER__|PRERENDER_CSS__|PRERENDER_HEAD__)[A-Z_]+?__",
+        html,
     )
     if leftover:
         # Only possible when shell.html is newer than this process's code:
@@ -558,13 +559,16 @@ def render_shell(
     # pre-rendered page counts: it is the app's own text.
     user = {
         "__PYWEFT_TITLE__": escape(identity.title),
+        # A <Head> <title> on the first screen names the pre-rendered page.
+        "__PYWEFT_PAGE_TITLE__": escape(pre.get("title") or identity.title) if pre else escape(identity.title),
         "__PYWEFT_HEAD__": head,
+        "__PYWEFT_PRERENDER_HEAD__": pre.get("head", "") if pre else "",
         "__PYWEFT_LOADING__": loading_screen(app_dir),
         "__PYWEFT_PRERENDER__": pre["html"] if pre else "",
         "__PYWEFT_PRERENDER_CSS__": pre["css"] if pre else "",
     }
     return re.sub(
-        "__PYWEFT_(?:TITLE|HEAD|LOADING|PRERENDER_CSS|PRERENDER)__",
+        "__PYWEFT_(?:TITLE|PAGE_TITLE|HEAD|LOADING|PRERENDER_CSS|PRERENDER_HEAD|PRERENDER)__",
         lambda m: user[m.group(0)],
         html,
     )

@@ -130,6 +130,7 @@ def remove(self, item):
 | `class:active="on"`, `style:width="f'{pct}%'"` | add a class while true / set one CSS property unless None/False, on top of `class`/`style` |
 | `@bind="name"` | two-way binding for input, textarea, select, checkbox, radio; converts to the field's declared type |
 | `<input type="checkbox" :value="t" @bind="tags" />` | a checkbox group: bound to a `list`/`set` field, each box adds or removes its own value (typed with `:value`) |
+| `<Head><title>{{ name }}</title><meta name="description" :content="text" /></Head>` | tags for the page's `<head>` while the component is shown (`title`, `meta`, `link`, `style`); renders nothing in place |
 | `<Html :content="body_html" />` | show an HTML string as markup (Markdown output, say), sanitized; `trusted="true"` only for HTML you wrote. `{{ }}` always shows text |
 | `@bind.number` / `.lazy` / `.trim` | parse as a number / update on change, not each key / strip spaces |
 | `@keydown.enter.ctrl.prevent="send"` | modifiers: key names (`enter`, `esc`, `up`, `page-down`, `a`), `ctrl alt shift meta exact`, `prevent stop self once capture passive`; `click.right` |
@@ -257,7 +258,7 @@ def save_theme(self, name):
 - **Shared state:** subclass `pyweft.Store` in a `.py` module, create one
   instance, import it where needed. Setting its fields or calling its methods
   updates every component that shows it.
-- `pyweft.set_title(text)` sets the window or tab title.
+- `pyweft.set_title(text)` sets the window or tab title (or `<Head><title>` in a template).
 
 ## Pages and routing
 
@@ -306,8 +307,8 @@ Pages = router("pages")         # one page per .weft file in pages/
    There is no `v-model`, `onClick=`, `this.` or JSX: fields, methods and
    properties are plain names in templates (`{{ count }}`, `@click="bump"`).
 8. **`key` is reserved**, and `<If>`, `<ElseIf>`, `<Else>`, `<For>`, `<Slot>`,
-   `<Fill>`, `<Dynamic>`, `<Await>`, `<Then>`, `<Catch>`, `<Html>`, `<Window>`,
-   `<Document>` are framework tags. Component tags start with a capital
+   `<Fill>`, `<Dynamic>`, `<Await>`, `<Then>`, `<Catch>`, `<Html>`, `<Head>`,
+   `<Window>`, `<Document>` are framework tags. Component tags start with a capital
    letter (or are dotted, `ui.Button`); lower-case tags are HTML.
 9. **No `document`, `window` or DOM access** from Python: the page is updated
    from the rendered template only. Use refs + `self.focus()` for focus.

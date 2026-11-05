@@ -8,6 +8,11 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **`<Head>`:** `<title>`, `<meta>`, `<link>` and `<style>` for the page's
+  head while a component is shown, with expressions, `<If>` and `<For>`
+  inside; tags of several components add up and the last title wins. The
+  pre-rendered first screen carries them in the HTML (`pyweft build`), for
+  link previews and search engines; a desktop window takes the title.
 - **Compiled templates:** each component's template is compiled into a
   Python function the first time it renders, instead of being walked node
   by node on every render: about twice as fast (a 1000-row table renders

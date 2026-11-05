@@ -309,6 +309,7 @@ class DesktopApp:
         """The page (re)loaded: the whole current page, where it is now."""
         routing.location_changed(here)
         self.here = here
+        self.renderer.resend_head()  # a reloaded page has lost the <Head> tags
         self.tree = self.renderer.render()
         return {"tree": to_dicts(self.tree), "css": collect_styles(self.cls)}
 
@@ -333,6 +334,17 @@ class DesktopApp:
             # The page's <title> is set too, but the window keeps its own.
             if command["op"] == "set_title" and hasattr(self.window, "set_title"):
                 self.window.set_title(command["text"])
+            elif command["op"] == "head" and hasattr(self.window, "set_title"):
+                # A <Head> <title> names the window while it is shown.
+                titles = [n for n in command["nodes"] if n.get("tag") == "title"]
+                if titles:
+                    self.window.set_title("".join(c.get("text", "") for c in titles[-1]["children"]))
+                    self._head_titled = True
+                elif getattr(self, "_head_titled", False):
+                    from .cli import app_identity
+
+                    self.window.set_title(app_identity(self.app_dir).title)
+                    self._head_titled = False
         if commands:
             self.js(f"pyweftDesktop.commands({json.dumps(commands)})")
 

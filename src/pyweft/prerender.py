@@ -67,21 +67,41 @@ def _write(nodes: list[Node], out: list[str], selected: str | None) -> None:
             continue
         if node.tag == "textarea":
             out.append(html.escape(text, quote=False))
+        elif node.tag == "style":
+            # Raw text: escaping would break CSS (a > b); only "</style" ends it.
+            css = "".join(c.text for c in node.children if not isinstance(c, Element))
+            out.append(css.replace("</style", "<\\/style"))
         else:
             _write(node.children, out, inner)
         out.append(f"</{node.tag}>")
 
 
+def head_html(nodes: list[Node]) -> tuple[str, str | None]:
+    """``<Head>`` content for the page's head (marked, so the runtime
+    replaces it), and the text of its last ``<title>``, if any."""
+    title = None
+    tags = []
+    for node in nodes:
+        if not isinstance(node, Element):
+            continue
+        if node.tag == "title":
+            title = "".join(c.text for c in node.children if not isinstance(c, Element))
+            continue
+        tags.append(Element(node.tag, {**node.attrs, "data-pyweft-head": ""}, {}, node.children))
+    return to_html(tags), title
+
+
 def prerender(app_dir: Path) -> dict[str, Any]:
-    """``{"html", "css", "location"}`` for the app's first screen.
-    ``location`` is the address it was rendered at, or ``""`` when the app
-    doesn't route, so any address may show it."""
+    """``{"html", "css", "location", "head", "title"}`` for the app's first
+    screen. ``location`` is the address it was rendered at, or ``""`` when
+    the app doesn't route, so any address may show it. ``head`` and
+    ``title`` come from its ``<Head>`` blocks (``title`` None without one)."""
     app_dir = app_dir.resolve()
     sys.path.insert(0, str(app_dir))  # the app's own modules, as in the browser
     routing.set_host(routing.MemoryHistory("/"))
     App = load_component(app_dir / "app.weft")
 
-    async def first_screen() -> list[Node]:
+    async def first_screen() -> tuple[list[Node], list[Node]]:
         # What the browser shows once its first render has settled: effects
         # and the synchronous start of an async on_init included.
         renderer = Renderer(App())
@@ -93,11 +113,14 @@ def prerender(app_dir: Path) -> dict[str, Any]:
             tree = renderer.render()
         for task in renderer.pending_tasks():
             task.cancel()
-        return tree
+        return tree, renderer._head_nodes
 
-    tree = asyncio.run(first_screen())
+    tree, head = asyncio.run(first_screen())
     css = collect_styles(App)
+    head_tags, title = head_html(head)
     return {
+        "head": head_tags,
+        "title": title,
         "html": to_html(tree),
         # Inside <style>, only "</style" could end the element early.
         "css": css.replace("</style", "<\\/style"),

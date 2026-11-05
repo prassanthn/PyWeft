@@ -565,6 +565,38 @@ const PyWeftRuntime = (() => {
 
   const savedFocus = [];
 
+  // <Head> content (Renderer.head): the elements this runtime added to
+  // document.head carry data-pyweft-head, and are replaced as a set; ones
+  // pre-rendered into the page carry it too. A <title> sets the page title
+  // while one is shown, and the title from before comes back after.
+  let titleBefore = null;
+  const textOf = (dict) => dict.type === "text" ? dict.text : (dict.children || []).map(textOf).join("");
+
+  function setHead(nodes) {
+    for (const old of document.head.querySelectorAll("[data-pyweft-head]")) old.remove();
+    let title = null;
+    for (const dict of nodes) {
+      if (dict.type !== "element") continue;
+      if (dict.tag === "title") {
+        title = textOf(dict);
+        continue;
+      }
+      const el = createNode(dict);
+      el.setAttribute("data-pyweft-head", "");
+      document.head.appendChild(el);
+    }
+    if (title !== null) {
+      // The app's own title, even when the page was pre-rendered with a
+      // <Head> title in place of it.
+      const shell = document.querySelector("title[data-pyweft-title]");
+      if (titleBefore === null) titleBefore = shell ? shell.dataset.pyweftTitle : document.title;
+      document.title = title;
+    } else if (titleBefore !== null) {
+      document.title = titleBefore;
+      titleBefore = null;
+    }
+  }
+
   // Requests from Python's focus(), scroll_to() ... (Renderer.take_commands),
   // run once the render they refer to is on the page. Not patch ops: they
   // change no node, so dommodel.py has nothing to mirror.
@@ -623,6 +655,9 @@ const PyWeftRuntime = (() => {
           break;
         case "set_title":
           document.title = cmd.text;
+          break;
+        case "head":
+          setHead(cmd.nodes);
           break;
         case "restore_focus": {
           const target = savedFocus.pop();

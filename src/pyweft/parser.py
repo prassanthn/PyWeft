@@ -145,6 +145,15 @@ class THtml:
     line: int = field(default=0, compare=False, repr=False, kw_only=True)
 
 
+@dataclass
+class THead:
+    """``<Head>``: ``<title>``, ``<meta>``, ``<link>`` and ``<style>`` for the
+    page's ``<head>`` while the component is shown (see Renderer.head)."""
+
+    children: list[Any] = field(default_factory=list)
+    line: int = field(default=0, compare=False, repr=False, kw_only=True)
+
+
 def subtrees(node: Any) -> list[list[Any]]:
     """The child lists of any template node, for code that walks a template
     without caring what each control element means."""
@@ -152,7 +161,7 @@ def subtrees(node: Any) -> list[list[Any]]:
         return [children for _, children in node.branches]
     if isinstance(node, TAwait):
         return node.blocks
-    return [node.children] if isinstance(node, (TElement, TFor, TSlot, TFill)) else []
+    return [node.children] if isinstance(node, (TElement, TFor, TSlot, TFill, THead)) else []
 
 
 # ------------------------------------------------------------ source slicing
@@ -400,6 +409,11 @@ def _convert_children(el: ET.Element) -> list[Any]:
             raise TemplateError(f"<{child.tag}> must directly follow an <If>")
         if child.tag in ("Then", "Catch"):
             raise TemplateError(f"<{child.tag}> must be directly inside an <Await>")
+        if child.tag == "Head":
+            out.append(_convert_head(child))
+            out += _text_nodes(child.tail)
+            i += 1
+            continue
         if child.tag in ("Await", "Html"):
             out.append(_convert_await(child) if child.tag == "Await" else _convert_html(child))
             out += _text_nodes(child.tail)
@@ -505,6 +519,39 @@ def _convert_await(el: ET.Element) -> TAwait:
         else:
             holder.append(kid)
     node.pending = _convert_children(holder)
+    return node
+
+
+HEAD_TAGS = frozenset({"title", "meta", "link", "style"})
+
+
+def _convert_head(el: ET.Element) -> THead:
+    if el.attrib:
+        raise TemplateError(f"<Head> takes no attributes, not {', '.join(sorted(el.attrib))}")
+    node = THead(children=_convert_children(el), line=_line(el))
+
+    def check(nodes: list[Any]) -> None:
+        for child in nodes:
+            if isinstance(child, TStatic):
+                raise TemplateError("<Head> holds elements (<title>, <meta>, <link>, <style>), not text")
+            if isinstance(child, (TIf, TFor)):
+                for kids in subtrees(child):
+                    check(kids)
+                continue
+            if not isinstance(child, TElement) or child.tag not in HEAD_TAGS:
+                what = f"<{child.tag}>" if isinstance(child, TElement) else type(child).__name__[1:]
+                raise TemplateError(
+                    f"<Head> can hold <title>, <meta>, <link> and <style>, not {what} "
+                    "(scripts and the like go in head.html)"
+                )
+            if child.events or child.bind:
+                raise TemplateError(f"<{child.tag}> in <Head> takes no event handlers or @bind")
+            if child.tag in ("title", "style") and not all(isinstance(k, TStatic) for k in child.children):
+                raise TemplateError(f"<{child.tag}> in <Head> holds text only")
+            if child.tag in ("meta", "link") and child.children:
+                raise TemplateError(f"<{child.tag}> takes no content")
+
+    check(node.children)
     return node
 
 

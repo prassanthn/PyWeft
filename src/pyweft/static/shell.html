@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>__PYWEFT_TITLE__</title>
+  <title data-pyweft-title="__PYWEFT_TITLE__">__PYWEFT_PAGE_TITLE__</title>
   __PYWEFT_ICON__
   <!-- Only PyWeft's own elements are styled here. The page itself is left to
        the app, so CSS frameworks see browser defaults, not a layout to undo. -->
@@ -39,6 +39,7 @@
     #pyweft-dev-stale { top: 1rem; bottom: auto; border-left-color: #f5a524; background: #2b2110; color: #ffe7b8; }
   </style>
   __PYWEFT_HEAD__
+  __PYWEFT_PRERENDER_HEAD__
   __PYWEFT_CSS__
   <style id="pyweft-component-styles">__PYWEFT_PRERENDER_CSS__</style>
   <!-- defer: without it nothing paints, loading screen included, until the
@@ -65,6 +66,10 @@
         app.replaceChildren();
         app.removeAttribute("data-pyweft-prerendered");
         app.removeAttribute("inert");
+        // Its <Head> tags and title belong to that address too.
+        for (const el of document.head.querySelectorAll("[data-pyweft-head]")) el.remove();
+        const title = document.querySelector("title[data-pyweft-title]");
+        if (title) document.title = title.dataset.pyweftTitle;
       }
     })();
   </script>

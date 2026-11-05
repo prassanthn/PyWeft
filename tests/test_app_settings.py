@@ -88,13 +88,13 @@ def test_the_icon_must_be_an_image(tmp_path):
 
 def test_the_browser_page_gets_the_title_and_favicon(tmp_path):
     page = render_shell(make_app(tmp_path))
-    assert "<title>Acme &amp; Co Orders</title>" in page
+    assert '<title data-pyweft-title="Acme &amp; Co Orders">Acme &amp; Co Orders</title>' in page
     assert '<link rel="icon" href="assets/icon.ico" />' in page
 
 
 def test_a_title_is_never_taken_for_a_placeholder(tmp_path):
     app = make_app(tmp_path, '[tool.pyweft]\ntitle = "__PYWEFT_DEV__"\n', icon=False)
-    assert "<title>__PYWEFT_DEV__</title>" in render_shell(app)
+    assert '<title data-pyweft-title="__PYWEFT_DEV__">__PYWEFT_DEV__</title>' in render_shell(app)
     assert "<title>__PYWEFT_DEV__</title>" in desktop.page(app)
 
 

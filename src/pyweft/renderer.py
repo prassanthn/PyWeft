@@ -27,11 +27,11 @@ from .component import Component, component_named, declared_props, is_component_
 from .effects import dispose_effects, run_effects
 from .events import Event
 from .expressions import ExpressionError, Scope, eval_expr, render_parts, run_handler
-from .parser import TAwait, TElement, TemplateError, TFill, TFor, THtml, TIf, TSlot, TStatic, subtrees
+from .parser import TAwait, TElement, TemplateError, TFill, TFor, THead, THtml, TIf, TSlot, TStatic, subtrees
 from .rawhtml import html_nodes
 from .store import _renderers as _live_renderers
 from .styles import marker
-from .vdom import Element, Node, Text
+from .vdom import Element, Node, Text, to_dicts
 
 # Consecutive after-render passes in which effects changed state. Past this,
 # effects are feeding each other forever and it is a bug in the app.
@@ -243,6 +243,9 @@ class Renderer:
         # The component whose template is being rendered right now: the
         # parent, for context (inject), of any component it creates.
         self._rendering: list[Any] = [component]
+        # <Head> content: this render's nodes, and what hosts were last sent.
+        self._head_nodes: list[Node] = []
+        self._head_sent: list[dict] = []
         self._watch(component)
         _live_renderers.add(self)  # a Store's changes and set_title() reach this host
 
@@ -276,6 +279,9 @@ class Renderer:
             if op == "set_title":
                 out.append({"op": op, "text": ref})
                 continue
+            if op == "head":
+                out.append({"op": op, **options})
+                continue
             if ref is None:
                 out.append({"op": op})
                 continue
@@ -285,6 +291,22 @@ class Renderer:
                 out.append({"op": op, "path": path, **options})
         self._commands = []
         return out
+
+    @property
+    def head(self) -> list[dict]:
+        """What ``<Head>`` blocks rendered last time, as node dicts: their
+        ``<title>``, ``<meta>``, ``<link>`` and ``<style>`` elements in
+        render order. A change is also sent as a ``{"op": "head", "nodes":
+        [...]}`` command (take_commands); hosts replace the elements they
+        added to the page's head with these, and take a ``<title>`` as the
+        page (or window) title."""
+        return self._head_sent
+
+    def resend_head(self) -> None:
+        """For a host whose page reloaded: send the head with the next
+        render's commands even if it hasn't changed (when there is any)."""
+        if self._head_sent:
+            self._head_sent = [{"type": "resend"}]
 
     def _path_to(self, target: Element) -> list[int] | None:
         stack: list[tuple[list[Node], list[int]]] = [(self._tree, [])]
@@ -390,6 +412,7 @@ class Renderer:
             self._seen = set()
             self._awaits_seen = {}
             self._rendering = [self.component]
+            self._head_nodes = []
             out: list[Node] = []
             try:
                 self._template(self.component, Scope(self.component), [], out, None)
@@ -399,6 +422,10 @@ class Renderer:
                 self.handlers, self._refs = previous_handlers, previous_refs
                 raise
             self._tree = out
+            head = to_dicts(self._head_nodes)
+            if head != self._head_sent:
+                self._head_sent = head
+                self._commands.append((None, "head", None, {"nodes": head}))
             for inst_id in [i for i in self.instances if i not in self._seen]:
                 _dispose(self.instances.pop(inst_id))
             for ident in [i for i in self._awaits if i[-1] >= self._awaits_seen.get(i[:-1], 0)]:
@@ -491,6 +518,10 @@ class Renderer:
 
             elif isinstance(tnode, TAwait):
                 self._await(tnode, scope, path, out, key)
+
+            elif isinstance(tnode, THead):
+                # Not in place: into the page's <head>, by way of the host.
+                self._emit(tnode.children, scope, path + ["head"], self._head_nodes)
 
             elif isinstance(tnode, THtml):
                 scope_id = getattr(type(scope.component), "__scope__", None)
