@@ -1784,7 +1784,9 @@ def add(self, when):
 - **Agenda:** the events by day, a good choice on phones.
 - **`@select`** gets the event you passed in. **`@day`** gets the date of
   an empty day, or in the week view the `datetime` of the hour, so you can
-  add one there; days are only clickable when you listen to `@day`.
+  add one there; days are only clickable when you listen to `@day`, and
+  then the day numbers (and the week view's day headings) are buttons, so
+  a keyboard picks a day too.
 - **`@navigate`** gets the `(first, last)` dates now showing, whenever the
   user moves or switches view: load just those events from your server
   with `pyweft.http`.
@@ -2125,6 +2127,12 @@ readers and mobile devices work the way people expect:
   interrupt), and pause while someone is reading them.
 - **Motion is reduced** for visitors who ask their system for it: spinners
   slow down, and dialogs and toasts appear without animating.
+
+Every control passes `pyweft check`'s accessibility checks, and the same
+checks look at your own templates: run [`pyweft
+check`](../../../docs/getting-started.md#checking-an-app-pyweft-check) and
+it points out images without `alt`, clicks a keyboard can't reach,
+unlabelled fields and the like, with the file and line.
 
 What you should add yourself:
 

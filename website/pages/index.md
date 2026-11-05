@@ -120,12 +120,34 @@ then `pyweft new myapp` and `pyweft run myapp`.
 
     [:octicons-arrow-right-24: Async handlers](guide/first-component.md#async-handlers-and-background-work)
 
+-   :material-code-tags:{ .lg .middle } **Templates that do the work**
+
+    ---
+
+    `<Await>` shows loading, result and error states of async calls;
+    `transition="fade"` and `animate="flip"` animate elements and lists;
+    `<Html>` shows sanitized Markdown output; `<Head>` sets each page's
+    title and meta tags; `provide`/`inject` pass values down the tree.
+
+    [:octicons-arrow-right-24: Template syntax](guide/templates.md)
+
+-   :material-application-brackets-outline:{ .lg .middle } **Inside any website**
+
+    ---
+
+    Put a built app into another page, a blog post, an intranet or your
+    docs, with one `<script>` and a `<pyweft-app>` tag, and pass data and
+    events between them.
+
+    [:octicons-arrow-right-24: Embedding an app](guide/projects.md#putting-an-app-inside-another-website)
+
 -   :material-reload:{ .lg .middle } **A fast dev loop**
 
     ---
 
     Hot reload that keeps your app's state, readable errors that point to
-    your `.weft` file and line, and a first screen that shows before Python
+    your `.weft` file and line, `pyweft check` for mistakes and
+    accessibility problems, and a first screen that shows before Python
     has even started.
 
     [:octicons-arrow-right-24: Hot reload](guide/projects.md#hot-reload)

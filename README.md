@@ -170,16 +170,26 @@ To see every control live, clone this repository and run
   that only applies to that component.
 - **Template syntax:**
   - **Values:** `{{ expression }}` shows a value, `:attr="expression"` sets an
-    attribute from Python, `@bind="field"` keeps a form control and a field
-    in sync, and `data-mask="(999) 999-9999"` shapes what's typed.
+    attribute from Python, `class:active="cond"` and `style:width="..."`
+    add one class or style, `@bind="field"` keeps a form control and a field
+    in sync (checkboxes bound to a list make a group), and
+    `data-mask="(999) 999-9999"` shapes what's typed.
   - **Events:** `@click="method"` handles an event, with modifiers like
-    `@submit.prevent` and `@keydown.enter`.
+    `@submit.prevent` and `@keydown.enter`; `<Window @keydown.ctrl.k="...">`
+    listens to the whole page.
   - **Focus:** `ref="name"` marks an element; `self.focus("name")` and
     `self.scroll_to("name")` move the keyboard focus or the page to it, and
     `self.keep_in_view("name")` keeps a popup inside the window.
-  - **Control flow:** `<If>`, `<ElseIf>`, `<Else>` and `<For>`.
+  - **Control flow:** `<If>`, `<ElseIf>`, `<Else>` and `<For>`, and
+    `<Await>` to show loading, result and error states of an async call.
+  - **Motion:** `transition="fade"` animates elements in and out, and
+    `animate="flip"` slides a list's rows into their new places.
+  - **HTML and the page head:** `<Html :content="...">` shows HTML such as
+    rendered Markdown, sanitized; `<Head>` sets the title and meta tags per
+    page.
 - **Composition:** components inside components, with props, events, slots
-  for passing content, and `@bind` on your own components. Organise them in
+  for passing content, and `@bind` on your own components; `provide` and
+  `inject` hand a value to everything below a component. Organise them in
   folders, or install them as packages.
 - **Shared state:** a `Store` holds what many components use, like a cart
   or the signed-in user; change it from anywhere and every page showing it
@@ -205,7 +215,13 @@ To see every control live, clone this repository and run
 - **A fast dev loop:** hot reload that keeps your app's state, and readable
   errors that point to your `.weft` file and line.
 - **Fast first load:** your app's first screen is rendered ahead of time and
-  shows at once, while Python starts in the background.
+  shows at once, while Python starts in the background. Templates are
+  compiled to Python functions, so rendering stays quick.
+- **Inside any website:** `<pyweft-app>` puts a built app into another page
+  (a blog, an intranet, docs), with events and data passing both ways.
+- **Checked before it runs:** `pyweft check` finds unknown names, props,
+  events and slots, packages that won't install in a browser, and
+  accessibility problems, with file and line.
 
 ## Learn more
 
@@ -215,12 +231,19 @@ To see every control live, clone this repository and run
 | Run code when a component appears, updates or goes away | [Lifecycle](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#lifecycle-when-your-code-runs) |
 | Split an app into components, use slots | [Composing components](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#4-composing-components) |
 | Build an app with several pages | [Pages and navigation](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#pages-and-navigation) |
+| Load data and show loading and error states | [`<Await>`](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#waiting-in-the-template-await) |
+| Animate elements and list rows | [Transitions and animations](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#transitions-and-animations) |
+| Show Markdown or other HTML | [`<Html>`](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#showing-html-from-elsewhere-html) |
+| Give each page its own title and meta tags | [`<Head>`](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#per-page-tags-head) |
+| Pass a value to everything below a component | [provide and inject](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#passing-values-down-the-tree-provide-and-inject) |
 | Handle forms and keyboard input | [Binding form controls](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#binding-form-controls), [event modifiers](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#event-modifiers), [input masks](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#input-masks) |
 | Check a form, pick dates, show a calendar of events | [pyweft-ui guide: forms](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/docs/guide.md#4-forms), [calendars of events](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/docs/guide.md#10-calendars-of-events) |
 | Load data, run async code, do heavy work | [Async handlers](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#async-handlers-and-background-work), [`run_in_background`](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#heavy-work-run_in_background) |
 | Style with Tailwind or Bootstrap | [Using CSS frameworks](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#using-css-frameworks) |
 | Build screens with the ready-made controls | [pyweft-ui guide](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/docs/guide.md), then the [reference](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/README.md) |
 | Deploy your app | [Building for deployment](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#building-for-deployment) |
+| Put your app inside another website | [Inside another website](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#putting-an-app-inside-another-website) |
+| Find mistakes and accessibility problems | [Checking an app](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#checking-an-app-pyweft-check) |
 | Run it as a desktop app | [A desktop app](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#a-desktop-app-pyweft-run---desktop) |
 | Hand out a desktop app (`.exe`, `.app`) | [Handing out a desktop app](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#handing-out-a-desktop-app-pyweft-build---desktop) |
 | Open and save files, ask for confirmation | [Files and dialogs](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#files-and-dialogs) |
@@ -306,13 +329,20 @@ Under the hood:
   400 of the tests do this on randomly generated trees.
 - **Handler ids** are built from list keys where available, so a row keeps
   its handlers when a list is reordered.
+- **Compiled templates:** each template becomes one Python function the
+  first time it renders. Tests render the examples and randomly generated
+  templates both compiled and node by node, and check the results match.
 
 ## Roadmap
 
 **Done:** the render core and differ; the browser target; the desktop target
 (pywebview), and standalone desktop programs (PyInstaller); components with props, events, slots and component libraries;
-pages and navigation; shared state with stores; events with modifiers and
-`@bind` for every form control; moving focus from Python; effects; async
+pages and navigation; shared state with stores and context (`provide`/`inject`);
+events with modifiers, whole-page events and `@bind` for every form control
+(checkbox groups included); `class:`/`style:` toggles; transitions and list
+animations; `<Await>`, `<Html>` and `<Head>`; compiled templates; embedding
+in other websites (`<pyweft-app>`); accessibility checks in `pyweft check`;
+moving focus from Python; effects; async
 handlers and Web Worker background work; file and confirmation dialogs on
 both targets; the app's title and icon, and window settings; scoped styles
 and CSS framework support; the `pyweft` CLI with hot reload, static builds

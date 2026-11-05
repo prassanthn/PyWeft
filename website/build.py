@@ -88,8 +88,11 @@ and the name probably meant, without a browser.
 - [Using AI coding assistants]({SITE_URL}ai/): AGENTS.md, pyweft check and
   these files
 - [Tutorial]({SITE_URL}tutorial/): a small app, step by step
-- [Guide]({SITE_URL}guide/): install, components, templates, composing
-  components, apps and building, testing without a browser
+- [Guide]({SITE_URL}guide/): install, components, async and `<Await>`,
+  templates (bindings, events, transitions, `<Html>`), composing components
+  (slots, stores, provide/inject, pages), apps and building (`pyweft check`,
+  `<Head>`, deployment, embedding with `<pyweft-app>`, desktop), testing
+  without a browser
 
 ## Controls
 

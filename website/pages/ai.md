@@ -24,7 +24,7 @@ format and its XML rules, every directive and modifier, components, props,
 events, slots, async work, data, routing, the `pyweft-ui` controls, and a
 list of **the mistakes generated code usually makes**, such as a field named
 `max` hiding Python's `max()`, a keyed `<For>` with two root elements, or a
-generator expression in a template.
+generator expression in an inline statement handler.
 
 It is written for the PyWeft version you have. After upgrading, refresh it
 (this also adds it to an app made before PyWeft wrote one):
@@ -53,6 +53,11 @@ app.weft:12: error: {{ }}: unknown name 'cout' (did you mean 'count'?) [unknown-
 app.weft:20: warning: <ui.TextField>: 'lable' is not one of its props, so it goes to its root element as an attribute (did you mean 'label'?) [unknown-prop]
 1 error, 1 warning in 4 component files.
 ```
+
+It warns about accessibility problems too: images without `alt`, clicks
+a keyboard can't reach, unlabelled fields, misspelt `aria-*` attributes.
+Generated markup is prone to all of them, and they are invisible when
+you try the app with a mouse.
 
 It also checks that the app's dependencies install in the browser, naming
 the package that won't (LangChain and the OpenAI and Anthropic SDKs don't:

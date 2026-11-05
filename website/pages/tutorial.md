@@ -485,6 +485,11 @@ uv add "pyweft[desktop]"
 uv run pyweft run todo --desktop
 ```
 
+The build also contains an `embed.js`, so the app can go inside another
+website: load that script on any page and put
+`<pyweft-app></pyweft-app>` where the app should appear (see [inside
+another website](guide/projects.md#putting-an-app-inside-another-website)).
+
 To hand it to people who don't have Python, build it into one program (an
 `.exe` on Windows, a `.app` on macOS), in `todo/dist-desktop/`:
 
@@ -498,6 +503,11 @@ uv run pyweft build todo --desktop
 - **Load data from the web**: [pyweft.http](guide/projects.md#loading-data-pywefthttp);
   and run slow work without freezing the page: [background
   work](guide/first-component.md#async-handlers-and-background-work).
+- **Animate the list**: `transition="slide" animate="flip"` on the
+  `<TodoItem>` makes rows slide in and out and the rest close up:
+  [transitions](guide/templates.md#transitions-and-animations).
+- **Load data with a loading state** in the template itself:
+  [`<Await>`](guide/first-component.md#waiting-in-the-template-await).
 - **Use ready-made controls** instead of plain inputs and buttons:
   [pyweft-ui](controls/index.md), and the
   <a href="../live/gallery/" target="_blank">live gallery</a>.

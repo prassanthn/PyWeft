@@ -27,26 +27,34 @@ later mobile: only the transport differs.
    [effects](#effects-reacting-to-state-changes),
    [async handlers, background work](#async-handlers-and-background-work),
    [heavy work in a Web Worker](#heavy-work-run_in_background),
-   [threads](#threads)
+   [threads](#threads),
+   [waiting in the template (Await)](#waiting-in-the-template-await)
 3. [Template syntax reference](#3-template-syntax-reference): bindings,
    inline handlers, [the event object](#the-event-object),
+   [element size (@resize)](#reacting-to-an-elements-size-resize),
+   [events on the whole page (Window, Document)](#events-on-the-whole-page-window-and-document),
    [event modifiers](#event-modifiers),
-   [binding form controls](#binding-form-controls),
+   [binding form controls and checkbox groups](#binding-form-controls),
    [input masks](#input-masks),
-   [focus and scrolling](#moving-focus-and-scrolling-ref), component styles
+   [focus and scrolling](#moving-focus-and-scrolling-ref), component styles,
+   [transitions and animations](#transitions-and-animations),
+   [showing HTML (Html)](#showing-html-from-elsewhere-html)
 4. [Composing components](#4-composing-components): props, events,
    components in folders, [slots](#passing-content-slots),
    [@bind on components](#bind-on-your-own-components),
    [attributes on a component tag](#attributes-on-a-component-tag),
    [components from packages](#components-from-packages),
    [shared state (Store)](#sharing-state-between-components-store),
+   [provide and inject](#passing-values-down-the-tree-provide-and-inject),
    [Dynamic](#choosing-a-component-while-the-app-runs-dynamic),
    [pages and navigation](#pages-and-navigation)
 5. [Starting a new project](#5-starting-a-new-project):
-   [hot reload](#hot-reload), [the loading screen](#the-loading-screen),
+   [hot reload](#hot-reload), [checking an app (pyweft check)](#checking-an-app-pyweft-check),
+   [the loading screen](#the-loading-screen),
    [the first screen before Python starts](#the-first-screen-before-python-starts),
    [title and icon](#the-apps-title-and-icon),
    [head.html and assets](#the-page-head-and-the-assets-folder),
+   [per-page tags (Head)](#per-page-tags-head),
    [CSS frameworks (Tailwind, Bootstrap)](#using-css-frameworks),
    [ready-made controls (pyweft-ui)](#ready-made-controls-pyweft-ui),
    [PyPI packages](#using-pypi-packages),
@@ -55,6 +63,7 @@ later mobile: only the transport differs.
    [loading data (http)](#loading-data-pywefthttp),
    [saving data between visits (storage)](#saving-data-between-visits-pyweftstorage),
    [building for deployment](#building-for-deployment),
+   [inside another website](#putting-an-app-inside-another-website),
    [a desktop app](#a-desktop-app-pyweft-run---desktop),
    [handing it out](#handing-out-a-desktop-app-pyweft-build---desktop)
 6. [Using the engine from plain Python](#6-using-the-engine-from-plain-python):
