@@ -34,6 +34,9 @@ from .store import Store
 from .styles import scope_css
 
 
+_MISSING = object()
+
+
 class Component:
     __template__: list[Any] = []
     # Set by the loader when the file has a <style> block: the id stamped on
@@ -176,6 +179,39 @@ class Component:
         invalidate = self.__dict__.get("_pw_invalidate")
         if invalidate is not None:
             invalidate()
+
+    # -------------------------------------------------------------- context
+
+    def provide(self, key: Any, value: Any) -> Any:
+        """Make ``value`` available to every component below this one, by
+        ``key`` (a string, or a class for a typed lookup): a theme, the
+        signed-in user, a form, without passing it down as a prop through
+        every level. Call it in ``on_init`` so children see it from their
+        own ``on_init``. Returns ``value``."""
+        self.__dict__.setdefault("_pw_context", {})[key] = value
+        return value
+
+    def inject(self, key: Any, default: Any = _MISSING) -> Any:
+        """The value the nearest component above this one provided for
+        ``key``; ``default`` if none did (without one, LookupError). Read it
+        where you use it (a template, a property) rather than copying it
+        into a field in ``on_init``: a provider that later provides a new
+        value is then seen on the next render. To share changing state,
+        provide an object (a Store) and change its fields."""
+        node = self.__dict__.get("_pw_parent")
+        while node is not None:
+            context = node.__dict__.get("_pw_context")
+            if context and key in context:
+                return context[key]
+            node = node.__dict__.get("_pw_parent")
+        if default is not _MISSING:
+            return default
+        name = getattr(key, "__name__", None) or repr(key)
+        raise LookupError(
+            f"{type(self).__name__}.inject({name}): no component above it provides "
+            f"that (call self.provide({name}, value) in an ancestor's on_init), "
+            "or it isn't rendered yet (inject works from on_init onwards)"
+        )
 
     def has_slot(self, name: str = "default") -> bool:
         """Whether the parent passed content for this slot, for wrappers that

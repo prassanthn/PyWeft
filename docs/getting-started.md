@@ -1319,6 +1319,46 @@ name: str = "Teapot"
 A store is the right place for state that outlives one component. For state
 that only a component and its children use, props and `emit` stay simpler.
 
+### Passing values down the tree: provide and inject
+
+Some values are needed deep inside a part of the page without the
+components in between caring: the current theme, the signed-in user, the
+form a field belongs to. Instead of passing them as props through every
+level, a component *provides* a value and any component below it *injects*
+it:
+
+```python
+# app.weft (or any component)
+from session import Session
+
+def on_init(self):
+    self.provide("session", Session(user="ada"))
+```
+
+```xml
+<!-- a component anywhere inside it -->
+<p>Signed in as {{ inject('session').user }}</p>
+```
+
+- **Keys** are strings, or classes for a typed lookup:
+  `self.provide(Session, ...)` and `self.inject(Session)`.
+- **Nearest wins.** `inject` asks the component above, then the one above
+  that, and so on, and a component's own `provide` is only seen by those
+  below it. So a component can inject a value and provide a changed one to
+  its own children (a nested section that's one level deeper).
+- **Content passed into a slot** sees what the component showing it
+  provides, so a wrapper like `<ThemeProvider>...</ThemeProvider>` works.
+- **Missing values:** `inject("x", None)` returns the default; without
+  one, a missing key raises an error naming the component.
+- **Changes:** read it where you use it (in the template or a property),
+  not once into a field: a template reads it on every render, so it sees a
+  value the provider later replaces with another `provide`. For changing
+  state, provide a [Store](#sharing-state-between-components-store) or
+  another object and change its fields.
+- Call `provide` in `on_init` (children are created after it, so they can
+  inject in their own `on_init`). Like everything else, it works from
+  `on_init` onwards, not in `__init__`.
+
 ### Choosing a component while the app runs: Dynamic
 
 When *which* component to show is decided by your state, write `<Dynamic>`

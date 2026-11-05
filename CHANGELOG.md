@@ -8,6 +8,11 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **Context: `self.provide(key, value)` and `self.inject(key, default)`:**
+  pass a value (a theme, the signed-in user, a form) to every component
+  below one, without threading it through props. The nearest provider
+  wins, and content passed into a slot sees what the component showing it
+  provides.
 - **Checkbox groups:** checkboxes with `@bind` on a `list` (or `set`,
   `tuple`) field add and remove their own `value`; `:value="row['id']"`
   keeps the value's type.

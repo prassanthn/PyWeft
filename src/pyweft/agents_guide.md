@@ -195,6 +195,10 @@ def bump(self):
   variables inside it (`{{ row['name'] }}`). `self.has_slot("footer")`.
 - **`<Dynamic :is="cls" :props="{'a': 1}" />`** renders a component class
   chosen at runtime.
+- **Context:** `self.provide("theme", value)` in an ancestor's `on_init`;
+  `self.inject("theme")` (or `{{ inject('theme') }}`) in any component
+  below it, `inject("x", default)` when it may be missing. Keys can be
+  classes. For changing values provide a Store or object.
 - **Lifecycle:** `on_init(self)` (first appearance; may be `async`),
   `on_after_render(self, first)`, `on_dispose(self)`.
 - **Effects:** `from pyweft import effect`, then `@effect` on a method: it

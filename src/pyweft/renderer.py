@@ -66,6 +66,7 @@ def _dispose(component: Any) -> None:
         task.cancel()
     component.__dict__.pop("_pw_start", None)
     component.__dict__.pop("_pw_command", None)
+    component.__dict__.pop("_pw_parent", None)
     # Effect cleanups first: on_dispose is user code that may not call super().
     dispose_effects(component)
     component.on_dispose()
@@ -216,6 +217,9 @@ class Renderer:
         self._refs: dict[tuple[int, str], Element] = {}
         self._tree: list[Node] = []
         self._commands: list[tuple[Any, str, str | None, dict[str, Any]]] = []
+        # The component whose template is being rendered right now: the
+        # parent, for context (inject), of any component it creates.
+        self._rendering: list[Any] = [component]
         self._watch(component)
         _live_renderers.add(self)  # a Store's changes and set_title() reach this host
 
@@ -361,6 +365,7 @@ class Renderer:
             self.handlers = {}
             self._refs = {}
             self._seen = set()
+            self._rendering = [self.component]
             out: list[Node] = []
             try:
                 self._emit(self.component.__template__, Scope(self.component), [], out)
@@ -588,6 +593,10 @@ class Renderer:
             if instance is not None:
                 _dispose(instance)
             instance = cls(**props)
+            # Before on_init, so inject() works there. The component rendering
+            # now, not the one that wrote the tag: content passed into a slot
+            # sees what the component showing it provides.
+            instance.__dict__["_pw_parent"] = self._rendering[-1]
             self._watch(instance)
             self._hook(instance, instance.on_init())
             self.instances[inst_id] = instance
@@ -603,8 +612,13 @@ class Renderer:
         # the *parent's* refs; focus() on it then moves into the component.
         ref = passthrough.pop("ref", None)
 
+        instance.__dict__["_pw_parent"] = self._rendering[-1]
         before = len(out)
-        self._emit(cls.__template__, Scope(instance), path, out, key)
+        self._rendering.append(instance)
+        try:
+            self._emit(cls.__template__, Scope(instance), path, out, key)
+        finally:
+            self._rendering.pop()
         roots = [node for node in out[before:] if isinstance(node, Element)]
         if ref and roots:
             self._refs[(id(scope.component), ref)] = roots[0]
