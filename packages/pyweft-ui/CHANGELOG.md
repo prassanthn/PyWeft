@@ -8,6 +8,13 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- `EventCalendar`: with `@day`, days can be picked from the keyboard (the
+  day numbers, and the week view's column headings, are buttons); the
+  mouse-only cells behind them are hidden from screen readers.
+- Click-outside backdrops (menus, pickers, popovers, bottom sheet) are
+  hidden from screen readers. Every control now passes `pyweft check`'s
+  accessibility rules, and a test keeps it that way.
+
 ## 0.5.0
 
 - **Data-science charts:** `Histogram` (round bins, overlapping groups, a

@@ -4,6 +4,7 @@
       <label class="label" :for="_id">{{ label }}<If cond="required"><span class="req" aria-hidden="true"> *</span></If></label>
     </If>
     <div class="combo">
+      <!-- pyweft-ignore: a11y-click-without-keyboard (clicking the box's empty space focuses the input, which Tab reaches) -->
       <div :class="'box' + (' invalid' if error else '') + (' off' if disabled else '')" @click="focus('input')">
         <!-- The chips get a wrapper of their own, so the input keeps its place
              among the box's children: as one of them, a chip added before it

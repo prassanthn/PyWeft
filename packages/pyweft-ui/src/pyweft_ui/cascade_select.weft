@@ -19,7 +19,7 @@
         <input type="hidden" :name="name" :value="'' if value is None else str(value)" />
       </If>
       <If cond="_open">
-        <div class="backdrop" @click="close(False)"></div>
+        <div class="backdrop" aria-hidden="true" @click="close(False)"></div>
         <MenuList class="drop" :items="menu_items" :custom="has_slot('option')" start="first"
                   :list_id="_id + '-list'" :labelled_by="_id" :chosen="path" :pick_groups="any_level"
                   drill="true" @select="choose(event)" @close="close(event)" @load="load(event)">

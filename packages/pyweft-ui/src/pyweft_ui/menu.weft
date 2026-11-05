@@ -20,7 +20,7 @@
       </button>
     </Else>
     <If cond="_open">
-      <div class="backdrop" @click="close(False)" @contextmenu.prevent="close(False)"></div>
+      <div class="backdrop" aria-hidden="true" @click="close(False)" @contextmenu.prevent="close(False)"></div>
       <MenuList class="drop" :items="items" :custom="has_slot('item')" :start="_start"
                 :side="'left' if align == 'end' else 'right'"
                 :list_id="_id + '-list'" :labelled_by="_id + '-button'"

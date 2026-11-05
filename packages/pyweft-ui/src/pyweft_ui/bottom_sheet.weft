@@ -3,7 +3,7 @@
     <If cond="value or _seen">
       <div :class="'layer open' if value else 'layer'" :inert="not value"
            @keydown.esc.stop="dismiss('esc')" @pointerup="drop(event)" @pointercancel="cancel_grab()">
-        <div class="backdrop" @click="dismiss('backdrop')"></div>
+        <div class="backdrop" aria-hidden="true" @click="dismiss('backdrop')"></div>
         <!-- Tab past either end lands on a guard, which sends focus round. -->
         <span class="guard" tabindex="0" data-focus-guard="" @focus="focus_last('box')"></span>
         <div class="sheet" role="dialog" aria-modal="true" :aria-label="title or aria_label or None"

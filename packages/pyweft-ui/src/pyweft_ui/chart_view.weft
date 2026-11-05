@@ -28,14 +28,17 @@
                :viewBox="'0 0 ' + str(scene.width) + ' ' + str(scene.height)" aria-hidden="true">
             <For each="m in marks(scene)" key="m.key">
               <If cond="m.kind == 'rect'">
+                <!-- pyweft-ignore: a11y-click-without-keyboard (the plot takes arrow keys and Enter) -->
                 <rect :x="m.x" :y="m.y" :width="m.w" :height="m.h" :rx="m.rx" :class="m.cls" :style="m.style"
                       @mouseenter="enter(m)" @click="pick(m)" />
               </If>
               <ElseIf cond="m.kind == 'path'">
+                <!-- pyweft-ignore: a11y-click-without-keyboard (the plot takes arrow keys and Enter) -->
                 <path :d="m.d" :class="m.cls" :style="m.style" :transform="m.transform"
                       @mouseenter="enter(m)" @click="pick(m)" />
               </ElseIf>
               <ElseIf cond="m.kind == 'circle'">
+                <!-- pyweft-ignore: a11y-click-without-keyboard (the plot takes arrow keys and Enter) -->
                 <circle :cx="m.cx" :cy="m.cy" :r="m.r" :class="m.cls" :style="m.style"
                         @mouseenter="enter(m)" @click="pick(m)" />
               </ElseIf>

@@ -1,6 +1,7 @@
 <template>
   <div class="host">
     <If cond="value">
+      <!-- pyweft-ignore: a11y-not-focusable (Esc from inside the dialog bubbles here; the backdrop itself is never a Tab stop) -->
       <div class="backdrop" @click.self="dismiss" @keydown.esc="dismiss">
         <!-- Tab past either end lands on a guard, which sends focus round. -->
         <span class="guard" tabindex="0" data-focus-guard="" @focus="focus_last('box')"></span>

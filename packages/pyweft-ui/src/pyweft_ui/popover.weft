@@ -19,7 +19,7 @@
       </div>
     </If>
     <ElseIf cond="is_open">
-      <div class="backdrop" @click="close(False)"></div>
+      <div class="backdrop" aria-hidden="true" @click="close(False)"></div>
       <div class="panel" ref="panel" role="dialog" tabindex="-1" :id="_id + '-panel'"
            :aria-label="title or label or None" :style="panel_style" @keydown.esc.stop="close(True)">
         <If cond="arrow"><span class="arrow" aria-hidden="true"></span></If>

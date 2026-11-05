@@ -33,6 +33,7 @@
               </span>
               <If cond="e['hint']"><span class="hint">{{ e['hint'] }}</span></If>
             </Else>
+            <!-- pyweft-ignore: a11y-click-without-keyboard (the right arrow key opens the submenu) -->
             <If cond="e['group']"><span class="more" @click.stop="open_from_arrow(e)"><Icon :name="'chevron-left' if side == 'left' else 'chevron-right'" size="1em" /></span></If>
           </button>
           <If cond="_sub == e['index'] and e['group']">

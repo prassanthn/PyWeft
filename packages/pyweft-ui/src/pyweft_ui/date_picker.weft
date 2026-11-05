@@ -14,7 +14,7 @@
       </button>
       <If cond="name"><input type="hidden" :name="name" :value="chosen.isoformat() if chosen else ''" /></If>
       <If cond="_open">
-        <div class="backdrop" @click="close(False)"></div>
+        <div class="backdrop" aria-hidden="true" @click="close(False)"></div>
         <div class="popup" ref="popup" role="dialog" :aria-label="'Choose a date' + (', ' + label if label else '')"
              @keydown.esc.stop="close(True)">
           <Calendar :value="chosen" :min="min" :max="max" :week_start="week_start" autofocus="true"

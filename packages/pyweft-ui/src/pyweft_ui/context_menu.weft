@@ -7,7 +7,7 @@
          @keydown.context-menu.prevent="open_at(None)" @keydown.f10.shift.prevent="open_at(None)">
       <Slot />
       <If cond="_open">
-        <div class="backdrop" @click="close(False)" @contextmenu.prevent="close(False)"></div>
+        <div class="backdrop" aria-hidden="true" @click="close(False)" @contextmenu.prevent="close(False)"></div>
         <MenuList :class="'drop' + (' at-pointer' if _at else '')" :style="place" vertical="true"
                   :items="items" :custom="has_slot('item')" start="first" :aria_label="label"
                   @select="choose(event)" @close="close(event)">

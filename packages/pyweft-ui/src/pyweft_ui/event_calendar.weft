@@ -27,11 +27,20 @@
         <For each="week in block['weeks']" key="week['key']">
           <div class="week" :style="week['rows_style']">
             <For each="cell in week['cells']" key="cell['iso']">
-              <div :class="cell['classes']" :style="cell['style']" @click="day_clicked(cell['date'])"></div>
+              <div :class="cell['classes']" :style="cell['style']" aria-hidden="true"
+                   @click="day_clicked(cell['date'])"></div>
             </For>
             <For each="cell in week['cells']" key="'n' + cell['iso']">
-              <span :class="'num today' if cell['today'] else 'num'" :style="'grid-column: ' + str(cell['col'] + 1)"
-                    :aria-label="cell['long']">{{ cell['day'] }}</span>
+              <If cond="days_clickable">
+                <!-- The keyboard's way to pick a day; the cell behind is a bigger target for the mouse. -->
+                <button type="button" :class="'num today' if cell['today'] else 'num'"
+                        :style="'grid-column: ' + str(cell['col'] + 1)" :aria-label="cell['long']"
+                        @click="day_clicked(cell['date'])">{{ cell['day'] }}</button>
+              </If>
+              <Else>
+                <span :class="'num today' if cell['today'] else 'num'" :style="'grid-column: ' + str(cell['col'] + 1)"
+                      :aria-label="cell['long']">{{ cell['day'] }}</span>
+              </Else>
             </For>
             <For each="bar in week['bars']" key="bar['key']">
               <button type="button" :class="bar['classes']" :style="bar['style']" :aria-label="bar['label']"
@@ -59,9 +68,17 @@
         <div class="wv-head">
           <span class="gutter"></span>
           <For each="day in week_days" key="day['iso']">
-            <span :class="'wv-day today' if day['today'] else 'wv-day'">
-              <span class="wv-name">{{ day['name'] }}</span> <span class="wv-num">{{ day['day'] }}</span>
-            </span>
+            <If cond="days_clickable">
+              <button type="button" :class="'wv-day today' if day['today'] else 'wv-day'" :aria-label="day['long']"
+                      @click="day_clicked(day['date'])">
+                <span class="wv-name">{{ day['name'] }}</span> <span class="wv-num">{{ day['day'] }}</span>
+              </button>
+            </If>
+            <Else>
+              <span :class="'wv-day today' if day['today'] else 'wv-day'">
+                <span class="wv-name">{{ day['name'] }}</span> <span class="wv-num">{{ day['day'] }}</span>
+              </span>
+            </Else>
           </For>
         </div>
         <If cond="week_allday['bars']">
@@ -82,7 +99,7 @@
           <For each="day in week_days" key="'c' + day['iso']">
             <div :class="'wv-col today' if day['today'] else 'wv-col'">
               <For each="hour in hours" key="hour['h']">
-                <div class="slot" @click="slot_clicked(day['date'], hour['h'])"></div>
+                <div class="slot" aria-hidden="true" @click="slot_clicked(day['date'], hour['h'])"></div>
               </For>
               <For each="ev in day['timed']" key="ev['key']">
                 <button type="button" class="timed" :style="ev['style']" :aria-label="ev['label']"
@@ -292,6 +309,10 @@ def collapse(self, key):
 def choose(self, index):
     self.emit("select", self.events[index])
 
+@property
+def days_clickable(self):
+    return callable(getattr(self, "on_day", None))
+
 def day_clicked(self, day):
     self.emit("day", day)
 
@@ -488,7 +509,7 @@ def week_days(self):
             })
         out.append({
             "date": day, "iso": day.isoformat(), "day": day.day, "today": day == self.today,
-            "name": self._DAYS[day.weekday()][:3], "timed": boxes,
+            "name": self._DAYS[day.weekday()][:3], "timed": boxes, "long": self._long(day),
         })
     return out
 
@@ -581,6 +602,12 @@ button:focus-visible {
   font-size: 0.8rem; font-weight: 600; border-radius: 999px; color: var(--ui-muted, #59636e);
 }
 .num.today { background: var(--ui-primary, #4f46e5); color: var(--ui-on-primary, #fff); }
+button.num { pointer-events: auto; border: 0; background: none; font-family: inherit; cursor: pointer; }
+button.num:hover { background: var(--ui-subtle, #f6f8fa); color: var(--ui-text, #1f2328); }
+button.num.today:hover { background: var(--ui-primary, #4f46e5); color: var(--ui-on-primary, #fff); }
+button.num:focus-visible, button.wv-day:focus-visible { outline: 2px solid var(--ui-primary, #4f46e5); outline-offset: 1px; }
+button.wv-day { border: 0; background: none; font-family: inherit; cursor: pointer; border-radius: 6px; }
+button.wv-day:hover { background: var(--ui-subtle, #f6f8fa); }
 .event {
   z-index: 1; min-width: 0; margin: 0 4px; padding: 2px 6px;
   display: flex; align-items: center; gap: 4px;
