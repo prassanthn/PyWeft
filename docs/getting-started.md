@@ -2651,15 +2651,18 @@ Working today:
   `@bind` for every form control, event handlers (methods, expressions or
   inline statements) with modifiers (`@submit.prevent`, `@keydown.enter`)
   and a detailed event object (keys, modifier keys, mouse, form fields),
-  `<If>`/`<For>` with keyed lists, `@property` computed values, `ref=` with
-  `focus()`, `scroll_to()` and `keep_in_view()`, and input masks
-  (`data-mask`).
+  `<If>`/`<For>` with keyed lists, `<Await>` for async data, `<Html>` for
+  sanitized HTML, `class:`/`style:` toggles, transitions and list
+  animations, `<Window>`/`<Document>` events, checkbox groups bound to a
+  list, `@property` computed values, `ref=` with `focus()`, `scroll_to()`
+  and `keep_in_view()`, and input masks (`data-mask`).
 - **Composition:** child components with props, events (`emit`) and
   lifecycle hooks; slots (named, with fallbacks and slot props); `@bind` on
   components; attributes passed through to a component's root element;
   components in subfolders as `<folder.Name>`, or imported from packages
   (`ComponentLibrary`), shipped to the browser from your environment;
-  `Store` for state many components share;
+  `Store` for state many components share; `provide`/`inject` for values
+  a whole part of the page needs;
   `<Dynamic :is>` for a component chosen at runtime.
 - **Pages:** `router("pages")` turns a folder into screens, with `<Link>`,
   `navigate()`, Back/Forward, typed `{params}` and query values as fields.
@@ -2697,7 +2700,6 @@ Working today:
   "Ready-made controls" in section 5), with a live gallery.
 - **Releases:** `pyweft` and `pyweft-ui` on PyPI.
 
-Coming next: a faster first start that also works offline, `pyweft check`
-for errors without running the app, and installers (`.msi`, `.dmg`) and code
-signing for desktop apps.
+Coming next: a faster first start that also works offline, and installers
+(`.msi`, `.dmg`) and code signing for desktop apps.
 

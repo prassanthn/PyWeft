@@ -306,7 +306,8 @@ Pages = router("pages")         # one page per .weft file in pages/
    There is no `v-model`, `onClick=`, `this.` or JSX: fields, methods and
    properties are plain names in templates (`{{ count }}`, `@click="bump"`).
 8. **`key` is reserved**, and `<If>`, `<ElseIf>`, `<Else>`, `<For>`, `<Slot>`,
-   `<Fill>`, `<Dynamic>` are framework tags. Component tags start with a capital
+   `<Fill>`, `<Dynamic>`, `<Await>`, `<Then>`, `<Catch>`, `<Html>`, `<Window>`,
+   `<Document>` are framework tags. Component tags start with a capital
    letter (or are dotted, `ui.Button`); lower-case tags are HTML.
 9. **No `document`, `window` or DOM access** from Python: the page is updated
    from the rendered template only. Use refs + `self.focus()` for focus.
