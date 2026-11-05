@@ -157,6 +157,20 @@ Control flow is **elements**, never `v-if` / `@if` / `{% if %}`:
   rows (and their components' state) are matched by position.
 - `<If>` / `<ElseIf>` / `<Else>` must be siblings, in that order.
 
+Loading data: `<Await>` instead of `loading`/`error` fields:
+
+```xml
+<Await task="load_orders(page)" key="page">
+  <p>Loading…</p>
+  <Then as="orders"><OrderTable :orders="orders" /></Then>
+  <Catch as="error"><p>Failed: {{ error }}</p></Catch>
+</Await>
+```
+
+- `task` is an async call (or a task kept in a field). It runs once, not on
+  every render; `key` restarts it when that value changes. The content
+  outside `<Then>`/`<Catch>` shows while it runs.
+
 ## Components
 
 ```xml

@@ -14,7 +14,7 @@ import re
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from .parser import TElement, TFill, TFor, TIf, TSlot, TStatic
+from .parser import TElement, TSlot, TStatic, subtrees
 
 # WAI-ARIA 1.2, plus the graphics roles.
 ROLES = frozenset("""
@@ -72,11 +72,9 @@ class _Audit:
                 if not self.is_component(node.tag) and not node.tag.startswith("pyweft-"):
                     self.element(node, in_label, at)
                 self.walk(node.children, in_label or node.tag == "label", at)
-            elif isinstance(node, TIf):
-                for _, children in node.branches:
-                    self.walk(children, in_label, node.line or line)
-            elif isinstance(node, (TFor, TSlot, TFill)):
-                self.walk(node.children, in_label, node.line or line)
+            else:
+                for children in subtrees(node):
+                    self.walk(children, in_label, getattr(node, "line", 0) or line)
 
     def warn(self, line: int, code: str, message: str) -> None:
         self.add(line, "warning", f"a11y-{code}", message)
@@ -181,10 +179,7 @@ def _has_text(nodes: Iterable[Any], is_component: Callable[[str], bool]) -> bool
                 return True
         elif isinstance(node, TSlot):
             return True
-        elif isinstance(node, TIf):
-            if any(_has_text(children, is_component) for _, children in node.branches):
-                return True
-        elif isinstance(node, (TFor, TFill)) and _has_text(node.children, is_component):
+        elif any(_has_text(children, is_component) for children in subtrees(node)):
             return True
     return False
 
@@ -202,12 +197,8 @@ def _label_targets(nodes: list[Any]) -> tuple[set, bool]:
                         targets.add(value)
                     elif _has(node, "for"):
                         dynamic = True
-                walk(node.children)
-            elif isinstance(node, TIf):
-                for _, children in node.branches:
-                    walk(children)
-            elif isinstance(node, (TFor, TSlot, TFill)):
-                walk(node.children)
+            for children in subtrees(node):
+                walk(children)
 
     walk(nodes)
     return targets, dynamic

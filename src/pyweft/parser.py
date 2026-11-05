@@ -113,6 +113,37 @@ class TFill:
     line: int = field(default=0, compare=False, repr=False, kw_only=True)
 
 
+@dataclass
+class TAwait:
+    """``<Await task="load(id)" key="id">`` pending content ``<Then
+    as="user">`` ... ``<Catch as="error">`` ... ``</Await>``: what to show
+    while an awaitable runs, once it returns, and if it raises. ``then`` /
+    ``catch`` are None when the block is absent (not the same as empty)."""
+
+    task: str
+    key_expr: str | None = None
+    pending: list[Any] = field(default_factory=list)
+    then_var: str = "value"
+    then: list[Any] | None = None
+    catch_var: str = "error"
+    catch: list[Any] | None = None
+    line: int = field(default=0, compare=False, repr=False, kw_only=True)
+
+    @property
+    def blocks(self) -> list[list[Any]]:
+        return [self.pending, self.then or [], self.catch or []]
+
+
+def subtrees(node: Any) -> list[list[Any]]:
+    """The child lists of any template node, for code that walks a template
+    without caring what each control element means."""
+    if isinstance(node, TIf):
+        return [children for _, children in node.branches]
+    if isinstance(node, TAwait):
+        return node.blocks
+    return [node.children] if isinstance(node, (TElement, TFor, TSlot, TFill)) else []
+
+
 # ------------------------------------------------------------ source slicing
 
 _BLOCK_OPEN = re.compile(r"<(template|code|style)\s*>")
@@ -356,6 +387,13 @@ def _convert_children(el: ET.Element) -> list[Any]:
         child = kids[i]
         if child.tag in ("ElseIf", "Else"):
             raise TemplateError(f"<{child.tag}> must directly follow an <If>")
+        if child.tag in ("Then", "Catch"):
+            raise TemplateError(f"<{child.tag}> must be directly inside an <Await>")
+        if child.tag == "Await":
+            out.append(_convert_await(child))
+            out += _text_nodes(child.tail)
+            i += 1
+            continue
         if child.tag == "If":
             node, i = _convert_if(kids, i)
             out.append(node)
@@ -421,6 +459,42 @@ def _convert_for(el: ET.Element) -> TFor:
         children=_convert_children(el),
         line=_line(el),
     )
+
+
+def _convert_await(el: ET.Element) -> TAwait:
+    task = el.get("task")
+    if not task or not task.strip():
+        raise TemplateError('<Await> requires task="...", the awaitable to wait for, e.g. task="load_orders()"')
+    extra = sorted(set(el.attrib) - {"task", "key"})
+    if extra:
+        raise TemplateError(f"<Await> takes only task= and key=, not {', '.join(extra)}")
+    node = TAwait(task=task, key_expr=el.get("key"), line=_line(el))
+    # Everything but <Then>/<Catch> is the pending content, text included.
+    holder = ET.Element("Await")
+    holder.text = el.text
+    for kid in el:
+        if kid.tag in ("Then", "Catch"):
+            if (node.then if kid.tag == "Then" else node.catch) is not None:
+                raise TemplateError(f"<Await> has two <{kid.tag}> blocks")
+            unknown = sorted(set(kid.attrib) - {"as"})
+            if unknown:
+                raise TemplateError(f"<{kid.tag}> takes only as=, not {', '.join(unknown)}")
+            name = kid.get("as", "value" if kid.tag == "Then" else "error")
+            if not name.isidentifier():
+                raise TemplateError(f'<{kid.tag} as="{name}">: as= names a variable, so it must be a Python name')
+            if kid.tag == "Then":
+                node.then_var, node.then = name, _convert_children(kid)
+            else:
+                node.catch_var, node.catch = name, _convert_children(kid)
+            tail = kid.tail or ""
+            if len(holder):
+                holder[-1].tail = (holder[-1].tail or "") + tail
+            else:
+                holder.text = (holder.text or "") + tail
+        else:
+            holder.append(kid)
+    node.pending = _convert_children(holder)
+    return node
 
 
 _SLOT_NAME = re.compile(r"^[A-Za-z_][\w-]*$")

@@ -8,6 +8,12 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **`<Await task="..." key="...">`:** waits for an async call in the
+  template: its content shows while the call runs, then `<Then as="x">`
+  with the result or `<Catch as="error">` with the exception. The call
+  runs once (not on every render) and starts over when `key` changes;
+  a replaced or removed one is cancelled. The shop example's order page
+  uses it.
 - **Context: `self.provide(key, value)` and `self.inject(key, default)`:**
   pass a value (a theme, the signed-in user, a form) to every component
   below one, without threading it through props. The nearest provider

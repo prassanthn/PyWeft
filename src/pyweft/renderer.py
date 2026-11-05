@@ -26,7 +26,7 @@ from .component import Component, component_named, declared_props, is_component_
 from .effects import dispose_effects, run_effects
 from .events import Event
 from .expressions import ExpressionError, Scope, eval_expr, render_parts, run_handler
-from .parser import TElement, TemplateError, TFill, TFor, TIf, TSlot, TStatic
+from .parser import TAwait, TElement, TemplateError, TFill, TFor, TIf, TSlot, TStatic, subtrees
 from .store import _renderers as _live_renderers
 from .styles import marker
 from .vdom import Element, Node, Text
@@ -83,11 +83,8 @@ def slot_names(cls: type) -> frozenset[str]:
         for node in nodes:
             if isinstance(node, TSlot):
                 found.add(node.name)
-            if isinstance(node, TIf):
-                for _, children in node.branches:
-                    walk(children)
-            elif isinstance(node, (TElement, TFor, TSlot, TFill)):
-                walk(node.children)
+            for children in subtrees(node):
+                walk(children)
 
     walk(cls.__template__)
     return frozenset(found)
@@ -143,6 +140,26 @@ def set_title(text: str) -> None:
             # Outside a handler nothing else would render and settle, which
             # is when hosts carry requests out.
             renderer.component.state_has_changed()
+
+
+_NO_KEY = object()
+
+
+@dataclasses.dataclass(eq=False)
+class _Awaited:
+    """One <Await> on the page: what it waits for and how that ended."""
+
+    key: Any
+    source: Any
+    state: str = "pending"  # "pending" | "then" | "catch"
+    value: Any = None
+    task: asyncio.Task | None = None
+
+    def same_key(self, key: Any) -> bool:
+        try:
+            return bool(self.key == key)
+        except Exception:  # an array's ==, say: treat as changed
+            return False
 
 
 def _is_group(cls: type, field: str, current: Any) -> bool:
@@ -217,6 +234,10 @@ class Renderer:
         self._refs: dict[tuple[int, str], Element] = {}
         self._tree: list[Node] = []
         self._commands: list[tuple[Any, str, str | None, dict[str, Any]]] = []
+        # <Await> blocks by where they are, kept across renders like child
+        # instances so a render doesn't restart what they wait for.
+        self._awaits: dict[tuple, _Awaited] = {}
+        self._awaits_seen: dict[tuple, int] = {}
         # The component whose template is being rendered right now: the
         # parent, for context (inject), of any component it creates.
         self._rendering: list[Any] = [component]
@@ -365,6 +386,7 @@ class Renderer:
             self.handlers = {}
             self._refs = {}
             self._seen = set()
+            self._awaits_seen = {}
             self._rendering = [self.component]
             out: list[Node] = []
             try:
@@ -377,6 +399,10 @@ class Renderer:
             self._tree = out
             for inst_id in [i for i in self.instances if i not in self._seen]:
                 _dispose(self.instances.pop(inst_id))
+            for ident in [i for i in self._awaits if i[-1] >= self._awaits_seen.get(i[:-1], 0)]:
+                entry = self._awaits.pop(ident)
+                if entry.task is not None:
+                    entry.task.cancel()
             self.component._dirty = False
             for instance in self.instances.values():
                 instance._dirty = False
@@ -461,6 +487,9 @@ class Renderer:
             elif isinstance(tnode, TSlot):
                 self._slot(tnode, scope, path, out, key)
 
+            elif isinstance(tnode, TAwait):
+                self._await(tnode, scope, path, out, key)
+
             elif isinstance(tnode, TFill):
                 raise TemplateError(
                     f'<Fill name="{tnode.name}"> must be directly inside a component tag'
@@ -491,6 +520,96 @@ class Renderer:
                         "a keyed <For> body must produce exactly one element "
                         f"per item, got {len(elements)}"
                     )
+
+    # ----------------------------------------------------------------- await
+
+    def _await(
+        self, tnode: TAwait, scope: Scope, path: list[str], out: list[Node], key: Any
+    ) -> None:
+        """``<Await task="load(id)" key="id">``: start the awaitable the
+        first time this block renders, then show the pending content, the
+        ``<Then>`` block with the result, or the ``<Catch>`` block with the
+        exception.
+
+        ``task`` is evaluated on every render, but a new run only starts
+        when ``key`` changes, or, without a key, when it gives a different
+        task or future object (``self.orders = self.start_task(...)``
+        again). A fresh coroutine from the same call is the same work
+        asked for again: it is closed unrun."""
+        owner = scope.component
+        where = (
+            "/".join(path),
+            getattr(type(owner), "__weft_file__", None) or type(owner).__qualname__,
+            tnode.line,
+            key,
+        )
+        nth = self._awaits_seen.get(where, 0)
+        self._awaits_seen[where] = nth + 1
+        ident = (*where, nth)
+
+        source = eval_expr(tnode.task, scope)
+        key_value = eval_expr(tnode.key_expr, scope) if tnode.key_expr else _NO_KEY
+        entry = self._awaits.get(ident)
+        if entry is not None and (
+            entry.same_key(key_value) if tnode.key_expr
+            else source is entry.source
+            or (inspect.iscoroutine(source) and inspect.iscoroutine(entry.source))
+        ):
+            if inspect.iscoroutine(source) and source is not entry.source:
+                source.close()
+        else:
+            if entry is not None and entry.task is not None:
+                entry.task.cancel()
+            entry = self._begin_await(owner, source, key_value, tnode.catch is not None)
+            self._awaits[ident] = entry
+
+        if entry.state == "pending":
+            self._emit(tnode.pending, scope, path, out, key)
+        elif entry.state == "then":
+            if tnode.then is not None:
+                self._emit(tnode.then, scope.child(**{tnode.then_var: entry.value}), path, out, key)
+        elif tnode.catch is not None:
+            self._emit(tnode.catch, scope.child(**{tnode.catch_var: entry.value}), path, out, key)
+
+    def _begin_await(self, owner: Any, source: Any, key: Any, catches: bool) -> _Awaited:
+        entry = _Awaited(key=key, source=source)
+        if not inspect.isawaitable(source):
+            # A plain value (a cache hit, say): there is nothing to wait for.
+            entry.state, entry.value = "then", source
+            return entry
+        if asyncio.isfuture(source) and source.done():
+            if source.cancelled():
+                entry.state, entry.value = "catch", asyncio.CancelledError()
+            elif source.exception() is not None:
+                entry.state, entry.value = "catch", source.exception()
+            else:
+                entry.state, entry.value = "then", source.result()
+            return entry
+
+        # A task or future may be shared with other code: cancelling this
+        # wait (key changed, block gone) must not cancel it. A coroutine is
+        # this block's own work, and stops with it.
+        awaited = asyncio.shield(source) if asyncio.isfuture(source) else source
+
+        async def run() -> None:
+            try:
+                value = await awaited
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                entry.state, entry.value = "catch", exc
+                if not catches:
+                    raise  # no <Catch>: reported like any failed task
+            else:
+                entry.state, entry.value = "then", value
+
+        try:
+            entry.task = self._start(owner, run())
+        except RuntimeError:
+            if inspect.iscoroutine(source):
+                source.close()
+            raise
+        return entry
 
     # ------------------------------------------------------------ components
 

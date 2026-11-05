@@ -531,6 +531,52 @@ So, in practice:
   `run_in_background` makes you do. (In a desktop app, real threads exist,
   so this matters most there.)
 
+### Waiting in the template: Await
+
+Loading something usually means three fields (`loading`, `error`, the data)
+and an `<If>` over them. `<Await>` does that bookkeeping: it starts an async
+call, shows its own content while the call runs, then the `<Then>` block
+with what it returned, or the `<Catch>` block with what it raised.
+
+```xml
+<Await task="load_user(user_id)" key="user_id">
+  <p>Loading…</p>
+  <Then as="user">
+    <h2>{{ user['name'] }}</h2>
+  </Then>
+  <Catch as="error">
+    <p class="error">Couldn't load it: {{ error }}</p>
+  </Catch>
+</Await>
+```
+
+```python
+from pyweft import http
+
+user_id: int = 1
+
+async def load_user(self, uid):
+    return await http.get_json(f"/api/users/{uid}")
+```
+
+- **When it runs.** The call starts when the `<Await>` first appears and
+  runs once: re-rendering doesn't start it again. Give `key` an expression
+  and it starts over (showing the waiting content again) whenever that
+  value changes; above, choosing another user loads that user. A run that
+  is replaced, or whose `<Await>` leaves the page, is cancelled.
+- **A task you keep.** `task` can also be a task you started yourself,
+  kept in a field: `self.users = self.start_task(self.fetch_users())`.
+  Assigning a new task (a Refresh button) shows the new one; the old one is
+  left alone, since other code may be waiting for it too.
+- **A plain value** shows the `<Then>` block straight away, so
+  `task="cached or fetch()"` skips the wait when there's a cached copy.
+- **`<Then>` and `<Catch>` are optional.** `as` names the variable
+  (`value` and `error` when left out). Without a `<Catch>`, an error is
+  reported like any failed handler (in the error overlay during `pyweft
+  run`) and nothing is shown.
+- Everything inside is in the component's scope as usual: its fields,
+  methods and loop variables, plus the `as` name.
+
 ---
 
 ## 3. Template syntax reference
@@ -546,6 +592,7 @@ So, in practice:
 | `@bind="field"` | Two-way binding on inputs, textareas, selects, checkboxes and radio buttons, converting to the field's declared type. `@bind.lazy`, `.trim`, `.number`: see [binding form controls](#binding-form-controls) |
 | `<If cond="...">` / `<ElseIf cond="...">` / `<Else>` | Conditional rendering. Branch elements must be adjacent siblings |
 | `<For each="item in items" key="item['id']" index="i">` | Loop. `key` gives rows stable identity across reorders (always use it for dynamic lists); `index` is optional |
+| `<Await task="load(id)" key="id">` ... `<Then as="data">` ... `<Catch as="error">` | Wait for an async call: the content shown while it runs, then the `<Then>` or `<Catch>` block. See [waiting in the template](#waiting-in-the-template-await) |
 | `<PascalCaseTag ... />` | Renders a child component (see below) |
 
 Expressions are real Python, evaluated against the component's state plus any

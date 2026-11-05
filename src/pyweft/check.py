@@ -37,7 +37,7 @@ from .component import (
     split_source,
 )
 from .a11y import audit, ignored
-from .parser import TElement, TemplateError, TFill, TFor, TIf, TSlot, TStatic
+from .parser import TAwait, TElement, TemplateError, TFill, TFor, TIf, TSlot, TStatic, subtrees
 
 BUILTINS = frozenset(dir(builtins))
 # Attributes any element may carry: not taken for a mistyped prop when
@@ -335,6 +335,16 @@ class _Checker:
                 self._walk(node.children, scope, at)
             elif isinstance(node, TFill):
                 self._walk(node.children, scope, node.line or line)
+            elif isinstance(node, TAwait):
+                at = node.line or line
+                self._expr(node.task, at, scope, "<Await task>")
+                if node.key_expr:
+                    self._expr(node.key_expr, at, scope, "<Await key>")
+                self._walk(node.pending, scope, at)
+                if node.then is not None:
+                    self._walk(node.then, scope | {node.then_var}, at)
+                if node.catch is not None:
+                    self._walk(node.catch, scope | {node.catch_var}, at)
             elif isinstance(node, TElement):
                 self._element(node, scope, node.line or line)
 
@@ -596,12 +606,8 @@ def _emitted_events(cls: type) -> frozenset[str] | None:
         for node in nodes:
             if isinstance(node, TElement):
                 sources.extend(node.events.values())
-                gather(node.children)
-            elif isinstance(node, TIf):
-                for _, children in node.branches:
-                    gather(children)
-            elif isinstance(node, (TFor, TSlot, TFill)):
-                gather(node.children)
+            for children in subtrees(node):
+                gather(children)
 
     gather(cls.__template__)
     names: set[str] = set()
@@ -648,12 +654,8 @@ def _slots(cls: type) -> dict[str, frozenset[str]] | None:
         for node in nodes:
             if isinstance(node, TSlot):
                 found.setdefault(node.name, set()).update(node.attrs, node.expr_attrs)
-                walk(node.children)
-            elif isinstance(node, TIf):
-                for _, children in node.branches:
-                    walk(children)
-            elif isinstance(node, (TElement, TFor, TFill)):
-                walk(node.children)
+            for children in subtrees(node):
+                walk(children)
 
     walk(template)
     return {name: frozenset(props) for name, props in found.items()}

@@ -22,12 +22,9 @@ from typing import Any, Callable
 from .parser import (
     TElement,
     TemplateError,
-    TFill,
-    TFor,
-    TIf,
-    TSlot,
     block_spans,
     parse_template,
+    subtrees,
     split_source,
 )
 from .store import Store
@@ -344,15 +341,10 @@ def declared_props(cls: type) -> frozenset[str]:
 
 def _component_tags(nodes: list[Any], found: set[str]) -> set[str]:
     for node in nodes:
-        if isinstance(node, TElement):
-            if is_component_tag(node.tag):
-                found.add(node.tag)
-            _component_tags(node.children, found)
-        elif isinstance(node, TIf):
-            for _, children in node.branches:
-                _component_tags(children, found)
-        elif isinstance(node, (TFor, TSlot, TFill)):
-            _component_tags(node.children, found)
+        if isinstance(node, TElement) and is_component_tag(node.tag):
+            found.add(node.tag)
+        for children in subtrees(node):
+            _component_tags(children, found)
     return found
 
 
