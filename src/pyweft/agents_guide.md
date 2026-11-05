@@ -305,7 +305,12 @@ lists take `"A, B, C"`, a list of values, `(value, label)` pairs or dicts.
   `RadarChart`; dashboards: `ScatterChart` (`group`, `size` = bubbles,
   `trend="true"`), `Sparkline` (numbers, `kind`), `Gauge` (`:value`,
   `bands="60:success, 85:warning, 100:danger"`), `FunnelChart`,
-  `WaterfallChart` (`totals="Start, End"`). `:data` = rows, a dict of columns or a DataFrame; `x=` the
+  `WaterfallChart` (`totals="Start, End"`); data science: `Histogram`
+  (`curve`, `show_mean`), `BoxPlot` (`violin`), `Heatmap` (`x`, `y`,
+  `value`), `CorrelationMatrix`, `CandlestickChart` (`averages`),
+  `Treemap` (`path="region, country"`), `SankeyChart` (source, target,
+  value), `CalendarHeatmap` (`date`, `value`); series options `lower`/
+  `upper` (band), `error` (error bars), `trend`. `:data` = rows, a dict of columns or a DataFrame; `x=` the
   category field, `y="a, b"` the series; `:series` dicts add `type`
   (line/bar/area: combo), `axis="right"`, `dash`, `color`. `@select` gets
   `{index, label, series, value, values, row}`. Don't hand-draw SVG charts.

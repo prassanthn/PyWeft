@@ -83,6 +83,47 @@
                            format="${:,.0f}" tick_format="${:,.0f}" />
       </div>
       <div class="box">
+        <ui.LineChart :data="FORECAST" x="month" title="Forecast" subtitle="With a 90% interval and a trend line"
+                      :series="FORECAST_SERIES" connect_gaps="true" />
+      </div>
+      <div class="box">
+        <ui.BarChart :data="TRIALS" x="dose" y="effect" title="Trial results" subtitle="Mean ± standard error"
+                     :series="[{'key': 'effect', 'label': 'Effect', 'error': 'se'}]" legend="none" />
+      </div>
+      <div class="box">
+        <ui.Histogram :data="HEIGHTS" y="height" group="group" curve="true" show_mean="true" title="Heights"
+                      x_label="Height (cm)" />
+      </div>
+      <div class="box">
+        <ui.BoxPlot :data="TIMES" title="Response times" subtitle="Box plot, outliers as dots" y_label="ms" />
+      </div>
+      <div class="box">
+        <ui.BoxPlot :data="TIMES" violin="true" title="The same, as violins" y_label="ms" />
+      </div>
+      <div class="box">
+        <ui.Heatmap :data="ACTIVITY" x="hour" y="day" value="visits" title="Visits by hour" />
+      </div>
+      <div class="box">
+        <ui.CorrelationMatrix :data="CARS" triangle="lower" title="What moves together"
+                              subtitle="Correlation of car measures" />
+      </div>
+      <div class="box">
+        <ui.CandlestickChart :data="PRICES" averages="5, 20" title="ACME shares" format="${:,.2f}"
+                             tick_format="${:,.0f}" />
+      </div>
+      <div class="box">
+        <ui.Treemap :data="REGION_SALES" path="region, country" value="sales" title="Sales by region"
+                    format="${:,.0f}k" />
+      </div>
+      <div class="box">
+        <ui.SankeyChart :data="BUDGET" title="Where the money goes" format="${:,.0f}" />
+      </div>
+    </ui.Grid>
+    <div class="box">
+      <ui.CalendarHeatmap :data="CONTRIBUTIONS" title="Contributions" subtitle="A year of days" />
+    </div>
+    <ui.Grid min_width="20rem" gap="lg">
+      <div class="box">
         <ui.RadarChart :data="SKILLS" x="skill" y="ada, grace" :series="SKILL_NAMES" title="Skills" />
       </div>
     </ui.Grid>
@@ -92,6 +133,8 @@
 <code>
 # Every chart, with data a real app would have; the toggles restyle the
 # first ones live and "New numbers" changes the data.
+import datetime
+import math
 import random
 
 from pyweft_ui import ui
@@ -132,6 +175,50 @@ FUNNEL = {"Visited the site": 12400, "Started sign-up": 4100, "Confirmed email":
 BRIDGE = [{"item": "Revenue", "amount": 48000}, {"item": "Cost of goods", "amount": -19500},
           {"item": "Salaries", "amount": -14200}, {"item": "Marketing", "amount": -4100},
           {"item": "Other income", "amount": 2300}, {"item": "Tax", "amount": -3100}, {"item": "Profit"}]
+_rnd = random.Random(7)
+FORECAST = [{"month": m, "actual": a, "forecast": f, "low": lo, "high": hi} for m, a, f, lo, hi in [
+    ("Jan", 120, None, None, None), ("Feb", 132, None, None, None), ("Mar", 128, None, None, None),
+    ("Apr", 141, None, None, None), ("May", 150, 150, 150, 150), ("Jun", None, 156, 148, 164),
+    ("Jul", None, 163, 150, 176), ("Aug", None, 169, 151, 187), ("Sep", None, 176, 153, 199)]]
+FORECAST_SERIES = [{"key": "actual", "label": "Actual", "trend": True},
+                   {"key": "forecast", "label": "Forecast", "dash": True, "lower": "low", "upper": "high"}]
+TRIALS = [{"dose": d, "effect": e, "se": se} for d, e, se in
+          [("Placebo", 1.2, 0.6), ("5 mg", 2.9, 0.7), ("10 mg", 4.4, 0.8), ("20 mg", 5.1, 1.1)]]
+HEIGHTS = [{"group": g, "height": round(_rnd.gauss(m, 7), 1)} for g, m in (("Women", 164), ("Men", 177))
+           for _ in range(160)]
+TIMES = {name: [round(_rnd.lognormvariate(mu, 0.35)) for _ in range(60)]
+         for name, mu in (("Search", 4.6), ("Checkout", 5.2), ("Login", 4.2), ("Upload", 5.6))}
+ACTIVITY = [{"day": d, "hour": f"{h:02d}", "visits": round(max(0, 40 * math.sin((h - 6) / 16 * math.pi)
+            + (25 if d in ("Sat", "Sun") and 10 <= h <= 16 else 0) + _rnd.uniform(-6, 6)))}
+            for d in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] for h in range(6, 24)]
+CARS = []
+for _ in range(40):
+    _weight = _rnd.uniform(900, 2200)
+    _power = _weight * 0.08 + _rnd.uniform(-30, 40)
+    CARS.append({"price": round(_power * 260 + _rnd.uniform(-4000, 4000)), "power": round(_power),
+                 "weight": round(_weight), "mpg": round(70 - _weight / 50 + _rnd.uniform(-5, 5), 1),
+                 "doors": _rnd.choice([3, 5])})
+PRICES = []
+_price = 84.0
+for _i in range(60):
+    _close = _price * (1 + _rnd.gauss(0.002, 0.018))
+    PRICES.append({"date": f"{['Mar', 'Apr', 'May'][_i // 20]} {_i % 20 + 1}", "open": round(_price, 2),
+                   "high": round(max(_price, _close) * (1 + abs(_rnd.gauss(0, 0.008))), 2),
+                   "low": round(min(_price, _close) * (1 - abs(_rnd.gauss(0, 0.008))), 2),
+                   "close": round(_close, 2), "volume": _rnd.randint(8, 30) * 1000})
+    _price = _close
+REGION_SALES = [{"region": r, "country": c, "sales": v} for r, c, v in [
+    ("Europe", "Germany", 182), ("Europe", "France", 140), ("Europe", "Spain", 76), ("Europe", "Italy", 98),
+    ("Europe", "Sweden", 41), ("Americas", "USA", 260), ("Americas", "Canada", 64), ("Americas", "Brazil", 88),
+    ("Asia", "Japan", 150), ("Asia", "India", 120), ("Asia", "Korea", 58), ("Oceania", "Australia", 49)]]
+BUDGET = [("Salary", "Budget", 5200), ("Freelance", "Budget", 1300), ("Budget", "Housing", 1900),
+          ("Budget", "Food", 850), ("Budget", "Transport", 420), ("Budget", "Fun", 630), ("Budget", "Savings", 2700),
+          ("Savings", "Index funds", 1800), ("Savings", "Emergency fund", 900)]
+_today = datetime.date(2026, 11, 4)
+CONTRIBUTIONS = {}
+for _k in range(365):
+    _day = _today - datetime.timedelta(days=_k)
+    CONTRIBUTIONS[_day.isoformat()] = _rnd.choice([0, 0, 1, 2, 3, 5, 8] if _day.weekday() < 5 else [0, 0, 0, 1])
 SKILL_NAMES = [{"key": "ada", "label": "Ada"}, {"key": "grace", "label": "Grace"}]
 
 sales: list = [{"month": m, "online": o, "store": s} for m, o, s in zip(

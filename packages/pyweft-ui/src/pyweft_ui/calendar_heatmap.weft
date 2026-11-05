@@ -1,0 +1,38 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" legend="none" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.CalendarHeatmap :data="commits" date="day" value="count" title="Contributions" />
+# A year of days as squares, a column per week, shaded by value (in four
+# steps, by quartile, so a few huge days don't wash out the rest). data:
+# rows with a date (a date, datetime or ISO text) and a value (rows without
+# value= count 1 each; days that repeat add up), or a {date: value} dict.
+# start and end (dates or "2026-01-01") set the range: default the year up
+# to the last date. week_start: monday or sunday. On narrow screens it
+# shows the latest weeks that fit. @select gets {date, value}.
+from pyweft_ui.charting import calendar, days_input
+
+data = None
+date: str = ""
+value: str = ""
+start = None
+end = None
+week_start: str = "monday"  # monday, sunday
+color: str = ""
+title: str = ""
+subtitle: str = ""
+format = ""
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    return calendar(days_input(self.data, self.date, self.value), width=width, start=self.start, end=self.end,
+                    week_start=6 if self.week_start == "sunday" else 0, color=self.color or None,
+                    fmt=self.format or None, empty_text=self.empty)
+</code>

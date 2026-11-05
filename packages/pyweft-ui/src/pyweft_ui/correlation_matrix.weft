@@ -1,0 +1,39 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" legend="none" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.CorrelationMatrix :data="cars" fields="price, power, weight, mpg" triangle="lower" />
+# How strongly each pair of number fields moves together, from -1 (one
+# rises as the other falls) through 0 to 1, in a diverging heatmap with
+# the coefficient in each cell. data: rows (dicts, objects or a
+# DataFrame); fields: which to compare (default: every number field).
+# method: pearson (straight-line relationships) or spearman (any rising or
+# falling one, by rank). triangle="lower" leaves out the mirror half.
+# @select gets {x, y, value} for a clicked pair.
+from pyweft_ui.charting import correlation, heatmap
+
+data = None
+fields = ""
+method: str = "pearson"   # pearson, spearman
+triangle: str = "full"    # full, lower
+title: str = ""
+subtitle: str = ""
+height: int = 0
+labels: bool = True
+format = ".2f"
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    names, matrix = correlation(self.data, self.fields, self.method)
+    skip = (lambda i, j: j > i) if self.triangle == "lower" else None
+    return heatmap(names, names, matrix, width=width, height=self.height, lo=-1, hi=1, diverging=True,
+                   labels=self.labels, fmt=self.format or None, skip=skip, kind="Correlation matrix",
+                   empty_text=self.empty)
+</code>

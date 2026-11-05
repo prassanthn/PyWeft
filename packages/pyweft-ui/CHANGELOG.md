@@ -8,6 +8,13 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- **Data-science charts:** `Histogram` (round bins, overlapping groups, a
+  KDE curve, means), `BoxPlot` (quartiles, outliers, violins, all points),
+  `Heatmap`, `CorrelationMatrix` (Pearson or Spearman), `CandlestickChart`
+  (volume, moving averages, hollow and OHLC styles), `Treemap`,
+  `SankeyChart` and `CalendarHeatmap`. Bar and line series take error
+  bars, shaded bands (`lower`/`upper`) and trend lines. The statistics are
+  plain Python: no numpy needed in the browser.
 - **Dashboard charts:** `ScatterChart` (groups, bubbles sized by area,
   least-squares trend lines with R²), `Sparkline` (line, area or bars, for
   stat cards and table cells), `Gauge` (270° or half dial, coloured bands,

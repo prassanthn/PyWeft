@@ -117,6 +117,9 @@ class Series:
     curve: str | None = None
     points: bool | None = None
     width: float | None = None
+    low: list | None = None   # error bars or a band: the bottom of each value's range
+    high: list | None = None
+    trend: bool = False       # a least-squares line through the values
 
 
 @dataclass
@@ -227,8 +230,27 @@ def cartesian_input(data, x="", y="", series=(), kind="bar", colors=()):
             curve=_curve(spec),
             points=spec.get("points"),
             width=spec.get("width"),
+            trend=spec.get("trend") not in (None, False, "", "false"),
         ))
+        out[-1].low, out[-1].high = _range(spec, rows, out[-1].values)
     return categories, out, rows
+
+
+def _range(spec, rows, values):
+    """(low, high) lists from a series' "lower"/"upper" fields (a band, a
+    confidence interval) or "error" (a field, or one number: plus or minus)."""
+    if spec.get("lower") or spec.get("upper"):
+        low = [number(field(r, spec["lower"])) if spec.get("lower") else v for r, v in zip(rows, values)]
+        high = [number(field(r, spec["upper"])) if spec.get("upper") else v for r, v in zip(rows, values)]
+        return low, high
+    error = spec.get("error")
+    if error in (None, "", False):
+        return None, None
+    fixed = number(error) if not isinstance(error, str) or number(error) is not None else None
+    errs = [fixed if fixed is not None else number(field(r, error)) for r in rows]
+    low = [None if v is None or e is None else v - abs(e) for v, e in zip(values, errs)]
+    high = [None if v is None or e is None else v + abs(e) for v, e in zip(values, errs)]
+    return low, high
 
 
 def _from_chartjs(data: Mapping, kind: str, palette: list):
@@ -279,3 +301,29 @@ def slices_input(data, label="", value="", colors=()) -> list[Slice]:
         own = own or (palette[i] if i < len(palette) else None)
         out.append(Slice(str(i), label_text(field(row, label)), number(field(row, value)), color_of(own, i), row))
     return out
+
+
+def mix(color: str, pct: float, base: str = "var(--ui-surface, #ffffff)") -> str:
+    """``pct`` percent of ``color`` over ``base``: lighter shades that still
+    follow the theme (a dark theme mixes towards its dark surface)."""
+    pct = max(0.0, min(100.0, pct))
+    return f"color-mix(in oklab, {color} {pct:.0f}%, {base})"
+
+
+def ramp(t: float | None, low: str, high: str, diverging: bool = False) -> str:
+    """The colour for ``t`` in 0..1: from the surface to ``high``, or with
+    ``diverging``, from ``low`` through the surface (0.5) to ``high``."""
+    if t is None:
+        return "var(--ui-subtle, #f6f8fa)"
+    t = max(0.0, min(1.0, t))
+    if diverging:
+        return mix(low, (0.5 - t) * 200) if t < 0.5 else mix(high, (t - 0.5) * 200)
+    return mix(high, 8 + t * 92)
+
+
+def ink(t: float | None, diverging: bool = False) -> str:
+    """Text colour that stays readable on ``ramp(t)``."""
+    if t is None:
+        return "var(--ui-muted, #59636e)"
+    strong = abs(t - 0.5) > 0.3 if diverging else t > 0.55
+    return "#ffffff" if strong else "var(--ui-text, #1f2328)"

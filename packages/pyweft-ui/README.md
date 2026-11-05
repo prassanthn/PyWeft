@@ -156,12 +156,22 @@ function), `align` and `sortable`. Left out, they come from the first row.
 | `Gauge` | `value`, `min`, `max`, `label`, `format`, `bands`, `color`, `half`, `needle`, `show_range` | A 270° dial or half circle, coloured by `bands` (`"60:success, 85:warning, 100:danger"`); a meter for screen readers. |
 | `FunnelChart` | `data`, `label`, `value`, `shape` (bars, funnel), `color`, `colors`, `height` | Stages with their share of the first; tooltips add the step's conversion and how many were lost. |
 | `WaterfallChart` | `data`, `label`, `value`, `total`, `totals`, `labels`, `up_color`, `down_color`, `total_color` | Each bar starts where the last ended; totals stand on zero. |
+| `Histogram` | `data`, `y`, `group`, `bins`, `density`, `cumulative`, `curve`, `show_mean` | Counts in round bins; overlapping groups; a density curve (KDE). |
+| `BoxPlot` | `data`, `y`, `group`, `violin`, `points` (outliers, all, none), `horizontal`, `show_mean` | Quartiles, whiskers and outliers, or violins. |
+| `Heatmap` | `data`, `x`, `y`, `value`, `x_labels`, `y_labels`, `labels`, `color`, `low_color`, `diverging`, `center`, `min_value`, `max_value`, `show_scale` | Cells coloured by value, with a colour scale. |
+| `CorrelationMatrix` | `data`, `fields`, `method` (pearson, spearman), `triangle` (full, lower) | Correlations between number fields, -1 to 1. |
+| `CandlestickChart` | `data`, `date`, `open`, `high`, `low`, `close`, `volume`, `averages`, `style` (candle, hollow, ohlc), `show_volume` | Prices per period with volume and moving averages. |
+| `Treemap` | `data`, `label`, `value`, `path`, `children`, `depth` | Nested rectangles sized by value. |
+| `SankeyChart` | `data`, `source`, `target`, `value`, `align` (left, justify), `node_width` | Flows between nodes. |
+| `CalendarHeatmap` | `data`, `date`, `value`, `start`, `end`, `week_start`, `color` | A year of days shaded by value. |
 
 The charts (all but `Gauge` and `Sparkline`) take `title`, `subtitle`,
 `height`, `legend` (auto, top, bottom, right, none), `format`, `tick_format`, `x_label`, `y_label`, `colors`,
 `aria_label` and `empty`, and emit `select` with what was clicked. `data`
 is rows (dicts or objects), a dict of columns, a pandas or polars
 DataFrame, a `{label: value}` dict or Chart.js's `{"labels", "datasets"}`.
+Bar and line series also take `lower`/`upper` (a band), `error` (error
+bars) and `trend` (a least-squares line).
 Charts are SVG drawn in Python: themed, sized to their container, with
 tooltips, a legend that hides series, arrow-key reading and a data table
 for screen readers.

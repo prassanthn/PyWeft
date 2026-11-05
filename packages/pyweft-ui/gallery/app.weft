@@ -456,7 +456,7 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['table'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Charts" id="charts" ref="charts" subtitle="Dashboards, bars, lines, pies, scatter, funnels and more: hover, use the arrow keys, click the legend">
+        <ui.Card title="Charts" id="charts" ref="charts" subtitle="Dashboards, everyday charts and data science: hover, use the arrow keys, click the legend">
           <Charts />
           <pre class="code">{{ CODE['charts'] }}</pre>
         </ui.Card>
@@ -572,7 +572,9 @@ SECTION_CONTROLS = {
     "Table": ["Table"],
     "Charts": ["BarChart", "LineChart", "PieChart", "PolarAreaChart", "RadarChart", "ScatterChart",
                "Sparkline", "Gauge", "FunnelChart", "WaterfallChart", "chart", "graph", "doughnut", "donut",
-               "area", "combo", "bubble", "dashboard", "kpi"],
+               "area", "combo", "bubble", "dashboard", "kpi", "Histogram", "BoxPlot", "violin", "Heatmap",
+               "CorrelationMatrix", "CandlestickChart", "Treemap", "SankeyChart", "CalendarHeatmap",
+               "error bars", "confidence", "trend", "statistics", "data science"],
     "Breadcrumbs": ["Breadcrumbs", "trail", "navigation"],
     "Tree": ["Tree"],
     "Carousel": ["Carousel", "slider", "slideshow"],
@@ -1056,6 +1058,18 @@ places = [
 <ui.Gauge :value="cpu" label="CPU" format="{:.0f}%" bands="60:success, 85:warning, 100:danger" />
 <ui.FunnelChart :data="{'Visited': 12400, 'Signed up': 4100, 'Paid': 310}" />
 <ui.WaterfallChart :data="bridge" label="item" value="amount" totals="Revenue, Profit" />
+
+<ui.Histogram :data="people" y="height" group="group" curve="true" show_mean="true" />
+<ui.BoxPlot :data="{'Search': times_a, 'Login': times_b}" violin="true" points="all" />
+<ui.Heatmap :data="visits" x="hour" y="day" value="visits" />
+<ui.CorrelationMatrix :data="cars" triangle="lower" />
+<ui.CandlestickChart :data="prices" averages="5, 20" />
+<ui.Treemap :data="sales" path="region, country" value="sales" />
+<ui.SankeyChart :data="[('Salary', 'Budget', 5200), ('Budget', 'Savings', 2700)]" />
+<ui.CalendarHeatmap :data="contributions" />
+<ui.LineChart :data="forecast" x="month" :series="[
+    {'key': 'forecast', 'lower': 'low', 'upper': 'high'}, {'key': 'actual', 'trend': True}]" />
+<ui.BarChart :data="trials" x="dose" y="effect" :series="[{'key': 'effect', 'error': 'se'}]" />
 
 sales = [{"month": "Jan", "online": 4200, "store": 3100}, ...]   # or a DataFrame""",
     "tree": """<ui.Tree :nodes="files" @bind="selected" :filter="query"

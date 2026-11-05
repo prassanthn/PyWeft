@@ -253,6 +253,32 @@ def toggle(self, key):
 .stage-value { fill: var(--ui-text, #1f2328); font-size: 12px; font-weight: 600; }
 .connector { stroke: var(--ui-muted, #59636e); stroke-width: 1; stroke-dasharray: 3 3; }
 .swatch.dot { border-radius: 50%; }
+.band-fill { fill-opacity: 0.15; }
+.whisker { stroke: var(--ui-text, #1f2328); stroke-width: 1.25; opacity: 0.7; }
+.bin.layered { fill-opacity: 0.5; }
+.mean-line { stroke-width: 1.5; stroke-dasharray: 4 3; }
+.mean-label { font-size: 10px; font-weight: 600; }
+.box { fill-opacity: 0.22; stroke-width: 1.5; }
+.median { stroke-width: 2.5; }
+.mean-dot { fill: var(--ui-surface, #ffffff); stroke-width: 1.5; }
+.point.small { stroke-width: 1.5; fill-opacity: 0.9; }
+.violin { fill-opacity: 0.3; stroke-width: 1.5; stroke-linejoin: round; }
+.violin-box { fill: var(--ui-text, #1f2328); opacity: 0.7; }
+.violin-median { fill: var(--ui-surface, #ffffff); }
+.cell-label { font-size: 11px; font-variant-numeric: tabular-nums; }
+.hover-cell { fill: none; stroke: var(--ui-text, #1f2328); stroke-width: 2; }
+.wick { stroke-width: 1.25; }
+.candle { stroke-width: 1; }
+.candle.hollow { fill: var(--ui-surface, #ffffff); }
+.volume { fill-opacity: 0.35; }
+.line.thin { stroke-width: 1.5; }
+.tm-header { fill: var(--ui-text, #1f2328); font-size: 11px; font-weight: 600; }
+.tm-label { fill: #ffffff; font-size: 12px; font-weight: 600; }
+.tm-value { fill: #ffffff; font-size: 11px; opacity: 0.9; }
+.link { fill-opacity: 0.3; }
+.hover-link { fill-opacity: 0.55; }
+.node-label { fill: var(--ui-text, #1f2328); font-size: 12px; paint-order: stroke; stroke: var(--ui-surface, #ffffff);
+  stroke-width: 3px; stroke-linejoin: round; }
 .tip {
   position: absolute;
   z-index: 5;

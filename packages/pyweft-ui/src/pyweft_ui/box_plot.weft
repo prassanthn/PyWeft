@@ -1,0 +1,48 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" legend="none" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.BoxPlot :data="{'Plan A': times_a, 'Plan B': times_b}" title="Response times" />
+# <ui.BoxPlot :data="people" y="salary" group="team" violin="true" points="all" />
+# Groups of values side by side: the box spans the middle half (Q1 to Q3)
+# with a line at the median, whiskers reach the furthest values within 1.5
+# box-lengths, dots beyond are outliers, a ring marks the mean.
+# violin="true" draws each group's smoothed distribution instead, with a
+# slim box inside. data: a {name: [numbers]} dict, a list of numbers, or
+# rows with y= (one box per field, or per value of group=). points:
+# outliers (default), all (jittered) or none. horizontal="true" lays them
+# sideways. Tooltips give n, min, Q1, median, Q3, max and mean; @select gets
+# them too.
+from pyweft_ui.charting import boxplot, groups_input
+
+data = None
+y = ""
+group: str = ""
+horizontal: bool = False
+violin: bool = False
+points: str = "outliers"  # outliers, all, none
+show_mean: bool = True
+title: str = ""
+subtitle: str = ""
+height: int = 300
+format = ""
+tick_format = ""
+x_label: str = ""
+y_label: str = ""
+colors = ""
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    groups = groups_input(self.data, self.y, self.group, self.colors)
+    return boxplot(groups, width=width, height=self.height, hidden=hidden, horizontal=self.horizontal,
+                   violin=self.violin, points=self.points, show_mean=self.show_mean, fmt=self.format or None,
+                   tick_fmt=self.tick_format or None, x_label=self.x_label, y_label=self.y_label,
+                   empty_text=self.empty)
+</code>

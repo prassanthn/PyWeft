@@ -1,0 +1,55 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" :legend="legend" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.CandlestickChart :data="prices" averages="20, 50" title="ACME" />
+# Prices over time: each candle runs from open to close (green when it
+# closed higher, red lower) with a wick from low to high. data: rows with
+# date, open, high, low, close and optionally volume fields (any case:
+# "Open" works); the props of the same names pick other fields. Volume
+# shows as bars underneath (show_volume="false" hides it). averages adds
+# moving averages of the close ("20, 50" or a list), each in the legend.
+# style: candle, hollow (rising candles outlined) or ohlc (bars with ticks).
+# Tooltips give open, high, low, close, the change from the previous close,
+# volume and averages. @select gets {index, date, open, high, low, close,
+# volume, row}.
+from pyweft_ui.charting import candles_input, candlestick
+
+data = None
+date: str = ""
+open: str = ""
+high: str = ""
+low: str = ""
+close: str = ""
+volume: str = ""
+averages = ""
+style: str = "candle"     # candle, hollow, ohlc
+show_volume: bool = True
+title: str = ""
+subtitle: str = ""
+height: int = 360
+format = ""
+tick_format = ""
+y_label: str = ""
+up_color: str = ""
+down_color: str = ""
+legend: str = "auto"
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    windows = self.averages
+    if isinstance(windows, str):
+        windows = [int(w) for w in windows.replace(",", " ").split() if w.strip()]
+    rows = candles_input(self.data, self.date, self.open, self.high, self.low, self.close, self.volume)
+    return candlestick(rows, width=width, height=self.height, hidden=hidden, averages=windows or (),
+                       style=self.style, volume=self.show_volume, fmt=self.format or None,
+                       tick_fmt=self.tick_format or None, up=self.up_color or None, down=self.down_color or None,
+                       y_label=self.y_label, empty_text=self.empty)
+</code>

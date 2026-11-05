@@ -1,0 +1,53 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" legend="none" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.Heatmap :data="visits" x="hour" y="day" value="count" labels="true" />
+# <ui.Heatmap :data="[[1, 2], [3, 4]]" :x_labels="['a', 'b']" :y_labels="['x', 'y']" />
+# A grid of cells coloured by value, with a colour scale beside it. data:
+# rows with x, y and value fields (cells that repeat add up), a list of
+# lists (name them with x_labels and y_labels) or a {row: {column: value}}
+# dict. color is the strongest colour (the first chart colour); with
+# diverging="true", values below center (0) shade towards low_color and
+# above it towards color, around a neutral middle. min_value/max_value fix
+# the ends of the scale. labels="true" writes values in cells that fit
+# them. height: 0 (default) sizes rows from the width. @select gets {x, y,
+# value, row, column}.
+from pyweft_ui.charting import heat_input, heatmap
+
+data = None
+x: str = ""
+y: str = ""
+value: str = ""
+x_labels: list = []
+y_labels: list = []
+title: str = ""
+subtitle: str = ""
+height: int = 0
+labels: bool = False
+format = ""
+color: str = ""
+low_color: str = ""
+diverging: bool = False
+center: float = 0
+min_value: float | None = None
+max_value: float | None = None
+show_scale: bool = True
+x_label: str = ""
+y_label: str = ""
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    columns, rows, matrix = heat_input(self.data, self.x, self.y, self.value, self.x_labels, self.y_labels)
+    return heatmap(columns, rows, matrix, width=width, height=self.height, lo=self.min_value, hi=self.max_value,
+                   color=self.color or None, low_color=self.low_color or None, diverging=self.diverging,
+                   center=self.center, labels=self.labels, fmt=self.format or None, x_label=self.x_label,
+                   y_label=self.y_label, legend=self.show_scale, empty_text=self.empty)
+</code>

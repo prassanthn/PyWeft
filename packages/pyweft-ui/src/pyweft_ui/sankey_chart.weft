@@ -1,0 +1,41 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" legend="none" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.SankeyChart :data="flows" title="Where the money goes" />
+# Amounts flowing from one thing to the next (budgets, energy, user
+# journeys): each node is as tall as what passes through it, each band as
+# wide as its amount. data: rows with source, target and value fields
+# (source=, target=, value= pick others) or (source, target, value) tuples.
+# Nodes line up in columns by how many steps they are from a start;
+# align="justify" moves every end to the right-hand column. Hovering a
+# node highlights its flows. @select gets
+# {kind: "node", label, value, in, out} or {kind: "link", source, target,
+# value, row}.
+from pyweft_ui.charting import links_input, sankey
+
+data = None
+source: str = ""
+target: str = ""
+value: str = ""
+title: str = ""
+subtitle: str = ""
+height: int = 360
+node_width: float = 12
+align: str = "left"       # left, justify
+format = ""
+colors = ""
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    links = links_input(self.data, self.source, self.target, self.value)
+    return sankey(links, width=width, height=self.height, fmt=self.format or None, colors=self.colors,
+                  node_width=self.node_width, align=self.align, empty_text=self.empty)
+</code>

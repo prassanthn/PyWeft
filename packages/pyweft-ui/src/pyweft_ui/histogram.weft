@@ -1,0 +1,52 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" :legend="legend" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.Histogram :data="ages" title="Ages" />
+# <ui.Histogram :data="people" y="height" group="sex" curve="true" show_mean="true" />
+# How values are spread: counts in bins of equal width on round numbers.
+# data: a list of numbers, a {name: [numbers]} dict, or rows with y=
+# naming the value (several fields, or group= splitting by a field, make
+# overlapping histograms in their own colours). bins: about how many ("20"; widths stay round), a
+# width ("width:5"), the edges as a list, or left out to choose from the
+# data. density="true" shows density instead of counts, cumulative="true"
+# running totals; curve="true" adds a smoothed density curve (a KDE),
+# show_mean="true" a line at each mean. @select gets {index, start, end,
+# counts}.
+from pyweft_ui.charting import groups_input, histogram
+
+data = None
+y = ""
+group: str = ""
+bins = None
+density: bool = False
+cumulative: bool = False
+curve: bool = False
+show_mean: bool = False
+title: str = ""
+subtitle: str = ""
+height: int = 300
+format = ""
+tick_format = ""
+x_tick_format = ""
+x_label: str = ""
+y_label: str = ""
+legend: str = "auto"
+colors = ""
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    groups = groups_input(self.data, self.y, self.group, self.colors)
+    return histogram(groups, width=width, height=self.height, hidden=hidden, bins=self.bins, density=self.density,
+                     cumulative=self.cumulative, curve=self.curve, show_mean=self.show_mean,
+                     fmt=self.format or None, tick_fmt=self.tick_format or None,
+                     x_tick_fmt=self.x_tick_format or None, x_label=self.x_label, y_label=self.y_label,
+                     empty_text=self.empty)
+</code>

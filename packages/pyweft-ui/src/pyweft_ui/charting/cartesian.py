@@ -13,6 +13,7 @@ from collections import defaultdict
 from .data import label_text
 from .scales import LinearScale, fmt_tick, fmt_value, nice, tick_step, ticks
 from .scene import LegendItem, Mark, Scene, Tip, n, text_width
+from .stats import linear_fit
 
 _STEPS = ("step", "step-before", "step-after")
 
@@ -25,6 +26,9 @@ def cartesian(categories, series, *, width, height, hidden=frozenset(), horizont
     count = len(categories)
     for s in series:  # every series as long as the categories
         s.values = (list(s.values) + [None] * count)[:count]
+        if s.low is not None:
+            s.low = (list(s.low) + [None] * count)[:count]
+            s.high = (list(s.high) + [None] * count)[:count]
     names = [label_text(c) for c in categories]
     shown = [s for s in series if s.key not in hidden]
     scene = Scene(width, height)
@@ -96,6 +100,8 @@ def cartesian(categories, series, *, width, height, hidden=frozenset(), horizont
         if not members:
             continue
         vals = [v for s in members for v in (*top[s.key], *base[s.key]) if v is not None] or [0.0, 1.0]
+        vals += [v for s in members if s.low is not None and not group(s) for v in (*s.low, *s.high)
+                 if v is not None]
         lo, hi = min(vals), max(vals)
         if any(s.kind in ("bar", "area") for s in members):
             lo, hi = min(lo, 0.0), max(hi, 0.0)
@@ -221,6 +227,7 @@ def cartesian(categories, series, *, width, height, hidden=frozenset(), horizont
         if (group(s) or s.key) not in slots:
             slots.append(group(s) or s.key)
     texts_after = []
+    bar_at = {}
     if slots:
         slot = band / len(slots)
         thick = min(slot * (0.88 if len(slots) > 1 else 1.0), 80.0)
@@ -232,6 +239,7 @@ def cartesian(categories, series, *, width, height, hidden=frozenset(), horizont
                 if v1 is None:
                     continue
                 c = centers[i] - band / 2 + slot * (j + 0.5)
+                bar_at[(s.key, i)] = c
                 a, b = scale.clamp(v0), scale.clamp(v1)
                 lo_p, hi_p = min(a, b), max(a, b)
                 length = hi_p - lo_p
@@ -260,6 +268,22 @@ def cartesian(categories, series, *, width, height, hidden=frozenset(), horizont
                 else:
                     texts_after.append(Mark("text", f"l{i}|{s.key}", "value-label", x=n(c),
                                             y=n(lo_p - 5 if up else hi_p + 13), text=text, anchor="middle"))
+
+    def place(u, v, side):
+        w = scales[side].clamp(v)
+        return (w, u) if horizontal else (u, w)
+
+    # ------------------------------------- bands (a range around a line)
+    for s in shown:
+        if s.low is None or group(s) or s.kind == "bar":
+            continue
+        for k, seg in enumerate(_segments([None if a is None or b is None else a for a, b in zip(s.low, s.high)],
+                                          connect_gaps)):
+            edge = [at(i, s.high[i], s.axis) for i in seg]
+            floor_ = [at(i, s.low[i], s.axis) for i in reversed(seg)]
+            how = s.curve or curve
+            d = _path(edge, how, horizontal) + " " + _path(floor_, how, horizontal, start="L") + " Z"
+            marks.append(Mark("path", f"r{k}|{s.key}", "band-fill", style=f"fill: {s.color}", d=d))
 
     # ----------------------------------------------------- areas, lines
     drawn = [s for s in shown if s.kind in ("line", "area")]
@@ -295,6 +319,30 @@ def cartesian(categories, series, *, width, height, hidden=frozenset(), horizont
                                         y=n(y) if horizontal else n(y - 8), text=fmt_value(s.values[i], fmt),
                                         anchor="start" if horizontal else "middle",
                                         baseline="middle" if horizontal else None))
+    # ----------------------------------------- error bars, trend lines
+    for s in shown:
+        if s.low is None or group(s) or s.kind != "bar":
+            continue
+        cap = min(thick * 0.3, 8.0) if slots else 4.0
+        for i in range(count):
+            a, b = s.low[i], s.high[i]
+            if a is None or b is None or (s.key, i) not in bar_at:
+                continue
+            u = bar_at[(s.key, i)]
+            for key, (u0, v0, u1, v1) in (("e", (u, a, u, b)), ("ea", (u - cap, a, u + cap, a)),
+                                          ("eb", (u - cap, b, u + cap, b))):
+                (x1, y1), (x2, y2) = place(u0, v0, s.axis), place(u1, v1, s.axis)
+                marks.append(Mark("line", f"{key}{i}|{s.key}", "whisker", x1=n(x1), y1=n(y1), x2=n(x2), y2=n(y2)))
+    for s in shown:
+        if not s.trend:
+            continue
+        known = [i for i in range(count) if top[s.key][i] is not None]
+        fit = linear_fit(known, [top[s.key][i] for i in known])
+        if not fit:
+            continue
+        (x1, y1), (x2, y2) = at(known[0], fit(known[0]), s.axis), at(known[-1], fit(known[-1]), s.axis)
+        marks.append(Mark("line", f"trend|{s.key}", "trend", style=f"stroke: {s.color}", x1=n(x1), y1=n(y1),
+                          x2=n(x2), y2=n(y2)))
     marks.extend(texts_after)
 
     # ------------------------------------------------------------- tips
@@ -306,6 +354,8 @@ def cartesian(categories, series, *, width, height, hidden=frozenset(), horizont
             if v is None:
                 continue
             text = fmt_value(v, fmt)
+            if s.low is not None and not group(s) and s.low[i] is not None and s.high[i] is not None:
+                text += f" ({fmt_value(s.low[i], fmt)} – {fmt_value(s.high[i], fmt)})"
             if percent and group(s):
                 text += f" ({top[s.key][i] - base[s.key][i]:.1f}%)"
             tip_rows.append((s.key, s.color, s.label, text))

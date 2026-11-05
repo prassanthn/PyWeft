@@ -1686,6 +1686,62 @@ Pressing Enter picks the category under the keyboard, with `series` and
 
 All of them report clicks with `@select` like the other charts.
 
+#### Data science: distributions, matrices, finance, hierarchies, flows
+
+```xml
+<ui.Histogram :data="people" y="height" group="sex" curve="true" show_mean="true" />
+<ui.BoxPlot :data="{'Search': search_ms, 'Login': login_ms}" violin="true" />
+<ui.Heatmap :data="visits" x="hour" y="day" value="visits" />
+<ui.CorrelationMatrix :data="cars" triangle="lower" />
+<ui.CandlestickChart :data="prices" averages="20, 50" />
+<ui.Treemap :data="sales" path="region, country" value="sales" />
+<ui.SankeyChart :data="[('Salary', 'Budget', 5200), ('Budget', 'Rent', 1900)]" />
+<ui.CalendarHeatmap :data="commits" date="day" value="count" />
+```
+
+The statistics are computed in plain Python (no numpy needed), and the data
+can be a list of numbers, rows, or a DataFrame as with the other charts.
+
+- **`Histogram`**: counts in equal bins on round numbers. `bins` is about
+  how many (the width stays round), `"width:5"` or a list of edges; left
+  out, it is chosen from the data. `group=` or several `y` fields overlap
+  histograms; `curve="true"` adds a smoothed density curve (a kernel
+  density estimate), `show_mean="true"` a line at each mean, `density` and
+  `cumulative` change what the bars count.
+- **`BoxPlot`**: quartiles, median, whiskers to the furthest values within
+  1.5 box-lengths, outliers as dots, the mean as a ring. `violin="true"`
+  draws each group's smoothed distribution; `points="all"` shows every
+  value; `horizontal="true"` lays them sideways. Tooltips give n, min, Q1,
+  median, Q3, max and mean.
+- **`Heatmap`**: a grid coloured by value from rows with x, y and value
+  (repeats add up), a list of lists, or a `{row: {column: value}}` dict;
+  `diverging="true"` colours below and above `center` differently.
+- **`CorrelationMatrix`**: Pearson (or `method="spearman"`) correlations
+  of a table's number fields, from -1 to 1, with the values written in.
+- **`CandlestickChart`**: open, high, low and close per period (field
+  names in any case), volume underneath, moving averages with `averages`;
+  `style` is candle, hollow or ohlc.
+- **`Treemap`**: areas for values, nested by `path=` fields (or a nested
+  dict, or dicts with children); each group gets a colour and a header.
+- **`SankeyChart`**: amounts flowing between nodes, from source, target and
+  value; hovering a node highlights its flows. `align="justify"` puts every
+  end in the last column.
+- **`CalendarHeatmap`**: a year of days, a column per week, shaded in four
+  steps by quartile; on a phone it shows the latest weeks that fit.
+
+**Uncertainty and trends on bar and line charts.** A series can carry a
+range: `lower` and `upper` fields draw a shaded band around a line (a
+forecast interval, a confidence band), and on bars, `error` (a field, or
+one number for plus or minus) draws error bars. `trend: True` adds a
+least-squares line. Tooltips show the range beside the value.
+
+```xml
+<ui.LineChart :data="forecast" x="month" :series="[
+    {'key': 'forecast', 'lower': 'low', 'upper': 'high', 'dash': True},
+    {'key': 'actual', 'trend': True}]" />
+<ui.BarChart :data="trials" x="dose" y="effect" :series="[{'key': 'effect', 'error': 'se'}]" />
+```
+
 ## 10. Calendars of events
 
 `EventCalendar` shows events in a month, a week, or a list by day, the way

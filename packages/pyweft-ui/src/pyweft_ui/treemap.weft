@@ -1,0 +1,40 @@
+<template>
+  <ChartView :build="layout" :title="title" :subtitle="subtitle" legend="none" :aria_label="aria_label"
+             :clickable="clickable" @select="emit('select', event)" />
+</template>
+
+<code>
+# <ui.Treemap :data="sales" path="region, country" value="amount" title="Sales" />
+# <ui.Treemap :data="{'Europe': {'France': 30, 'Spain': 12}, 'Asia': {'Japan': 25}}" />
+# Parts of a whole as rectangles whose areas show their values, nested
+# by group: each group gets a colour and a header, its parts shades of it.
+# data: rows with path= fields (outermost first) and a value field; a
+# nested {name: value or {...}} dict; or dicts with label, value and
+# children. depth limits how many levels open (deeper ones are summed).
+# Tooltips give the value and its share of the whole and of its group.
+# @select gets {label, path, value, row} for a clicked rectangle.
+from pyweft_ui.charting import tree_input, treemap
+
+data = None
+label: str = ""
+value: str = ""
+path = ""
+children: str = "children"
+depth: int | None = None
+title: str = ""
+subtitle: str = ""
+height: int = 360
+format = ""
+colors = ""
+aria_label: str = ""
+empty: str = "No data"
+
+@property
+def clickable(self):
+    return callable(getattr(self, "on_select", None))
+
+def layout(self, width, hidden):
+    roots = tree_input(self.data, self.label, self.value, self.path, self.children)
+    return treemap(roots, width=width, height=self.height, fmt=self.format or None, colors=self.colors,
+                   depth=self.depth, empty_text=self.empty)
+</code>
