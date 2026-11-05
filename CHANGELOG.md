@@ -8,6 +8,12 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **`@resize`** on any element: `event.width` and `event.height` when it is
+  first laid out and whenever its size changes, so a component can lay
+  itself out for the space it has.
+- Mouse and pointer events carry `localX`/`localY`, the position inside the
+  element the handler is on (with its `width`/`height`).
+
 ## 0.5.0
 
 - **`pyweft check` checks dependencies for the browser:** it follows the

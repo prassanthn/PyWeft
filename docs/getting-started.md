@@ -608,10 +608,32 @@ def on_key(self, event):
 | `key`, `code`, `repeat` | keyboard events: `key` is the character or name (`"a"`, `"Enter"`, `"ArrowUp"`); `code` the physical key (`"KeyA"`) |
 | `ctrlKey`, `shiftKey`, `altKey`, `metaKey` | keyboard and mouse events |
 | `clientX`, `clientY`, `offsetX`, `offsetY`, `button`, `buttons` | mouse and pointer events (`deltaX`, `deltaY` on `wheel`) |
+| `localX`, `localY`, `width`, `height` | mouse and pointer events: the pointer's position inside the element the handler is on, and that element's size |
 | `form` | `submit`: the form's fields as `{name: value}`, a list when several fields share a name (file inputs are left out) |
 
 Asking for a key the event doesn't have raises an `AttributeError` that
 lists the keys it does have.
+
+### Reacting to an element's size: @resize
+
+`@resize` isn't a browser event: it fires when the element is first laid
+out and again whenever its size changes, with `event.width` and
+`event.height` in whole pixels (the content box). Use it to lay something
+out for the space it really has, such as fewer labels on a narrow screen:
+
+```xml
+<div @resize="fit"> ... </div>
+```
+
+```python
+wide: bool = True
+
+def fit(self, event):
+    self.wide = event.width >= 600
+```
+
+It needs a page, so it never fires in pre-rendering or headless tests:
+start with a sensible default.
 
 ### Event modifiers
 

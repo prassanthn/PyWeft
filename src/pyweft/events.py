@@ -88,6 +88,11 @@ class Event(dict):
     - ``ctrlKey``, ``shiftKey``, ``altKey``, ``metaKey``: keyboard and mouse
     - ``clientX``, ``clientY``, ``offsetX``, ``offsetY``, ``button``,
       ``buttons``: mouse and pointer events (``deltaX``/``deltaY`` on wheel)
+    - ``localX``, ``localY``: mouse and pointer events, the position inside
+      the element the handler is on, whose size is ``width``/``height``
+    - ``width``, ``height``: ``@resize``, which is not a DOM event: it fires
+      when the element is first laid out and whenever its size changes
+      (content box, whole pixels)
     - ``form``: on ``submit``, the form's fields as ``{name: value}`` (a list
       when several fields share a name)
     """

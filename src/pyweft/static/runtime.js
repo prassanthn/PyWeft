@@ -238,11 +238,40 @@ const PyWeftRuntime = (() => {
     return true;
   }
 
+  /* @resize: not a DOM event. A ResizeObserver reports the element's size
+   * (content box, whole pixels) when it is first laid out and whenever it
+   * changes, so a component can lay itself out for the space it really has.
+   * One observer serves every element; it doesn't keep removed ones alive. */
+  let resizeObserver = null;
+
+  function observeSize(el, spec) {
+    if (typeof ResizeObserver === "undefined") return;
+    if (!resizeObserver) {
+      resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const target = entry.target;
+          const width = Math.round(entry.contentRect.width);
+          const height = Math.round(entry.contentRect.height);
+          const last = target._pyweftSize;
+          if (last && last[0] === width && last[1] === height) continue;
+          target._pyweftSize = [width, height];
+          for (const s of target._pyweftResizeSpecs || []) {
+            const handlerId = (target._pyweftEvents || {})[s];
+            if (handlerId) dispatch(handlerId, { type: "resize", width, height });
+          }
+        }
+      });
+    }
+    (el._pyweftResizeSpecs = el._pyweftResizeSpecs || []).push(spec);
+    resizeObserver.observe(el);
+  }
+
   function ensureListener(el, spec) {
     if (!el._pyweftBound) el._pyweftBound = {};
     if (el._pyweftBound[spec]) return;
     el._pyweftBound[spec] = true;
     const [name, ...mods] = spec.split(".");
+    if (name === "resize") return observeSize(el, spec);
     // Browsers fire no click for the right or middle button.
     let type = name;
     if (name === "click" && mods.includes("right")) type = "contextmenu";
@@ -291,6 +320,16 @@ const PyWeftRuntime = (() => {
         offsetX: ev.offsetX, offsetY: ev.offsetY,
         button: ev.button, buttons: ev.buttons,
       });
+      // Relative to the element the handler is on, not the innermost one
+      // under the pointer (offsetX), which inside an SVG is rarely useful.
+      const here = ev.currentTarget;
+      if (here && here.getBoundingClientRect) {
+        const box = here.getBoundingClientRect();
+        payload.localX = ev.clientX - box.left;
+        payload.localY = ev.clientY - box.top;
+        payload.width = box.width;
+        payload.height = box.height;
+      }
     }
     if ("deltaY" in ev) {
       payload.deltaX = ev.deltaX;
