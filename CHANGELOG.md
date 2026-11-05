@@ -8,6 +8,12 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **Embedding in other websites:** `pyweft build` writes an `embed.js`;
+  any page that loads it can place the app with `<pyweft-app>` (`src`,
+  `route`, `height`, `label`, `data-*`). The app runs in its own frame
+  that follows its content's height. `pyweft.embed` reads the `data-*`
+  attributes (`params()`), fires DOM events on the element (`send()`) and
+  receives the page's `el.send()` messages (`on_message()`).
 - **`<Head>`:** `<title>`, `<meta>`, `<link>` and `<style>` for the page's
   head while a component is shown, with expressions, `<If>` and `<For>`
   inside; tags of several components add up and the last title wins. The

@@ -86,6 +86,37 @@
     const DEV = __PYWEFT_DEV__; // pyweft run: hot reload and the error overlay
     const SINCE = __PYWEFT_SINCE__; // dev server changes already in this page
 
+    // Inside a <pyweft-app> element on another page (embed.js): tell it how
+    // tall the page is, and hand its el.send(...) messages to Python
+    // (pyweft.embed.on_message), holding them until Python runs. Messages
+    // are JSON text starting {"pyweft", both ways.
+    const EMBEDDED = new URLSearchParams(location.search).has("pyweft-embed") && window.parent !== window;
+    const embedQueue = [];
+    let embedDeliver = null;
+    const embedPost = (data) => window.parent.postMessage(JSON.stringify(data), "*");
+    if (EMBEDDED) {
+      let reported = 0;
+      new ResizeObserver(() => {
+        const height = Math.ceil(document.documentElement.getBoundingClientRect().height);
+        if (height !== reported) {
+          reported = height;
+          embedPost({ pyweft: "size", height });
+        }
+      }).observe(document.documentElement);
+      window.addEventListener("message", (event) => {
+        if (event.source !== window.parent || typeof event.data !== "string") return;
+        let data;
+        try {
+          data = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+        if (data.pyweft !== "message") return;
+        if (embedDeliver) embedDeliver(data.name, data.detail);
+        else embedQueue.push(data);
+      });
+    }
+
     // The Python half of the bridge. Renders, dispatches, diffs -- and talks
     // JSON strings across the boundary to keep proxy lifetimes out of play.
     const BOOTSTRAP = `
@@ -116,6 +147,8 @@ _routing.set_host(_HashHost())
 # loads: a module it imports may read storage as it starts.
 from pyweft import webhost as _webhost
 _webhost.install_page(${JSON.stringify(APP_ID)})
+
+from pyweft.webhost import embed_message as pyweft_embed_message
 
 def pyweft_location(place):
     if place.startswith("#/"):
@@ -633,6 +666,12 @@ def pyweft_hot_reload():
       setStep("ready"); // lets a loading screen finish its picture as it fades
       wakeApp();
       hideLoading();
+      if (EMBEDDED) {
+        const deliver = pyodide.globals.get("pyweft_embed_message");
+        embedDeliver = (name, detail) => deliver(String(name), String(detail ?? "null"));
+        for (const message of embedQueue.splice(0)) embedDeliver(message.name, message.detail);
+        embedPost({ pyweft: "ready" });
+      }
 
       // Back, forward, a typed address or a plain <a href="#/...">. Python
       // re-renders through pyweftScheduleRender if the page changed.

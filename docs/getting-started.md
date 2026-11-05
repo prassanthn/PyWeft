@@ -2498,6 +2498,69 @@ works:
 - The same app can also be handed out as a desktop program, with
   [`pyweft build --desktop`](#handing-out-a-desktop-app-pyweft-build---desktop).
 
+### Putting an app inside another website
+
+A built app can go into any web page, a WordPress post, a company intranet,
+docs, without that site using PyWeft. `pyweft build` writes an `embed.js`
+next to `index.html`; the other page loads it and places a `<pyweft-app>`
+element where the app should appear:
+
+```html
+<script src="https://you.github.io/orders/embed.js" defer></script>
+
+<pyweft-app data-customer="42" route="/orders" label="Orders"></pyweft-app>
+```
+
+- **`src`** is the app's address; leave it out and it is the folder
+  `embed.js` came from. **`route`** opens a given page (`/orders/7`).
+- **Height:** the element grows and shrinks with the app's content. An app
+  laid out to fill the window (`min-height: 100vh`) has no content height
+  of its own, so give it one: `height="600px"`.
+- **`label`** names the app for screen readers.
+- The app runs in a frame of its own: its styles and the page's don't
+  meet, two apps on one page are independent, and its page addresses
+  (`#/orders`) don't change the host page's address.
+
+The app and the page can talk through `pyweft.embed`:
+
+```python
+from pyweft import embed
+
+customer: str = embed.params().get("customer", "")   # data-customer="42"
+
+def save(self):
+    embed.send("saved", {"id": self.order_id})
+
+def on_init(self):
+    embed.on_message(self.message)      # the page called el.send(...)
+
+def message(self, name, detail):
+    if name == "select":
+        self.order_id = detail["id"]
+        self.state_has_changed()        # it arrives outside any handler
+```
+
+```html
+<script>
+  const app = document.querySelector("pyweft-app");
+  app.addEventListener("saved", (event) => console.log(event.detail.id));
+  app.addEventListener("pyweft-ready", () => app.send("select", { id: 7 }));
+</script>
+```
+
+- `params()` holds the element's `data-*` attributes (without `data-`),
+  read when the app starts. `send(name, detail)` fires a DOM event of that
+  name on the element, with `detail` (anything JSON can carry) as
+  `event.detail`. `pyweft-ready` fires once the app is on screen.
+- Outside a host page, `embedded()` is `False`, `params()` is empty and
+  `send()` does nothing, so the same app works on its own too.
+- Whatever the page sends or sets is input from outside: check it like
+  form input. And whatever the app sends goes to any site that embeds it,
+  so keep secrets out of it.
+- Every `<pyweft-app>` starts its own Python, so a page with several of
+  them downloads Pyodide once (the browser caches it) but runs each app
+  separately.
+
 ### A desktop app: `pyweft run --desktop`
 
 The same app runs in a native window, with Python running on your own
@@ -2736,6 +2799,8 @@ Working today:
   form fields with validation, autocomplete, chips, sliders and masks, date and date-range pickers,
   calendars of events, charts, menus, tabs, tables, dialogs, toasts (see
   "Ready-made controls" in section 5), with a live gallery.
+- **Embedding:** `<pyweft-app>` (from the build's `embed.js`) puts an app
+  in any other website, with `pyweft.embed` for events and data both ways.
 - **Releases:** `pyweft` and `pyweft-ui` on PyPI.
 
 Coming next: a faster first start that also works offline, and installers

@@ -258,6 +258,11 @@ def save_theme(self, name):
 - **Shared state:** subclass `pyweft.Store` in a `.py` module, create one
   instance, import it where needed. Setting its fields or calling its methods
   updates every component that shows it.
+- **Inside another website** (`<pyweft-app>` from the build's `embed.js`):
+  `pyweft.embed.params()` = the element's `data-*` attributes,
+  `embed.send("saved", {...})` fires a DOM event on it,
+  `embed.on_message(fn)` gets `el.send(name, detail)` (outside a handler:
+  call `state_has_changed()`); `embed.embedded()` is False elsewhere.
 - `pyweft.set_title(text)` sets the window or tab title (or `<Head><title>` in a template).
 
 ## Pages and routing

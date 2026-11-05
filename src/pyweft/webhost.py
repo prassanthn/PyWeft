@@ -1,4 +1,4 @@
-"""The browser's hosts for pyweft.http and pyweft.storage.
+"""The browser's hosts for pyweft.http, pyweft.storage and pyweft.embed.
 
 Used only in the browser (the page's bootstrap in shell.html, and
 worker.js), never by the core: it reaches for ``js`` and ``pyodide``, which
@@ -9,7 +9,7 @@ the bootstrap so the page and the worker share it.
 
 from __future__ import annotations
 
-from . import http, storage
+from . import embed, http, storage
 
 
 def _js():
@@ -67,7 +67,36 @@ class LocalStorage:
         return [name[len(self.prefix):] for name in names if name.startswith(self.prefix)]
 
 
+class EmbedPage:
+    """pyweft.embed inside a <pyweft-app> (embed.js): the element's data-*
+    attributes arrive in the address's query; events go to the parent page
+    as JSON text, which embed.js turns into DOM events on the element."""
+
+    def __init__(self, query: str):
+        from urllib.parse import parse_qsl
+
+        self._params = {k: v for k, v in parse_qsl(query.lstrip("?")) if k != "pyweft-embed"}
+
+    def params(self):
+        return self._params
+
+    def send(self, name, detail_json):
+        import json
+
+        message = json.dumps({"pyweft": "event", "name": name, "detail": detail_json})
+        # Whoever embeds the app gets its events: "*" says so.
+        _js().window.parent.postMessage(message, "*")
+
+
+def embed_message(name: str, detail_json: str) -> None:
+    """Called by shell.html for each el.send(...) of the embedding page."""
+    embed.deliver(str(name), str(detail_json))
+
+
 def install_page(app_id: str) -> None:
+    js = _js()
+    if "pyweft-embed" in str(js.location.search) and js.window.parent != js.window:
+        embed.set_host(EmbedPage(str(js.location.search)))
     http.set_host(Fetch())
     try:
         _js().localStorage.length  # throws where storage is blocked

@@ -713,6 +713,8 @@ def cmd_build(app_dir: Path, out: Path, prerender: bool = True) -> None:
     (out / "index.html").write_text(html, encoding="utf-8")
     shutil.copy(_STATIC / "runtime.js", out / "runtime.js")
     shutil.copy(_STATIC / "worker.js", out / "worker.js")
+    # For other sites: <script src=".../embed.js"> + <pyweft-app>.
+    shutil.copy(_STATIC / "embed.js", out / "embed.js")
     for name in pyweft_modules():
         shutil.copy(_PKG_DIR / name, out / "pyweft-src" / name)
     for name in files + app_css_files(app_dir):
@@ -896,7 +898,7 @@ def make_dev_server(
                 return self._send("text/html", page.encode())
             if route == "/__pyweft/events":
                 return self._events()
-            if route in ("/runtime.js", "/worker.js"):
+            if route in ("/runtime.js", "/worker.js", "/embed.js"):
                 return self._file(_STATIC / route[1:], "text/javascript")
             name = Path(route).name  # flat lookups only; no traversal
             if route == f"/pyweft-src/{name}" and name in pyweft_modules():
