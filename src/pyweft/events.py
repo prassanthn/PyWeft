@@ -93,6 +93,8 @@ class Event(dict):
     - ``width``, ``height``: ``@resize``, which is not a DOM event: it fires
       when the element is first laid out and whenever its size changes
       (content box, whole pixels)
+    - ``scrollX``, ``scrollY`` (and ``width``/``height``): events on
+      ``<Window>``; ``hidden``: events on ``<Document>``
     - ``form``: on ``submit``, the form's fields as ``{name: value}`` (a list
       when several fields share a name)
     """

@@ -353,6 +353,11 @@ def _convert_children(el: ET.Element) -> list[Any]:
             out += _text_nodes(child.tail)
             i += 1
             continue
+        if child.tag in _GLOBAL_TAGS:
+            out.append(_convert_global(child))
+            out += _text_nodes(child.tail)
+            i += 1
+            continue
         if child.tag in ("Slot", "Fill"):
             out.append(_convert_slot(child) if child.tag == "Slot" else _convert_fill(child))
             out += _text_nodes(child.tail)
@@ -474,6 +479,29 @@ def _motion(tag: str, table: dict) -> None:
             value = table.pop(name)
             for target in targets:
                 table[target] = value
+
+
+# <Window @keydown.ctrl.k="..."> / <Document @visibilitychange="...">: a
+# hidden placeholder element whose listeners the runtime puts on window or
+# document instead. It is an ordinary element to the renderer and differ, so
+# its handlers come and go with the component that renders it.
+_GLOBAL_TAGS = {"Window": "pyweft-window", "Document": "pyweft-document"}
+
+
+def _convert_global(el: ET.Element) -> TElement:
+    node = _convert_element(el)
+    if node.children:
+        raise TemplateError(f"<{el.tag}> takes no content: it only listens for events")
+    other = [*node.attrs, *node.expr_attrs] + (["@bind"] if node.bind else []) + (["key"] if node.key_expr else [])
+    if other:
+        raise TemplateError(
+            f"<{el.tag}> takes only event handlers (@keydown=..., @scroll=...), not {', '.join(other)}"
+        )
+    if not node.events:
+        raise TemplateError(f"<{el.tag}> needs an event handler, such as @keydown.esc=\"close\"")
+    node.tag = _GLOBAL_TAGS[el.tag]
+    node.attrs = {"hidden": parse_interpolation("")}
+    return node
 
 
 def _convert_element(el: ET.Element) -> TElement:

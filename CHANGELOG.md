@@ -8,6 +8,11 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **`<Window>` and `<Document>`:** handlers for the whole page, such as
+  `<Window @keydown.ctrl.k.prevent="open_search" />`, `@scroll` or
+  `<Document @visibilitychange=...>`. They listen while the component that
+  renders them is shown. Window events carry the window's size and scroll
+  position; document events carry `hidden`.
 - **Transitions and animations:** `transition="fade"` (or `in=` / `out=`)
   animates an element appearing and leaving, with `fade`, `fly`, `slide`,
   `scale` and `blur` built in, options such as `duration=300 y=-20`, or the

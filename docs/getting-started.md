@@ -609,6 +609,8 @@ def on_key(self, event):
 | `ctrlKey`, `shiftKey`, `altKey`, `metaKey` | keyboard and mouse events |
 | `clientX`, `clientY`, `offsetX`, `offsetY`, `button`, `buttons` | mouse and pointer events (`deltaX`, `deltaY` on `wheel`) |
 | `localX`, `localY`, `width`, `height` | mouse and pointer events: the pointer's position inside the element the handler is on, and that element's size |
+| `width`, `height`, `scrollX`, `scrollY` | events on `<Window>`: the window's size and how far it is scrolled |
+| `hidden` | events on `<Document>`: whether the page is hidden (`visibilitychange`) |
 | `form` | `submit`: the form's fields as `{name: value}`, a list when several fields share a name (file inputs are left out) |
 
 Asking for a key the event doesn't have raises an `AttributeError` that
@@ -634,6 +636,33 @@ def fit(self, event):
 
 It needs a page, so it never fires in pre-rendering or headless tests:
 start with a sensible default.
+
+### Events on the whole page: Window and Document
+
+`<Window>` and `<Document>` listen to the window or the document instead
+of one element: keyboard shortcuts that work wherever the focus is, the
+window being scrolled or resized, the tab being hidden.
+
+```xml
+<Window @keydown.ctrl.k.prevent="focus('search')" @scroll="moved" />
+<Document @visibilitychange="paused(event)" />
+```
+
+```python
+def moved(self, event):
+    self.show_back_to_top = event.scrollY > 600
+
+def paused(self, event):
+    if event.hidden:
+        self.save_draft()
+```
+
+They take event handlers only (no content, no other attributes) and work
+anywhere in a template, with the usual modifiers. They listen while the
+component that renders them is on the page: put one inside an `<If>` to
+listen only some of the time, and when the component goes, so do its
+listeners (and their `.prevent`). A `<Window>` event carries `width`,
+`height`, `scrollX` and `scrollY`; a `<Document>` one carries `hidden`.
 
 ### Event modifiers
 

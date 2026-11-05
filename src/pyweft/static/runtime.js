@@ -392,33 +392,43 @@ const PyWeftRuntime = (() => {
     resizeObserver.observe(el);
   }
 
+  // <Window> and <Document> in a template render as these hidden
+  // placeholders: their listeners go on window or document, and come off
+  // the first time they fire after the placeholder has left the page.
+  const GLOBAL_TARGETS = { "PYWEFT-WINDOW": () => window, "PYWEFT-DOCUMENT": () => document };
+
   function ensureListener(el, spec) {
     if (!el._pyweftBound) el._pyweftBound = {};
     if (el._pyweftBound[spec]) return;
     el._pyweftBound[spec] = true;
     const [name, ...mods] = spec.split(".");
-    if (name === "resize") return observeSize(el, spec);
+    const global = GLOBAL_TARGETS[el.tagName];
+    if (name === "resize" && !global) return observeSize(el, spec);
+    const target = global ? global() : el;
     // Browsers fire no click for the right or middle button.
     let type = name;
     if (name === "click" && mods.includes("right")) type = "contextmenu";
     if (name === "click" && mods.includes("middle")) type = "mouseup";
-    el.addEventListener(
-      type,
-      (ev) => {
-        const events = el._pyweftEvents;
-        if (!events || !(spec in events)) return; // unbound since; a no-op, matching the renderer
-        if (!accepts(ev, mods)) return;
-        if (mods.includes("prevent")) ev.preventDefault();
-        if (mods.includes("stop")) ev.stopPropagation();
-        const handlerId = events[spec];
-        if (handlerId) dispatch(handlerId, eventPayload(ev));
-      },
-      {
-        capture: mods.includes("capture"),
-        once: mods.includes("once"),
-        passive: mods.includes("passive"),
+    const options = {
+      capture: mods.includes("capture"),
+      once: mods.includes("once"),
+      passive: mods.includes("passive"),
+    };
+    const listener = (ev) => {
+      if (global && !el.isConnected) {
+        // Its component is gone: no handler, and no preventDefault either.
+        target.removeEventListener(type, listener, options);
+        return;
       }
-    );
+      const events = el._pyweftEvents;
+      if (!events || !(spec in events)) return; // unbound since; a no-op, matching the renderer
+      if (!accepts(ev, mods)) return;
+      if (mods.includes("prevent")) ev.preventDefault();
+      if (mods.includes("stop")) ev.stopPropagation();
+      const handlerId = events[spec];
+      if (handlerId) dispatch(handlerId, eventPayload(ev));
+    };
+    target.addEventListener(type, listener, options);
   }
 
   // The keys a handler's event receives; documented on events.Event.
@@ -449,13 +459,20 @@ const PyWeftRuntime = (() => {
       // Relative to the element the handler is on, not the innermost one
       // under the pointer (offsetX), which inside an SVG is rarely useful.
       const here = ev.currentTarget;
-      if (here && here.getBoundingClientRect) {
+      if (here && here !== window && here !== document && here.getBoundingClientRect) {
         const box = here.getBoundingClientRect();
         payload.localX = ev.clientX - box.left;
         payload.localY = ev.clientY - box.top;
         payload.width = box.width;
         payload.height = box.height;
       }
+    }
+    // <Window>: the window's size and scroll; <Document>: whether the page
+    // is hidden (visibilitychange).
+    if (ev.currentTarget === window) {
+      Object.assign(payload, { width: innerWidth, height: innerHeight, scrollX, scrollY });
+    } else if (ev.currentTarget === document) {
+      payload.hidden = document.hidden;
     }
     if ("deltaY" in ev) {
       payload.deltaX = ev.deltaX;
