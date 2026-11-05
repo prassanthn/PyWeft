@@ -1,13 +1,21 @@
 """Expression compilation and evaluation.
 
-Every ``{{ expr }}`` and every directive value is compiled once with
-``compile(..., "eval")`` and cached by source text, then evaluated against a
-``Scope`` at render time. Compiling at parse time rather than calling ``eval``
-on a string every render is the single biggest perf lever in the render loop.
+Every ``{{ expr }}`` and every directive value is compiled once, cached by
+source text, into a Python function of (template variables, component):
+each free name in it becomes a lookup in the template's variables (loop
+variables, slot props, ``event``), then on the component, then in the
+builtins, which is the order a ``Scope`` resolves names in. Being a real
+function rather than ``eval`` against a mapping, it is faster, and
+generator expressions, lambdas and comprehensions in it see those names
+like any closure would.
+
+The few expressions that need ``eval``'s own frame (``:=``, ``locals()``
+and the like) are evaluated against the ``Scope`` as before.
 """
 
 from __future__ import annotations
 
+import ast
 import builtins
 import re
 from collections.abc import Mapping, MutableMapping
@@ -34,6 +42,129 @@ def compile_expr(src: str):
     return code
 
 
+_BUILTINS = builtins.__dict__
+# Using one of these needs the eval frame (or would see the wrong one).
+_FRAME_NAMES = frozenset({"locals", "vars", "dir", "globals", "eval", "exec", "super", "breakpoint"})
+
+
+def _lookup(variables: dict, component: Any, name: str) -> Any:
+    """A free name in a compiled expression: what ``Scope`` would give."""
+    if name in variables:
+        return variables[name]
+    if name == "self":
+        return component
+    try:
+        return getattr(component, name)
+    except AttributeError:
+        pass
+    try:
+        return _BUILTINS[name]
+    except KeyError:
+        raise NameError(f"name {name!r} is not defined") from None
+
+
+class _Uncompilable(Exception):
+    pass
+
+
+def _bound(target: ast.AST) -> set[str]:
+    return {n.id for n in ast.walk(target) if isinstance(n, ast.Name)}
+
+
+class _Rewriter(ast.NodeTransformer):
+    """Free names -> ``_pw_lookup(_pw_vars, _pw_self, "name")``. Names a
+    lambda or comprehension binds stay as they are."""
+
+    def __init__(self) -> None:
+        self.scopes: list[set[str]] = []
+
+    def visit_Name(self, node: ast.Name) -> ast.AST:
+        if not isinstance(node.ctx, ast.Load):
+            return node
+        if node.id in _FRAME_NAMES:
+            raise _Uncompilable(node.id)
+        if any(node.id in scope for scope in self.scopes):
+            return node
+        call = ast.Call(
+            func=ast.Name("_pw_lookup", ast.Load()),
+            args=[ast.Name("_pw_vars", ast.Load()), ast.Name("_pw_self", ast.Load()), ast.Constant(node.id)],
+            keywords=[],
+        )
+        return ast.copy_location(call, node)
+
+    def visit_NamedExpr(self, node: ast.NamedExpr) -> ast.AST:
+        raise _Uncompilable(":=")  # it stores into the Scope: component state
+
+    def visit_Lambda(self, node: ast.Lambda) -> ast.AST:
+        args = node.args
+        args.defaults = [self.visit(d) for d in args.defaults]
+        args.kw_defaults = [self.visit(d) if d is not None else None for d in args.kw_defaults]
+        names = {a.arg for a in [*args.posonlyargs, *args.args, *args.kwonlyargs]}
+        names |= {a.arg for a in (args.vararg, args.kwarg) if a is not None}
+        self.scopes.append(names)
+        node.body = self.visit(node.body)
+        self.scopes.pop()
+        return node
+
+    def _comprehension(self, node: Any, fields: tuple[str, ...]) -> ast.AST:
+        generators = node.generators
+        # The first iterable is evaluated outside the comprehension.
+        generators[0].iter = self.visit(generators[0].iter)
+        names: set[str] = set()
+        self.scopes.append(names)
+        for index, generator in enumerate(generators):
+            if index:
+                generator.iter = self.visit(generator.iter)
+            names |= _bound(generator.target)
+            generator.ifs = [self.visit(test) for test in generator.ifs]
+        for name in fields:
+            setattr(node, name, self.visit(getattr(node, name)))
+        self.scopes.pop()
+        return node
+
+    def visit_ListComp(self, node: ast.ListComp) -> ast.AST:
+        return self._comprehension(node, ("elt",))
+
+    visit_SetComp = visit_ListComp
+
+    def visit_GeneratorExp(self, node: ast.GeneratorExp) -> ast.AST:
+        return self._comprehension(node, ("elt",))
+
+    def visit_DictComp(self, node: ast.DictComp) -> ast.AST:
+        return self._comprehension(node, ("key", "value"))
+
+
+_FUNCTIONS: dict[str, Any] = {}
+_FUNCTION_GLOBALS = {"_pw_lookup": _lookup, "__builtins__": builtins}
+
+
+def compile_function(src: str) -> Any:
+    """``src`` as a function of (variables, component), or None when it
+    must be evaluated against a Scope (see the module docstring). Cached."""
+    src = src.strip()
+    try:
+        return _FUNCTIONS[src]
+    except KeyError:
+        pass
+    function = None
+    try:
+        tree = ast.parse(src, mode="eval")
+        body = _Rewriter().visit(tree.body)
+        lam = ast.Expression(ast.Lambda(
+            args=ast.arguments(
+                posonlyargs=[], args=[ast.arg("_pw_vars"), ast.arg("_pw_self")], vararg=None,
+                kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[],
+            ),
+            body=body,
+        ))
+        ast.fix_missing_locations(lam)
+        function = eval(compile(lam, "<pyweft>", "eval"), _FUNCTION_GLOBALS)
+    except (_Uncompilable, SyntaxError):
+        function = None  # eval reports a syntax error with the usual message
+    _FUNCTIONS[src] = function
+    return function
+
+
 class Scope(MutableMapping):
     """Name resolution for template expressions.
 
@@ -47,9 +178,8 @@ class Scope(MutableMapping):
     (``@click="count += 1"``): a store to a loop variable stays in the scope,
     a store to anything else becomes component state.
 
-    Known limitation: comprehensions and lambdas inside an expression build
-    their own frame and only see globals, so ``{{ [x for x in items] }}``
-    cannot see ``items``. Assign such values in the code block instead.
+    Expressions are normally compiled to functions that resolve names the
+    same way without going through this mapping (``compile_function``).
     """
 
     __slots__ = ("component", "vars")
@@ -97,9 +227,11 @@ class Scope(MutableMapping):
 
 
 def eval_expr(src: str, scope: Mapping) -> Any:
-    code = compile_expr(src)
+    function = compile_function(src) if type(scope) is Scope else None
     try:
-        return eval(code, _GLOBALS, scope)
+        if function is not None:
+            return function(scope.vars, scope.component)  # type: ignore[attr-defined]
+        return eval(compile_expr(src), _GLOBALS, scope)
     except ExpressionError:
         raise
     except Exception as exc:
@@ -137,7 +269,10 @@ def run_handler(src: str, scope: MutableMapping) -> Any:
     """Evaluate an expression handler, or execute a statement handler
     (returning ``None``), against ``scope``."""
     code, is_expr = compile_handler(src)
+    function = compile_function(src) if is_expr and type(scope) is Scope else None
     try:
+        if function is not None:
+            return function(scope.vars, scope.component)  # type: ignore[attr-defined]
         if is_expr:
             return eval(code, _GLOBALS, scope)
         exec(code, _GLOBALS, scope)

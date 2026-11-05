@@ -157,7 +157,7 @@ def test_traps(tmp_path):
             <p class="a" :class="'b'">x</p>
             <For each="r in rows" key="r"><p>{{ sum(r * scale for r in rows) }}</p></For>
             <p>{{ [r * scale for r in rows] }}</p>
-            <p :title="(lambda: scale)()">x</p>
+            <button @click="scale = sum(r * scale for r in rows)">x</button>
           </div>
         </template>
         <code>
@@ -172,8 +172,6 @@ def test_traps(tmp_path):
     assert rows == [
         ("app.weft", 3, "error", "keyed-for"),
         ("app.weft", 4, "warning", "class-replaced"),
-        ("app.weft", 5, "error", "template-closure"),
-        ("app.weft", 6, "warning", "template-closure"),
         ("app.weft", 7, "error", "template-closure"),
         ("app.weft", 16, "warning", "shadowed-builtin"),
     ]

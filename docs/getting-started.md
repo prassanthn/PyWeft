@@ -598,9 +598,16 @@ async def load_user(self, uid):
 
 Expressions are real Python, evaluated against the component's state plus any
 loop variables. `self` is the component, so `{{ self.count }}` is the explicit
-spelling of `{{ count }}`. One caveat: comprehensions and lambdas inside
-`{{ }}` can't see scope variables (CPython `eval` semantics) — compute those
-in the code block instead.
+spelling of `{{ count }}`. Comprehensions, generator expressions and lambdas
+see those names too: `{{ sum(i['price'] * qty for i in items) }}` works.
+(Inline *statement* handlers such as `@click="total = sum(...)"` are the
+exception: a generator or lambda there can't see them, so move such a
+statement into a method.)
+
+Each component's template is compiled into a Python function the first time
+the component renders, which makes rendering about twice as fast as walking
+the template. You don't have to do anything for it. Should you ever suspect
+it, `PYWEFT_INTERPRET=1` in the environment turns it off.
 
 ### Inline handlers
 
@@ -1740,8 +1747,8 @@ missing modules, components that can't be found, unknown names in
 expressions, handlers and `@bind` fields that don't exist, slot content for
 a slot the component doesn't have, modifiers on a component's events, a
 keyed `<For>` whose body has more than one element, and generator
-expressions or lambdas in a template that use the component's names (they
-can't see them).
+expressions or lambdas in an inline statement handler that use the
+component's names (they can't see them).
 
 **Warnings** (probably a mistake): an attribute on a component tag that
 isn't one of its props (it goes to the component's root element instead;
@@ -1750,7 +1757,7 @@ expected there, so they don't count), an event the component never emits,
 a handler that sets state the component doesn't declare, `:class` next to
 `class` (it replaces it), a field named like a Python builtin that the same
 code block calls (`max: int` then `max(a, b)`), and list comprehensions in
-a template that fail on Python 3.10 and 3.11.
+an inline statement handler that fail on Python 3.10 and 3.11.
 
 **It also checks that the app's dependencies install in the browser**
 (see [Using PyPI packages](#using-pypi-packages)): each one, and everything

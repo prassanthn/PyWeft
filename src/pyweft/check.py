@@ -279,16 +279,20 @@ class _Checker:
         visible = self.known | scope | ({"event"} if handler else set())
         finder = _Names()
         finder.visit(tree)
+        # Expressions are compiled to functions in which a comprehension,
+        # generator or lambda sees template names like any closure; only
+        # statement handlers (count += 1) still run through exec.
+        statement = isinstance(tree, ast.Module)
         for name, nested in finder.loads:
-            if nested and name not in BUILTINS:
+            if nested and statement and name not in BUILTINS:
                 if nested in ("generator expression", "lambda"):
                     self.add(line, "error", "template-closure",
-                             f"{what}: a {nested} in a template can't see {name!r} (it runs in "
-                             "its own scope): compute it in a method or property instead")
+                             f"{what}: a {nested} in a statement handler can't see {name!r} "
+                             "(statements run in a scope of their own): move the statement into a method")
                 else:
                     self.add(line, "warning", "template-closure",
-                             f"{what}: a {nested} in a template can't see {name!r} on Python "
-                             "3.10/3.11: compute it in a method or property to run everywhere")
+                             f"{what}: a {nested} in a statement handler can't see {name!r} on "
+                             "Python 3.10/3.11: move the statement into a method to run everywhere")
                 continue
             if name not in visible:
                 self.add(line, "error", "unknown-name",

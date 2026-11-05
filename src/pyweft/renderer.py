@@ -22,6 +22,7 @@ from functools import partial
 from typing import Any, Awaitable, Callable
 
 from .binding import KEEP, bind_kind, collection_type, convert, declared_type, prop_value
+from .compiler import compiled
 from .component import Component, component_named, declared_props, is_component_tag
 from .effects import dispose_effects, run_effects
 from .events import Event
@@ -391,7 +392,7 @@ class Renderer:
             self._rendering = [self.component]
             out: list[Node] = []
             try:
-                self._emit(self.component.__template__, Scope(self.component), [], out)
+                self._template(self.component, Scope(self.component), [], out, None)
             except BaseException:
                 # The page still shows the last good render; keep its handlers
                 # working (matters most when a hot reload's render fails).
@@ -505,6 +506,15 @@ class Renderer:
 
             else:  # pragma: no cover - defensive
                 raise TemplateError(f"unknown template node {tnode!r}")
+
+    def _template(self, instance: Any, scope: Scope, path: list[str], out: list[Node], key: Any) -> None:
+        """A component's own template: through its compiled function
+        (compiler.py) when there is one, else walked node by node."""
+        function = compiled(type(instance))
+        if function is None:
+            self._emit(type(instance).__template__, scope, path, out, key)
+        else:
+            function(self, scope, path, out, key)
 
     def _loop(
         self, tnode: TFor, scope: Scope, path: list[str], out: list[Node]
@@ -743,7 +753,7 @@ class Renderer:
         before = len(out)
         self._rendering.append(instance)
         try:
-            self._emit(cls.__template__, Scope(instance), path, out, key)
+            self._template(instance, Scope(instance), path, out, key)
         finally:
             self._rendering.pop()
         roots = [node for node in out[before:] if isinstance(node, Element)]

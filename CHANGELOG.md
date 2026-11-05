@@ -8,6 +8,14 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **Compiled templates:** each component's template is compiled into a
+  Python function the first time it renders, instead of being walked node
+  by node on every render: about twice as fast (a 1000-row table renders
+  in half the time). Output is identical; `PYWEFT_INTERPRET=1` turns it off.
+  Expressions are compiled to functions too, so generator expressions,
+  lambdas and comprehensions in `{{ }}`, `:attr` and expression handlers
+  now see the component's names and loop variables. `pyweft check` only
+  reports them in inline statement handlers, where the limit remains.
 - **`<Html :content="...">`:** shows an HTML string (rendered Markdown,
   rich text) as markup. It is sanitized by default: scripts, frames,
   forms, `on...` attributes, `javascript:` links and styles that load

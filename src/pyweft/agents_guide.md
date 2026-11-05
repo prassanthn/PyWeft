@@ -288,11 +288,11 @@ Pages = router("pages")         # one page per .weft file in pages/
    called `min`, `max`, `range`, `format`, `filter`, `type`, `id`, `sum`,
    `len` or `list` makes `max(...)` etc. call your field. Pick another name
    or keep a reference first (`_builtin_range = range`).
-2. **Generator expressions and lambdas inside `{{ }}`, `:attr` or a handler
-   can't see the component's names or template variables** (they run in a
-   scope of their own): `{{ sum(i['price'] for i in items) }}` fails. On
-   Python 3.10/3.11 list, set and dict comprehensions can't either. Put the
-   computation in a property or method: `{{ total }}`.
+2. **Inline statement handlers run in a scope of their own**: in
+   `@click="total = sum(i['price'] for i in items)"` the generator can't see
+   `items` (nor list comprehensions on Python 3.10/3.11). Put such a
+   statement in a method. Expressions (`{{ }}`, `:attr`, `@click="f(x)"`)
+   have no such limit: `{{ sum(i['price'] for i in items) }}` works.
 3. **A keyed `<For>` renders one element per item** (see above).
 4. **`:class` replaces `class`** on the same element. For conditional
    classes keep `class="row"` and add `class:active="on"` (or
