@@ -14,7 +14,7 @@ import re
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from .parser import TElement, TSlot, TStatic, subtrees
+from .parser import TElement, THtml, TSlot, TStatic, subtrees
 
 # WAI-ARIA 1.2, plus the graphics roles.
 ROLES = frozenset("""
@@ -177,7 +177,7 @@ def _has_text(nodes: Iterable[Any], is_component: Callable[[str], bool]) -> bool
                 return True  # a component may well render text; can't tell from here
             if any(_has(node, n) for n in ("aria-label", "aria-labelledby")) or _has_text(node.children, is_component):
                 return True
-        elif isinstance(node, TSlot):
+        elif isinstance(node, (TSlot, THtml)):
             return True
         elif any(_has_text(children, is_component) for children in subtrees(node)):
             return True

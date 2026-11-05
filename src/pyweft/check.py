@@ -37,7 +37,7 @@ from .component import (
     split_source,
 )
 from .a11y import audit, ignored
-from .parser import TAwait, TElement, TemplateError, TFill, TFor, TIf, TSlot, TStatic, subtrees
+from .parser import TAwait, TElement, TemplateError, TFill, TFor, THtml, TIf, TSlot, TStatic, subtrees
 
 BUILTINS = frozenset(dir(builtins))
 # Attributes any element may carry: not taken for a mistyped prop when
@@ -345,6 +345,8 @@ class _Checker:
                     self._walk(node.then, scope | {node.then_var}, at)
                 if node.catch is not None:
                     self._walk(node.catch, scope | {node.catch_var}, at)
+            elif isinstance(node, THtml):
+                self._expr(node.content, node.line or line, scope, "<Html :content>")
             elif isinstance(node, TElement):
                 self._element(node, scope, node.line or line)
 

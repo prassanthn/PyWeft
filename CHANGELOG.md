@@ -8,6 +8,12 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **`<Html :content="...">`:** shows an HTML string (rendered Markdown,
+  rich text) as markup. It is sanitized by default: scripts, frames,
+  forms, `on...` attributes, `javascript:` links and styles that load
+  files or cover the page are removed. `trusted="true"` keeps everything
+  but `<script>`. The markup becomes ordinary page nodes, so updates are
+  diffed and the component's scoped styles apply to it.
 - **`<Await task="..." key="...">`:** waits for an async call in the
   template: its content shows while the call runs, then `<Then as="x">`
   with the result or `<Catch as="error">` with the exception. The call

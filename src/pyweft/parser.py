@@ -134,6 +134,17 @@ class TAwait:
         return [self.pending, self.then or [], self.catch or []]
 
 
+@dataclass
+class THtml:
+    """``<Html :content="expr" />``: an HTML string shown as markup. The
+    renderer parses it into ordinary vdom nodes (see rawhtml.py), sanitized
+    unless ``trusted``."""
+
+    content: str
+    trusted: bool = False
+    line: int = field(default=0, compare=False, repr=False, kw_only=True)
+
+
 def subtrees(node: Any) -> list[list[Any]]:
     """The child lists of any template node, for code that walks a template
     without caring what each control element means."""
@@ -389,8 +400,8 @@ def _convert_children(el: ET.Element) -> list[Any]:
             raise TemplateError(f"<{child.tag}> must directly follow an <If>")
         if child.tag in ("Then", "Catch"):
             raise TemplateError(f"<{child.tag}> must be directly inside an <Await>")
-        if child.tag == "Await":
-            out.append(_convert_await(child))
+        if child.tag in ("Await", "Html"):
+            out.append(_convert_await(child) if child.tag == "Await" else _convert_html(child))
             out += _text_nodes(child.tail)
             i += 1
             continue
@@ -495,6 +506,25 @@ def _convert_await(el: ET.Element) -> TAwait:
             holder.append(kid)
     node.pending = _convert_children(holder)
     return node
+
+
+def _convert_html(el: ET.Element) -> THtml:
+    if len(el) or (el.text or "").strip():
+        raise TemplateError('<Html> takes no content: pass the markup as :content="..."')
+    content = el.get("py-colon-content")
+    if content is None:
+        raise TemplateError(
+            '<Html> needs :content="expr", the HTML string to show (content="..." '
+            "without the colon would be the literal text)"
+        )
+    extra = sorted(set(el.attrib) - {"py-colon-content", "trusted"})
+    if extra:
+        names = [n.replace("py-colon-", ":").replace("py-at-", "@") for n in extra]
+        raise TemplateError(f"<Html> takes only :content= and trusted=, not {', '.join(names)}")
+    trusted = el.get("trusted", "false").strip().lower()
+    if trusted not in ("", "true", "false"):
+        raise TemplateError(f'<Html trusted="{trusted}">: use trusted="true" or leave it out')
+    return THtml(content=content, trusted=trusted in ("", "true"), line=_line(el))
 
 
 _SLOT_NAME = re.compile(r"^[A-Za-z_][\w-]*$")

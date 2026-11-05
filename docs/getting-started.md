@@ -593,6 +593,7 @@ async def load_user(self, uid):
 | `<If cond="...">` / `<ElseIf cond="...">` / `<Else>` | Conditional rendering. Branch elements must be adjacent siblings |
 | `<For each="item in items" key="item['id']" index="i">` | Loop. `key` gives rows stable identity across reorders (always use it for dynamic lists); `index` is optional |
 | `<Await task="load(id)" key="id">` ... `<Then as="data">` ... `<Catch as="error">` | Wait for an async call: the content shown while it runs, then the `<Then>` or `<Catch>` block. See [waiting in the template](#waiting-in-the-template-await) |
+| `<Html :content="expr" />` | Show an HTML string (rendered Markdown, say) as markup, sanitized. See [showing HTML](#showing-html-from-elsewhere-html) |
 | `<PascalCaseTag ... />` | Renders a child component (see below) |
 
 Expressions are real Python, evaluated against the component's state plus any
@@ -956,6 +957,44 @@ everything inside a block that does, and not on the page's first render.
 Anyone who asks their system for reduced motion gets none. On a component
 tag, they apply to the component's root element; `:transition="..."`
 works too (`None` for no transition).
+
+### Showing HTML from elsewhere: Html
+
+Text in `{{ }}` is always shown as text: `<b>` in a value appears as the
+characters `<b>`. To show an HTML string as markup, Markdown rendered to
+HTML or rich text from a CMS, use `<Html>`:
+
+```xml
+<article class="post">
+  <Html :content="body_html" />
+</article>
+```
+
+```python
+import markdown            # a PyPI package, in your pyproject.toml
+
+text: str = "# Hello\n\nSome *Markdown*."
+
+@property
+def body_html(self):
+    return markdown.markdown(self.text)
+```
+
+- **It is sanitized.** The string often comes from users or another
+  service, so anything that could run code is removed first: `<script>`,
+  `<iframe>`, `<object>`, forms, `on...` attributes, `javascript:` links,
+  and styles that load files or cover the page. Headings, paragraphs,
+  lists, tables, links, images, code blocks and the like stay.
+- **`trusted="true"`** keeps everything except `<script>`, for HTML you
+  wrote yourself (an embedded video, an inline SVG). Never use it for text
+  a user typed.
+- The markup goes in place of the tag, with no wrapper element, and your
+  component's `<style>` block applies to it (`.post h2 { ... }` above works).
+- `None` shows nothing; an object with an `__html__()` method (such as
+  markupsafe's `Markup`) gives its HTML.
+- The HTML is turned into the same kind of nodes a template produces, so an
+  update changes only what changed, the same in the browser, the desktop
+  app and the first-screen pre-render.
 
 ## 4. Composing components
 

@@ -26,7 +26,8 @@ from .component import Component, component_named, declared_props, is_component_
 from .effects import dispose_effects, run_effects
 from .events import Event
 from .expressions import ExpressionError, Scope, eval_expr, render_parts, run_handler
-from .parser import TAwait, TElement, TemplateError, TFill, TFor, TIf, TSlot, TStatic, subtrees
+from .parser import TAwait, TElement, TemplateError, TFill, TFor, THtml, TIf, TSlot, TStatic, subtrees
+from .rawhtml import html_nodes
 from .store import _renderers as _live_renderers
 from .styles import marker
 from .vdom import Element, Node, Text
@@ -489,6 +490,13 @@ class Renderer:
 
             elif isinstance(tnode, TAwait):
                 self._await(tnode, scope, path, out, key)
+
+            elif isinstance(tnode, THtml):
+                scope_id = getattr(type(scope.component), "__scope__", None)
+                out.extend(html_nodes(
+                    eval_expr(tnode.content, scope), tnode.trusted,
+                    {marker(scope_id): ""} if scope_id else None,
+                ))
 
             elif isinstance(tnode, TFill):
                 raise TemplateError(
