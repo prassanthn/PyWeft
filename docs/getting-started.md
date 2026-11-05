@@ -732,6 +732,24 @@ template instead of in your method:
 - **Checkboxes** bind a `bool` to the checked state; **radio buttons** store
   the `value` of the one that is checked (converted, so `value="2"` with
   `size: int` stores `2`).
+- **Checkbox groups:** checkboxes bound to a `list` (or `set`, `tuple`)
+  field share it. Each one is checked while its `value` is in the list, and
+  adds or removes it when clicked:
+
+  ```xml
+  <For each="t in ['cheese', 'olives', 'basil']">
+    <label><input type="checkbox" :value="t" @bind="toppings" /> {{ t }}</label>
+  </For>
+  ```
+
+  ```python
+  toppings: list[str] = []      # ["cheese", "basil"] when those are ticked
+  ```
+
+  With `:value`, the list gets the value itself, with its type
+  (`:value="row['id']"` adds an `int`); with `value="..."` it gets the text.
+  Each click stores a new list rather than changing the old one, so
+  effects and other code see the change.
 - **Modifiers:** `@bind.lazy` updates when the user leaves the field (the
   `change` event) rather than on every keystroke; `@bind.trim` strips
   surrounding spaces; `@bind.number` parses a number even when the field has

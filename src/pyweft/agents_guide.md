@@ -129,6 +129,7 @@ def remove(self, item):
 | `@click="count += 1"` | a statement; assigning a bare name sets component state |
 | `class:active="on"`, `style:width="f'{pct}%'"` | add a class while true / set one CSS property unless None/False, on top of `class`/`style` |
 | `@bind="name"` | two-way binding for input, textarea, select, checkbox, radio; converts to the field's declared type |
+| `<input type="checkbox" :value="t" @bind="tags" />` | a checkbox group: bound to a `list`/`set` field, each box adds or removes its own value (typed with `:value`) |
 | `@bind.number` / `.lazy` / `.trim` | parse as a number / update on change, not each key / strip spaces |
 | `@keydown.enter.ctrl.prevent="send"` | modifiers: key names (`enter`, `esc`, `up`, `page-down`, `a`), `ctrl alt shift meta exact`, `prevent stop self once capture passive`; `click.right` |
 | `@resize="fit"` | not a DOM event: the element's `event.width`/`event.height` when laid out and on every size change (never in tests or pre-rendering). Mouse events carry `event.localX`/`localY`, the position inside the handler's element |

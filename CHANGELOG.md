@@ -8,6 +8,9 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **Checkbox groups:** checkboxes with `@bind` on a `list` (or `set`,
+  `tuple`) field add and remove their own `value`; `:value="row['id']"`
+  keeps the value's type.
 - **Accessibility checks in `pyweft check`:** warnings (`a11y-*`) for
   images without alt text, clicks with no keyboard way to do them, links
   without `href`, unlabelled form fields, buttons with nothing to read

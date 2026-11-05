@@ -53,6 +53,30 @@ def declared_type(cls: type, field: str) -> tuple[type | None, bool]:
     return (type(default) if type(default) in _SCALARS else None), False
 
 
+_COLLECTIONS = (list, set, frozenset, tuple)
+
+
+@functools.lru_cache(maxsize=1024)
+def collection_type(cls: type, field: str) -> type | None:
+    """list, set, frozenset or tuple if the field is declared as one
+    (``picked: list[int] = []``, ``tags: set[str] | None = None``), else
+    None: a checkbox bound to such a field is one of a group."""
+    annotation = _annotation(cls, field)
+    if annotation is not None:
+        options = (
+            typing.get_args(annotation)
+            if typing.get_origin(annotation) in (typing.Union, types.UnionType)
+            else (annotation,)
+        )
+        for option in options:
+            base = typing.get_origin(option) or option
+            if base in _COLLECTIONS:
+                return base
+        return None
+    default = getattr(cls, field, None)
+    return type(default) if type(default) in _COLLECTIONS else None
+
+
 def _annotation(cls: type, field: str) -> Any:
     for klass in cls.__mro__:
         try:

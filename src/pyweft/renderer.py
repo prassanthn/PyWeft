@@ -21,7 +21,7 @@ import sys
 from functools import partial
 from typing import Any, Awaitable, Callable
 
-from .binding import KEEP, bind_kind, convert, declared_type, prop_value
+from .binding import KEEP, bind_kind, collection_type, convert, declared_type, prop_value
 from .component import Component, component_named, declared_props, is_component_tag
 from .effects import dispose_effects, run_effects
 from .events import Event
@@ -142,6 +142,35 @@ def set_title(text: str) -> None:
             # Outside a handler nothing else would render and settle, which
             # is when hosts carry requests out.
             renderer.component.state_has_changed()
+
+
+def _is_group(cls: type, field: str, current: Any) -> bool:
+    """A checkbox bound to a list, set or tuple field is one of a group."""
+    if isinstance(current, (list, set, frozenset, tuple)):
+        return True
+    return current is None and collection_type(cls, field) is not None
+
+
+def _contains(collection: Any, member: Any) -> bool:
+    try:
+        return member in collection
+    except TypeError:  # an unhashable value against a set
+        return False
+
+
+def _toggled(current: Any, member: Any, checked: bool, kind: type | None) -> Any:
+    """A new collection of the field's kind, with or without ``member``
+    (new, not mutated: effects and ``==`` checks see the change)."""
+    items = list(current or ())
+    if checked:
+        if not _contains(items, member):
+            items.append(member)
+    else:
+        items = [item for item in items if item != member]
+    kind = type(current) if current is not None else kind
+    if kind in (set, frozenset, tuple):
+        return kind(items)
+    return items
 
 
 def _takes_arg(fn: Callable) -> bool:
@@ -761,7 +790,18 @@ class Renderer:
         field, mods = tnode.bind, tnode.bind_mods
         kind = bind_kind(tnode.tag, attrs)
         current = getattr(scope.component, field, None)
-        if kind == "checkbox":
+        member: Any = None
+        if kind == "checkbox" and _is_group(type(scope.component), field, current):
+            # Several checkboxes bound to one list: each adds or removes its
+            # own value. :value="..." keeps the value's type (an id, say).
+            kind = "group"
+            member = (
+                eval_expr(tnode.expr_attrs["value"], scope)
+                if "value" in tnode.expr_attrs else attrs.get("value", "on")
+            )
+            if current is not None and _contains(current, member):
+                attrs["checked"] = ""
+        elif kind == "checkbox":
             if current:
                 attrs["checked"] = ""
         elif kind == "radio":
@@ -773,7 +813,7 @@ class Renderer:
         # Checkboxes and radios report a choice on change; .lazy waits for
         # change (focus leaving the box) instead of every keystroke.
         spec = "change" if kind != "value" or "lazy" in mods else "input"
-        bind_handler = self._make_bind_handler(field, scope, kind, mods)
+        bind_handler = self._make_bind_handler(field, scope, kind, mods, member)
         handler_id = events.get(spec)
         own = self.handlers.get(handler_id) if handler_id else None
         if own is None:
@@ -790,14 +830,18 @@ class Renderer:
         events[spec] = handler_id
 
     def _make_bind_handler(
-        self, field: str, scope: Scope, kind: str, mods: tuple[str, ...]
+        self, field: str, scope: Scope, kind: str, mods: tuple[str, ...], member: Any = None
     ) -> Callable:
         component = scope.component
         target, allows_none = declared_type(type(component), field)
+        collection = collection_type(type(component), field) if kind == "group" else None
 
         def handler(event: dict | None = None) -> None:
             event = event or {}
-            if kind == "checkbox":
+            if kind == "group":
+                current = getattr(component, field, None)
+                value = _toggled(current, member, bool(event.get("checked")), collection)
+            elif kind == "checkbox":
                 value: Any = bool(event.get("checked"))
             else:
                 text = str(event.get("value", ""))
