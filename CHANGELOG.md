@@ -8,6 +8,8 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+## 0.7.0
+
 - **Embedding in other websites:** `pyweft build` writes an `embed.js`;
   any page that loads it can place the app with `<pyweft-app>` (`src`,
   `route`, `height`, `label`, `data-*`). The app runs in its own frame

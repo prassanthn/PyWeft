@@ -8,6 +8,9 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+## 0.6.0
+
+- Needs `pyweft` 0.7.
 - `EventCalendar`: with `@day`, days can be picked from the keyboard (the
   day numbers, and the week view's column headings, are buttons); the
   mouse-only cells behind them are hidden from screen readers.
