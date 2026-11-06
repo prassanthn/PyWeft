@@ -97,498 +97,515 @@
           </ui.Column>
         </ui.Card>
 
-        <h2 class="group-title" id="group-form-fields" ref="group-form-fields">Form fields</h2>
+        <Defer when="idle" height="900px" :ready="opened_groups >= 1">
+          <h2 class="group-title" id="group-form-fields" ref="group-form-fields">Form fields</h2>
 
-        <ui.Card title="Form fields" id="form" ref="form" subtitle="Each one is bound with @bind">
-          <ui.Grid min_width="16rem" gap="lg">
-            <ui.TextField label="Name" placeholder="Ada Lovelace" required="true" @bind="name"
-                          :error="'' if len(name) != 1 else 'Too short'" hint="Your full name" />
-            <ui.TextField label="Email" type="email" placeholder="you@example.com" @bind="email" />
-            <ui.NumberField label="Quantity" min="1" max="99" @bind="quantity" />
-            <ui.Select label="Size" placeholder="Choose a size" options="Small, Medium, Large" @bind="size" />
-            <ui.TextField label="Date" type="date" @bind="date" />
-            <ui.TextField label="Password" type="password" @bind="password" />
-            <ui.TextField label="Phone" mask="(999) 999-9999" @bind="phone" hint="Shaped as you type" />
-            <ui.TextField label="Card number" mask="9999 9999 9999 9999" @bind="card" />
-          </ui.Grid>
-          <ui.TextArea label="Notes" rows="3" @bind="notes" placeholder="Anything else?" />
-          <pre class="state">{{ form_state }}</pre>
-          <pre class="code">{{ CODE['form'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Choices" id="choices" ref="choices">
-          <ui.Grid min_width="14rem" gap="lg">
-            <ui.RadioGroup label="Plan" :options="PLANS" @bind="plan" />
-            <ui.Column gap="sm">
-              <ui.Checkbox label="Send me updates" @bind="updates" />
-              <ui.Checkbox label="I agree to the terms" @bind="agreed" />
-              <ui.Switch label="Dark mode" :value="mode == 'dark'" @update="mode = 'dark' if event else 'light'" />
-            </ui.Column>
-          </ui.Grid>
-          <p class="note">plan = {{ repr(plan) }}, updates = {{ updates }}, agreed = {{ agreed }}</p>
-          <pre class="code">{{ CODE['choices'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Autocomplete" id="autocomplete" ref="autocomplete" subtitle="Suggestions as you type">
-          <ui.Column gap="lg">
+          <ui.Card title="Form fields" id="form" ref="form" subtitle="Each one is bound with @bind">
             <ui.Grid min_width="16rem" gap="lg">
-              <ui.Autocomplete label="Country" placeholder="Start typing a country"
-                               :options="COUNTRIES" @bind="country" />
-              <ui.Autocomplete label="Assign to" placeholder="Name or email"
-                               :options="PEOPLE" @bind="assignee">
-                <Fill name="option">
-                  <span class="avatar">{{ option['data']['initials'] }}</span>
-                  <span class="person">
-                    <span class="person-name">{{ option['label'] }}</span>
-                    <span class="person-mail">{{ option['data']['email'] }}</span>
-                  </span>
-                  <ui.Badge :kind="'primary' if active else 'neutral'">{{ option['data']['role'] }}</ui.Badge>
-                </Fill>
-                <Fill name="empty">Nobody matches "{{ query }}"</Fill>
-              </ui.Autocomplete>
-              <ui.Autocomplete label="City" placeholder="Searched as you type" hint="Results come from a (pretend) server"
-                               :options="cities" match="none" :loading="searching"
-                               @search="find_cities(event)" @bind="city" />
+              <ui.TextField label="Name" placeholder="Ada Lovelace" required="true" @bind="name"
+                            :error="'' if len(name) != 1 else 'Too short'" hint="Your full name" />
+              <ui.TextField label="Email" type="email" placeholder="you@example.com" @bind="email" />
+              <ui.NumberField label="Quantity" min="1" max="99" @bind="quantity" />
+              <ui.Select label="Size" placeholder="Choose a size" options="Small, Medium, Large" @bind="size" />
+              <ui.TextField label="Date" type="date" @bind="date" />
+              <ui.TextField label="Password" type="password" @bind="password" />
+              <ui.TextField label="Phone" mask="(999) 999-9999" @bind="phone" hint="Shaped as you type" />
+              <ui.TextField label="Card number" mask="9999 9999 9999 9999" @bind="card" />
             </ui.Grid>
-            <pre class="state">country={{ repr(country) }}  assignee={{ repr(assignee) }}  city={{ repr(city) }}</pre>
-            <pre class="code">{{ CODE['autocomplete'] }}</pre>
-          </ui.Column>
-        </ui.Card>
+            <ui.TextArea label="Notes" rows="3" @bind="notes" placeholder="Anything else?" />
+            <pre class="state">{{ form_state }}</pre>
+            <pre class="code">{{ CODE['form'] }}</pre>
+          </ui.Card>
 
-        <ui.Card title="Cascade select" id="cascade-select" ref="cascade-select" subtitle="Nested options one level at a time; cities load as a country opens">
-          <ui.Grid min_width="16rem" gap="lg">
-            <ui.CascadeSelect label="City" :options="places" @bind="city_pick" show_path="true" clearable="true"
-                              placeholder="Choose a city" @load="load_places(event)"
-                              hint="Countries load their cities as they open" />
-            <ui.CascadeSelect label="Category" :options="CATEGORIES" @bind="category" any_level="true"
-                              hint="A group can be chosen too">
-              <Fill name="option">
-                <If cond="option.get('icon')"><ui.Icon :name="option['icon']" size="1.1em" /></If>
-                <span class="cat-label">{{ option['label'] }}</span>
-                <If cond="option.get('count')"><ui.Badge>{{ option['count'] }}</ui.Badge></If>
-              </Fill>
-            </ui.CascadeSelect>
-          </ui.Grid>
-          <pre class="state">city={{ repr(city_pick) }}  category={{ repr(category) }}</pre>
-          <pre class="code">{{ CODE['cascade'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Chips" id="chips" ref="chips" subtitle="Choose from a row, or type to add">
-          <ui.Column gap="lg">
-            <ui.Chips label="Size" options="Small, Medium, Large" @bind="chip_size" required="true" />
-            <ui.Chips label="Interests" multiple="true" @bind="interests"
-                      :options="[{'value': 'music', 'label': 'Music', 'icon': 'heart'},
-                                 {'value': 'travel', 'label': 'Travel', 'icon': 'send'},
-                                 {'value': 'books', 'label': 'Books', 'icon': 'star'},
-                                 {'value': 'games', 'label': 'Games', 'disabled': True}]" />
-            <ui.Row align="center">
-              <ui.Chips label="Filters" :options="filters" removable="true" selectable="false"
-                        @remove="drop_filter(event)" />
-              <If cond="len(filters) &lt; 3">
-                <ui.Button size="sm" variant="ghost" @click="filters = ['Open', 'Assigned to me', 'This week']">Reset</ui.Button>
-              </If>
-            </ui.Row>
-            <ui.Grid min_width="16rem" gap="lg">
-              <ui.ChipInput label="Tags" placeholder="Type, then Enter or a comma" @bind="tags"
-                            hint="Backspace in the empty box removes the last" />
-              <ui.ChipInput label="Invite" placeholder="Name or email" :options="PEOPLE" free="false"
-                            @bind="invitees">
-                <Fill name="chip"><span class="avatar small">{{ chip['data']['initials'] }}</span>{{ chip['label'] }}</Fill>
-                <Fill name="option">
-                  <span class="avatar">{{ option['data']['initials'] }}</span>
-                  <span class="person">
-                    <span class="person-name">{{ option['label'] }}</span>
-                    <span class="person-mail">{{ option['data']['email'] }}</span>
-                  </span>
-                </Fill>
-              </ui.ChipInput>
-            </ui.Grid>
-            <pre class="state">size={{ repr(chip_size) }}  interests={{ repr(interests) }}
-tags={{ repr(tags) }}  invitees={{ repr(invitees) }}</pre>
-            <pre class="code">{{ CODE['chips'] }}</pre>
-          </ui.Column>
-        </ui.Card>
-
-        <ui.Card title="Sliders" id="sliders" ref="sliders" subtitle="Drag, or use the arrow keys">
-          <ui.Grid min_width="16rem" gap="lg">
-            <ui.Slider label="Volume" @bind="volume" format="{}%" />
-            <ui.Slider label="Price" :min="0" :max="500" :step="10" range="true" @bind="price"
-                       format="${}" value_label="side" hint="Thumbs can pass each other" />
-            <ui.Slider label="Rating" :min="1" :max="5" ticks="true" value_label="always"
-                       marks="1, 3, 5" @bind="rating" />
-            <ui.Slider label="Opacity" :min="0" :max="1" :step="0.05" format="{:.2f}"
-                       lazy="true" @bind="opacity" hint="Updates when released" />
-          </ui.Grid>
-          <pre class="state">volume={{ volume }}  price={{ repr(price) }}  rating={{ rating }}  opacity={{ opacity }}</pre>
-          <pre class="code">{{ CODE['sliders'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Dates and menus" id="dates-and-menus" ref="dates-and-menus">
-          <ui.Column gap="lg">
-            <ui.Grid min_width="16rem" gap="lg">
-              <ui.DatePicker label="Check-in" @bind="check_in" :min="today" hint="From today on" />
-              <ui.DateRangePicker label="Stay" @bind="stay" :min="today" min_days="1"
-                                  hint="At least one night" />
-            </ui.Grid>
-            <ui.Row>
-              <ui.Menu label="Actions" :items="MENU" @select="last_action = event" />
-              <ui.Menu label="More" icon="more" icon_only="true" variant="ghost"
-                       :items="['Copy link', 'Rename', '-', {'value': 'Delete', 'label': 'Delete', 'icon': 'trash', 'danger': True}]"
-                       @select="last_action = event" />
-              <span class="note">{{ 'You chose: ' + last_action if last_action else 'Nothing chosen yet.' }}</span>
-            </ui.Row>
-            <pre class="state">{{ dates_state }}</pre>
-            <pre class="code">{{ CODE['dates'] }}</pre>
-          </ui.Column>
-        </ui.Card>
-
-        <ui.Card title="Drag and drop" id="drag-and-drop" ref="drag-and-drop" subtitle="Drag rows by their grip (or Alt+arrow keys); drop files on the box">
-          <ui.Grid min_width="16rem" gap="lg">
-            <ul class="sortable" sortable="" @sort="move_task(event)" aria-label="Tasks in order">
-              <For each="task in tasks" key="task">
-                <li class="sortable-row" tabindex="0" animate="flip">
-                  <span class="grip" sortable-handle="" aria-hidden="true"><ui.Icon name="menu" /></span>
-                  {{ task }}
-                </li>
-              </For>
-            </ul>
-            <ui.FileDrop accept="csv, txt, json" max_mb="2" @files="dropped_files(event)" />
-          </ui.Grid>
-          <pre class="state">tasks={{ tasks }}
-files={{ file_list or 'none yet' }}</pre>
-          <pre class="code">{{ CODE['drag-and-drop'] }}</pre>
-        </ui.Card>
-
-        <h2 class="group-title" id="group-forms" ref="group-forms">Forms</h2>
-
-        <ui.Card title="Validation" id="validation" ref="validation" subtitle="Form and rules: try submitting it empty">
-          <Signup />
-          <pre class="code">{{ CODE['validation'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Stepper" id="stepper" ref="stepper" subtitle="A checkout in steps; Next checks each one">
-          <OrderSteps />
-          <pre class="code">{{ CODE['stepper'] }}</pre>
-        </ui.Card>
-
-        <h2 class="group-title" id="group-feedback" ref="group-feedback">Feedback</h2>
-
-        <ui.Card title="Feedback" id="feedback" ref="feedback">
-          <ui.Column>
-            <ui.Alert kind="info" title="Heads up">A neutral message.</ui.Alert>
-            <ui.Alert kind="success">Saved. Your changes are live.</ui.Alert>
-            <ui.Alert kind="warning" title="Careful">This can't be undone.</ui.Alert>
-            <If cond="show_danger">
-              <ui.Alert kind="danger" title="Failed" dismissible="true" @close="show_danger = False">
-                The server didn't answer. Close me with the X.
-              </ui.Alert>
-            </If>
-            <Else><ui.Button size="sm" @click="show_danger = True">Show the error again</ui.Button></Else>
-            <ui.Row>
-              <ui.Badge>neutral</ui.Badge><ui.Badge kind="primary">primary</ui.Badge>
-              <ui.Badge kind="success">active</ui.Badge><ui.Badge kind="warning">pending</ui.Badge>
-              <ui.Badge kind="danger">failed</ui.Badge><ui.Spinner /><ui.Spinner size="1em" />
-            </ui.Row>
-            <ui.Row gap="sm">
-              <For each="icon in ICONS" key="icon"><span class="icon-cell" :title="icon"><ui.Icon :name="icon" size="1.3em" /></span></For>
-            </ui.Row>
-            <pre class="code">{{ CODE['feedback'] }}</pre>
-          </ui.Column>
-        </ui.Card>
-
-        <ui.Card title="Progress" id="progress" ref="progress" subtitle="How far along: a bar or a ring, or just still working">
-          <ui.Column gap="lg">
-            <ui.Row align="center">
-              <ui.Button variant="primary" icon="upload" :loading="uploading" @click="upload">Upload 24 files</ui.Button>
-              <ui.Progress shape="circle" :value="uploaded" :kind="'success' if uploaded == 24 else 'primary'"
-                           :max="24" label="Files" />
-            </ui.Row>
-            <ui.Progress label="Uploading" :value="uploaded" :max="24" format="{} of 24 files" show_value="true"
-                         :kind="'success' if uploaded == 24 else 'primary'" :striped="uploading" />
-            <ui.Progress label="Streaming" :value="35" :buffer="60" show_value="true" />
-            <ui.Progress label="Waiting for the server" />
-            <ui.Grid min_width="12rem">
-              <ui.Progress :value="80" kind="success" size="sm" aria_label="Small" />
-              <ui.Progress :value="55" kind="warning" aria_label="Medium" />
-              <ui.Progress :value="25" kind="danger" size="lg" aria_label="Large" />
-            </ui.Grid>
-            <ui.Row align="center">
-              <ui.Progress shape="circle" size="sm" />
-              <ui.Progress shape="circle" />
-              <ui.Progress shape="circle" size="lg" :value="72" kind="warning" />
-            </ui.Row>
-            <pre class="code">{{ CODE['progress'] }}</pre>
-          </ui.Column>
-        </ui.Card>
-
-        <ui.Card title="Toasts" id="toasts" ref="toasts" subtitle="Messages that go away by themselves">
-          <ui.Column>
-          <ui.ButtonToggle label="Look" :options="[('toast', 'Toast'), ('snackbar', 'Snackbar')]" @bind="toast_look"
-                           hint="Snackbar: a compact dark bar at the bottom, one at a time" />
-          <ui.Row>
-            <ui.Button variant="primary" icon="check" @click="toast('Changes saved.', 'success')">Save</ui.Button>
-            <ui.Button icon="info" @click="toast('A new version is ready.', title='Update')">Info</ui.Button>
-            <ui.Button icon="alert" @click="toast('Disk almost full.', 'warning', duration=None)">Stays until closed</ui.Button>
-            <ui.Button variant="danger" icon="trash" @click="delete_item">Delete with undo</ui.Button>
-          </ui.Row>
-          <p class="note">Items: {{ items }}</p>
-          </ui.Column>
-          <pre class="code">{{ CODE['toasts'] }}</pre>
-        </ui.Card>
-
-        <h2 class="group-title" id="group-overlays" ref="group-overlays">Overlays</h2>
-
-        <ui.Card title="Dialog" id="dialog" ref="dialog">
-          <ui.Row>
-            <ui.Button variant="danger" icon="trash" @click="confirming = True">Delete project</ui.Button>
-            <span class="note">{{ verdict }}</span>
-          </ui.Row>
-          <ui.Dialog title="Delete project?" @bind="confirming" @close="verdict = verdict or 'Dismissed.'">
-            <p>This removes the project and its 12 files. It can't be undone.</p>
-            <Fill name="footer">
-              <ui.Button @click="answer('Kept it.')">Cancel</ui.Button>
-              <ui.Button variant="danger" @click="answer('Deleted.')">Delete</ui.Button>
-            </Fill>
-          </ui.Dialog>
-          <pre class="code">{{ CODE['dialog'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Bottom sheet" id="bottom-sheet" ref="bottom-sheet" subtitle="Slides up from the bottom: swipe it down, press Esc or tap outside">
-          <ui.Row align="center">
-            <ui.Button icon="send" @click="sharing = True">Share</ui.Button>
-            <ui.Button variant="secondary" icon="settings" @click="filtering = True">Filters</ui.Button>
-            <span class="note">{{ sheet_note }}</span>
-          </ui.Row>
-          <ui.BottomSheet title="Share" @bind="sharing" :items="SHARE"
-                          @select="shared = event" @close="sheet_closed = event" />
-          <ui.BottomSheet title="Filters" @bind="filtering" @close="sheet_closed = event">
-            <ui.Column gap="lg">
-              <ui.Chips label="Status" options="Open, In progress, Done" multiple="true" @bind="filter_status" />
-              <ui.Slider label="Price" :max="500" :step="10" range="true" format="${}" value_label="side" @bind="filter_price" />
-              <ui.Switch label="Only items in stock" @bind="filter_stock" />
-            </ui.Column>
-            <Fill name="actions">
-              <ui.Button variant="ghost" @click="reset_filters">Reset</ui.Button>
-              <ui.Button variant="primary" @click="filtering = False">Show results</ui.Button>
-            </Fill>
-          </ui.BottomSheet>
-          <pre class="code">{{ CODE['sheet'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Popover and tooltip" id="popover-and-tooltip" ref="popover-and-tooltip" subtitle="Your own content beside a button; short labels on hover">
-          <ui.Column gap="lg">
-            <ui.Row align="center">
-              <ui.Popover label="Share" icon="send" title="Share this page" @bind="share_pop">
-                <ui.Column gap="sm">
-                  <ui.TextField label="Link" :value="SHARE_LINK" readonly="true" />
-                  <ui.Row justify="end">
-                    <ui.Button variant="primary" icon="copy" @click="copied()">Copy link</ui.Button>
-                  </ui.Row>
-                </ui.Column>
-              </ui.Popover>
-              <ui.Popover label="Details" icon="info" variant="ghost" position="end" align="center" width="16rem">
-                Popovers can sit below, above or to either side, and stay inside the window.
-              </ui.Popover>
-              <span class="note">
-                Made by
-                <ui.Popover open_on="hover" variant="link" label="Ada Lovelace" align="center" width="17rem">
-                  <Fill name="trigger">@ada</Fill>
-                  <div class="person-row">
-                    <span class="avatar">AL</span>
-                    <span class="person">
-                      <span class="person-name">Ada Lovelace</span>
-                      <span class="person-mail">Owner · 12 projects</span>
-                    </span>
-                  </div>
-                </ui.Popover>
-                (hover or Tab to it)
-              </span>
-            </ui.Row>
-            <ui.Row align="center">
-              <ui.Tooltip text="Bold (Ctrl+B)"><ui.Button variant="ghost" icon="bold" aria-label="Bold"></ui.Button></ui.Tooltip>
-              <ui.Tooltip text="Italic (Ctrl+I)"><ui.Button variant="ghost" icon="italic" aria-label="Italic"></ui.Button></ui.Tooltip>
-              <ui.Divider vertical="true" />
-              <ui.Tooltip text="Download as PDF" position="below"><ui.Button variant="ghost" icon="download" aria-label="Download"></ui.Button></ui.Tooltip>
-              <ui.Tooltip text="Delete forever: there is no undo" tip_id="delete-tip" position="end">
-                <ui.Button variant="ghost" icon="trash" aria-label="Delete" aria-describedby="delete-tip"></ui.Button>
-              </ui.Tooltip>
-            </ui.Row>
-            <pre class="code">{{ CODE['popover'] }}</pre>
-          </ui.Column>
-        </ui.Card>
-
-        <h2 class="group-title" id="group-navigation" ref="group-navigation">Navigation</h2>
-
-        <ui.Card title="Tabs" id="tabs" ref="tabs">
-          <ui.Column gap="lg">
-            <ui.Tabs label="Project" options="Overview, Activity, Settings" @bind="tab">
-              <If cond="tab == 'Overview'"><p class="panel-text">Three people are working on this project.</p></If>
-              <ElseIf cond="tab == 'Activity'"><p class="panel-text">Ada pushed 4 commits an hour ago.</p></ElseIf>
-              <Else><ui.Switch label="Email me about changes" @bind="updates" /></Else>
-            </ui.Tabs>
-            <ui.Tabs variant="pills" :options="[('day', 'Day'), ('week', 'Week'), ('month', 'Month')]">
-              <p class="panel-text">Showing one {{ tab }}.</p>
-            </ui.Tabs>
-          </ui.Column>
-          <pre class="code">{{ CODE['tabs'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Breadcrumbs" id="breadcrumbs" ref="breadcrumbs" subtitle="Where a page sits; in a routed app, auto=&quot;true&quot; builds the trail from the URL">
-          <ui.Column gap="lg">
-            <ui.Breadcrumbs :items="crumb_trail" @select="go_crumb(event)" />
-            <ui.Breadcrumbs :items="LONG_TRAIL" max="4" separator="slash" @select="go_crumb(event)" />
-            <ui.Breadcrumbs :items="ICON_TRAIL" @select="go_crumb(event)" />
-            <p class="note">{{ 'Went to ' + crumb_to if crumb_to else 'Click a level, or the … to see the hidden ones.' }}</p>
-            <pre class="code">{{ CODE['breadcrumbs'] }}</pre>
-          </ui.Column>
-        </ui.Card>
-
-        <ui.Card title="Tree" id="tree" ref="tree" subtitle="Folders load as they open; search; checkboxes with partly checked parents">
-          <Trees />
-          <pre class="code">{{ CODE['tree'] }}</pre>
-        </ui.Card>
-
-        <h2 class="group-title" id="group-data" ref="group-data">Data</h2>
-
-        <ui.Card title="Table" id="table" ref="table" subtitle="Click a heading to sort, a row to pick it">
-          <ui.Table :rows="ORDERS" row_key="id" sortable="true" sort="-total" @select="picked = event"
-                    :columns="[('id', '#'), 'customer', 'status', {'key': 'total', 'format': ',.2f'}]">
-            <Fill name="cell">
-              <If cond="column == 'status'"><ui.Badge :kind="STATUS_KINDS[value]">{{ text }}</ui.Badge></If>
-              <Else>{{ text }}</Else>
-            </Fill>
-          </ui.Table>
-          <p class="note below">Picked: {{ picked['customer'] + ', order ' + str(picked['id']) if picked else 'nothing yet' }}</p>
-          <pre class="code">{{ CODE['table'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Charts" id="charts" ref="charts" subtitle="Dashboards, everyday charts and data science: hover, use the arrow keys, click the legend">
-          <Charts />
-          <pre class="code">{{ CODE['charts'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Calendars" id="calendars" ref="calendars" subtitle="Choosing a date, and showing events">
-          <ui.Column gap="lg">
-            <ui.Row gap="xl" align="start" wrap="true">
-              <ui.Calendar @bind="picked_day" />
+          <ui.Card title="Choices" id="choices" ref="choices">
+            <ui.Grid min_width="14rem" gap="lg">
+              <ui.RadioGroup label="Plan" :options="PLANS" @bind="plan" />
               <ui.Column gap="sm">
-                <p class="note">A <b>Calendar</b> on the page, always open. Its month and year
-                  are buttons too.</p>
-                <pre class="state">picked_day={{ repr(picked_day) }}</pre>
+                <ui.Checkbox label="Send me updates" @bind="updates" />
+                <ui.Checkbox label="I agree to the terms" @bind="agreed" />
+                <ui.Switch label="Dark mode" :value="mode == 'dark'" @update="mode = 'dark' if event else 'light'" />
               </ui.Column>
+            </ui.Grid>
+            <p class="note">plan = {{ repr(plan) }}, updates = {{ updates }}, agreed = {{ agreed }}</p>
+            <pre class="code">{{ CODE['choices'] }}</pre>
+          </ui.Card>
+
+          <ui.Card title="Autocomplete" id="autocomplete" ref="autocomplete" subtitle="Suggestions as you type">
+            <ui.Column gap="lg">
+              <ui.Grid min_width="16rem" gap="lg">
+                <ui.Autocomplete label="Country" placeholder="Start typing a country"
+                                 :options="COUNTRIES" @bind="country" />
+                <ui.Autocomplete label="Assign to" placeholder="Name or email"
+                                 :options="PEOPLE" @bind="assignee">
+                  <Fill name="option">
+                    <span class="avatar">{{ option['data']['initials'] }}</span>
+                    <span class="person">
+                      <span class="person-name">{{ option['label'] }}</span>
+                      <span class="person-mail">{{ option['data']['email'] }}</span>
+                    </span>
+                    <ui.Badge :kind="'primary' if active else 'neutral'">{{ option['data']['role'] }}</ui.Badge>
+                  </Fill>
+                  <Fill name="empty">Nobody matches "{{ query }}"</Fill>
+                </ui.Autocomplete>
+                <ui.Autocomplete label="City" placeholder="Searched as you type" hint="Results come from a (pretend) server"
+                                 :options="cities" match="none" :loading="searching"
+                                 @search="find_cities(event)" @bind="city" />
+              </ui.Grid>
+              <pre class="state">country={{ repr(country) }}  assignee={{ repr(assignee) }}  city={{ repr(city) }}</pre>
+              <pre class="code">{{ CODE['autocomplete'] }}</pre>
+            </ui.Column>
+          </ui.Card>
+
+          <ui.Card title="Cascade select" id="cascade-select" ref="cascade-select" subtitle="Nested options one level at a time; cities load as a country opens">
+            <ui.Grid min_width="16rem" gap="lg">
+              <ui.CascadeSelect label="City" :options="places" @bind="city_pick" show_path="true" clearable="true"
+                                placeholder="Choose a city" @load="load_places(event)"
+                                hint="Countries load their cities as they open" />
+              <ui.CascadeSelect label="Category" :options="CATEGORIES" @bind="category" any_level="true"
+                                hint="A group can be chosen too">
+                <Fill name="option">
+                  <If cond="option.get('icon')"><ui.Icon :name="option['icon']" size="1.1em" /></If>
+                  <span class="cat-label">{{ option['label'] }}</span>
+                  <If cond="option.get('count')"><ui.Badge>{{ option['count'] }}</ui.Badge></If>
+                </Fill>
+              </ui.CascadeSelect>
+            </ui.Grid>
+            <pre class="state">city={{ repr(city_pick) }}  category={{ repr(category) }}</pre>
+            <pre class="code">{{ CODE['cascade'] }}</pre>
+          </ui.Card>
+
+          <ui.Card title="Chips" id="chips" ref="chips" subtitle="Choose from a row, or type to add">
+            <ui.Column gap="lg">
+              <ui.Chips label="Size" options="Small, Medium, Large" @bind="chip_size" required="true" />
+              <ui.Chips label="Interests" multiple="true" @bind="interests"
+                        :options="[{'value': 'music', 'label': 'Music', 'icon': 'heart'},
+                                   {'value': 'travel', 'label': 'Travel', 'icon': 'send'},
+                                   {'value': 'books', 'label': 'Books', 'icon': 'star'},
+                                   {'value': 'games', 'label': 'Games', 'disabled': True}]" />
+              <ui.Row align="center">
+                <ui.Chips label="Filters" :options="filters" removable="true" selectable="false"
+                          @remove="drop_filter(event)" />
+                <If cond="len(filters) &lt; 3">
+                  <ui.Button size="sm" variant="ghost" @click="filters = ['Open', 'Assigned to me', 'This week']">Reset</ui.Button>
+                </If>
+              </ui.Row>
+              <ui.Grid min_width="16rem" gap="lg">
+                <ui.ChipInput label="Tags" placeholder="Type, then Enter or a comma" @bind="tags"
+                              hint="Backspace in the empty box removes the last" />
+                <ui.ChipInput label="Invite" placeholder="Name or email" :options="PEOPLE" free="false"
+                              @bind="invitees">
+                  <Fill name="chip"><span class="avatar small">{{ chip['data']['initials'] }}</span>{{ chip['label'] }}</Fill>
+                  <Fill name="option">
+                    <span class="avatar">{{ option['data']['initials'] }}</span>
+                    <span class="person">
+                      <span class="person-name">{{ option['label'] }}</span>
+                      <span class="person-mail">{{ option['data']['email'] }}</span>
+                    </span>
+                  </Fill>
+                </ui.ChipInput>
+              </ui.Grid>
+              <pre class="state">size={{ repr(chip_size) }}  interests={{ repr(interests) }}
+  tags={{ repr(tags) }}  invitees={{ repr(invitees) }}</pre>
+              <pre class="code">{{ CODE['chips'] }}</pre>
+            </ui.Column>
+          </ui.Card>
+
+          <ui.Card title="Sliders" id="sliders" ref="sliders" subtitle="Drag, or use the arrow keys">
+            <ui.Grid min_width="16rem" gap="lg">
+              <ui.Slider label="Volume" @bind="volume" format="{}%" />
+              <ui.Slider label="Price" :min="0" :max="500" :step="10" range="true" @bind="price"
+                         format="${}" value_label="side" hint="Thumbs can pass each other" />
+              <ui.Slider label="Rating" :min="1" :max="5" ticks="true" value_label="always"
+                         marks="1, 3, 5" @bind="rating" />
+              <ui.Slider label="Opacity" :min="0" :max="1" :step="0.05" format="{:.2f}"
+                         lazy="true" @bind="opacity" hint="Updates when released" />
+            </ui.Grid>
+            <pre class="state">volume={{ volume }}  price={{ repr(price) }}  rating={{ rating }}  opacity={{ opacity }}</pre>
+            <pre class="code">{{ CODE['sliders'] }}</pre>
+          </ui.Card>
+
+          <ui.Card title="Dates and menus" id="dates-and-menus" ref="dates-and-menus">
+            <ui.Column gap="lg">
+              <ui.Grid min_width="16rem" gap="lg">
+                <ui.DatePicker label="Check-in" @bind="check_in" :min="today" hint="From today on" />
+                <ui.DateRangePicker label="Stay" @bind="stay" :min="today" min_days="1"
+                                    hint="At least one night" />
+              </ui.Grid>
+              <ui.Row>
+                <ui.Menu label="Actions" :items="MENU" @select="last_action = event" />
+                <ui.Menu label="More" icon="more" icon_only="true" variant="ghost"
+                         :items="['Copy link', 'Rename', '-', {'value': 'Delete', 'label': 'Delete', 'icon': 'trash', 'danger': True}]"
+                         @select="last_action = event" />
+                <span class="note">{{ 'You chose: ' + last_action if last_action else 'Nothing chosen yet.' }}</span>
+              </ui.Row>
+              <pre class="state">{{ dates_state }}</pre>
+              <pre class="code">{{ CODE['dates'] }}</pre>
+            </ui.Column>
+          </ui.Card>
+
+          <ui.Card title="Drag and drop" id="drag-and-drop" ref="drag-and-drop" subtitle="Drag rows by their grip (or Alt+arrow keys); drop files on the box">
+            <ui.Grid min_width="16rem" gap="lg">
+              <ul class="sortable" sortable="" @sort="move_task(event)" aria-label="Tasks in order">
+                <For each="task in tasks" key="task">
+                  <li class="sortable-row" tabindex="0" animate="flip">
+                    <span class="grip" sortable-handle="" aria-hidden="true"><ui.Icon name="menu" /></span>
+                    {{ task }}
+                  </li>
+                </For>
+              </ul>
+              <ui.FileDrop accept="csv, txt, json" max_mb="2" @files="dropped_files(event)" />
+            </ui.Grid>
+            <pre class="state">tasks={{ tasks }}
+  files={{ file_list or 'none yet' }}</pre>
+            <pre class="code">{{ CODE['drag-and-drop'] }}</pre>
+          </ui.Card>
+        </Defer>
+
+        <Defer when="idle" height="900px" :ready="opened_groups >= 2">
+          <h2 class="group-title" id="group-forms" ref="group-forms">Forms</h2>
+
+          <ui.Card title="Validation" id="validation" ref="validation" subtitle="Form and rules: try submitting it empty">
+            <Signup />
+            <pre class="code">{{ CODE['validation'] }}</pre>
+          </ui.Card>
+
+          <ui.Card title="Stepper" id="stepper" ref="stepper" subtitle="A checkout in steps; Next checks each one">
+            <OrderSteps />
+            <pre class="code">{{ CODE['stepper'] }}</pre>
+          </ui.Card>
+        </Defer>
+
+        <Defer when="idle" height="900px" :ready="opened_groups >= 3">
+          <h2 class="group-title" id="group-feedback" ref="group-feedback">Feedback</h2>
+
+          <ui.Card title="Feedback" id="feedback" ref="feedback">
+            <ui.Column>
+              <ui.Alert kind="info" title="Heads up">A neutral message.</ui.Alert>
+              <ui.Alert kind="success">Saved. Your changes are live.</ui.Alert>
+              <ui.Alert kind="warning" title="Careful">This can't be undone.</ui.Alert>
+              <If cond="show_danger">
+                <ui.Alert kind="danger" title="Failed" dismissible="true" @close="show_danger = False">
+                  The server didn't answer. Close me with the X.
+                </ui.Alert>
+              </If>
+              <Else><ui.Button size="sm" @click="show_danger = True">Show the error again</ui.Button></Else>
+              <ui.Row>
+                <ui.Badge>neutral</ui.Badge><ui.Badge kind="primary">primary</ui.Badge>
+                <ui.Badge kind="success">active</ui.Badge><ui.Badge kind="warning">pending</ui.Badge>
+                <ui.Badge kind="danger">failed</ui.Badge><ui.Spinner /><ui.Spinner size="1em" />
+              </ui.Row>
+              <ui.Row gap="sm">
+                <For each="icon in ICONS" key="icon"><span class="icon-cell" :title="icon"><ui.Icon :name="icon" size="1.3em" /></span></For>
+              </ui.Row>
+              <pre class="code">{{ CODE['feedback'] }}</pre>
+            </ui.Column>
+          </ui.Card>
+
+          <ui.Card title="Progress" id="progress" ref="progress" subtitle="How far along: a bar or a ring, or just still working">
+            <ui.Column gap="lg">
+              <ui.Row align="center">
+                <ui.Button variant="primary" icon="upload" :loading="uploading" @click="upload">Upload 24 files</ui.Button>
+                <ui.Progress shape="circle" :value="uploaded" :kind="'success' if uploaded == 24 else 'primary'"
+                             :max="24" label="Files" />
+              </ui.Row>
+              <ui.Progress label="Uploading" :value="uploaded" :max="24" format="{} of 24 files" show_value="true"
+                           :kind="'success' if uploaded == 24 else 'primary'" :striped="uploading" />
+              <ui.Progress label="Streaming" :value="35" :buffer="60" show_value="true" />
+              <ui.Progress label="Waiting for the server" />
+              <ui.Grid min_width="12rem">
+                <ui.Progress :value="80" kind="success" size="sm" aria_label="Small" />
+                <ui.Progress :value="55" kind="warning" aria_label="Medium" />
+                <ui.Progress :value="25" kind="danger" size="lg" aria_label="Large" />
+              </ui.Grid>
+              <ui.Row align="center">
+                <ui.Progress shape="circle" size="sm" />
+                <ui.Progress shape="circle" />
+                <ui.Progress shape="circle" size="lg" :value="72" kind="warning" />
+              </ui.Row>
+              <pre class="code">{{ CODE['progress'] }}</pre>
+            </ui.Column>
+          </ui.Card>
+
+          <ui.Card title="Toasts" id="toasts" ref="toasts" subtitle="Messages that go away by themselves">
+            <ui.Column>
+            <ui.ButtonToggle label="Look" :options="[('toast', 'Toast'), ('snackbar', 'Snackbar')]" @bind="toast_look"
+                             hint="Snackbar: a compact dark bar at the bottom, one at a time" />
+            <ui.Row>
+              <ui.Button variant="primary" icon="check" @click="toast('Changes saved.', 'success')">Save</ui.Button>
+              <ui.Button icon="info" @click="toast('A new version is ready.', title='Update')">Info</ui.Button>
+              <ui.Button icon="alert" @click="toast('Disk almost full.', 'warning', duration=None)">Stays until closed</ui.Button>
+              <ui.Button variant="danger" icon="trash" @click="delete_item">Delete with undo</ui.Button>
             </ui.Row>
-            <ui.Switch label="Show two months" @bind="two_months" />
-            <ui.EventCalendar label="Team calendar" :events="calendar_events" :months="2 if two_months else 1"
-                              @select="picked_event = event['title']" @day="add_event(event)" />
-            <p class="note">{{ 'You opened: ' + picked_event if picked_event else 'Click an event, or an empty day to add one.' }}</p>
-            <pre class="code">{{ CODE['calendars'] }}</pre>
-          </ui.Column>
-        </ui.Card>
+            <p class="note">Items: {{ items }}</p>
+            </ui.Column>
+            <pre class="code">{{ CODE['toasts'] }}</pre>
+          </ui.Card>
+        </Defer>
 
-        <h2 class="group-title" id="group-layout" ref="group-layout">Layout</h2>
+        <Defer when="idle" height="900px" :ready="opened_groups >= 4">
+          <h2 class="group-title" id="group-overlays" ref="group-overlays">Overlays</h2>
 
-        <ui.Card title="Layout" id="layout" ref="layout" subtitle="Row, Column, Grid, Card and Divider: no CSS needed">
-          <ui.Grid cols="3" gap="sm">
-            <For each="n in range(1, 7)" key="n"><div class="tile">{{ n }}</div></For>
-          </ui.Grid>
-          <ui.Divider spacing="lg" />
-          <div class="people">
-            <For each="p in PEOPLE[:3]" key="p['value']" index="i">
-              <div>
-                <If cond="i &gt; 0"><ui.Divider inset="3.1rem" spacing="none" /></If>
-                <div class="person-row">
-                  <span class="avatar">{{ p['initials'] }}</span>
-                  <span class="person">
-                    <span class="person-name">{{ p['label'] }}</span>
-                    <span class="person-mail">{{ p['email'] }}</span>
-                  </span>
-                </div>
-              </div>
-            </For>
-          </div>
-          <ui.Divider label="or" spacing="lg" />
-          <ui.Row align="center">
-            <ui.Button variant="ghost" icon="bold" aria-label="Bold"></ui.Button>
-            <ui.Button variant="ghost" icon="italic" aria-label="Italic"></ui.Button>
-            <ui.Divider vertical="true" />
-            <ui.Button variant="ghost" icon="align-left" aria-label="Align left"></ui.Button>
-            <ui.Button variant="ghost" icon="align-center" aria-label="Align centre"></ui.Button>
-            <ui.Divider vertical="true" />
-            <ui.Button variant="ghost" icon="trash" aria-label="Delete"></ui.Button>
-          </ui.Row>
-          <pre class="code">{{ CODE['layout'] }}</pre>
-        </ui.Card>
+          <ui.Card title="Dialog" id="dialog" ref="dialog">
+            <ui.Row>
+              <ui.Button variant="danger" icon="trash" @click="confirming = True">Delete project</ui.Button>
+              <span class="note">{{ verdict }}</span>
+            </ui.Row>
+            <ui.Dialog title="Delete project?" @bind="confirming" @close="verdict = verdict or 'Dismissed.'">
+              <p>This removes the project and its 12 files. It can't be undone.</p>
+              <Fill name="footer">
+                <ui.Button @click="answer('Kept it.')">Cancel</ui.Button>
+                <ui.Button variant="danger" @click="answer('Deleted.')">Delete</ui.Button>
+              </Fill>
+            </ui.Dialog>
+            <pre class="code">{{ CODE['dialog'] }}</pre>
+          </ui.Card>
 
-        <ui.Card title="Expansion panels" id="expansion-panels" ref="expansion-panels" subtitle="Open one, or a stack where one is open at a time">
-          <ui.Column gap="lg">
-            <ui.Expansion title="Delivery" description="Address and speed" icon="send" @bind="delivery_open">
-              <ui.Column>
-                <ui.TextField label="Street" @bind="street" />
-                <ui.RadioGroup label="Speed" options="Standard, Express" @bind="speed" />
+          <ui.Card title="Bottom sheet" id="bottom-sheet" ref="bottom-sheet" subtitle="Slides up from the bottom: swipe it down, press Esc or tap outside">
+            <ui.Row align="center">
+              <ui.Button icon="send" @click="sharing = True">Share</ui.Button>
+              <ui.Button variant="secondary" icon="settings" @click="filtering = True">Filters</ui.Button>
+              <span class="note">{{ sheet_note }}</span>
+            </ui.Row>
+            <ui.BottomSheet title="Share" @bind="sharing" :items="SHARE"
+                            @select="shared = event" @close="sheet_closed = event" />
+            <ui.BottomSheet title="Filters" @bind="filtering" @close="sheet_closed = event">
+              <ui.Column gap="lg">
+                <ui.Chips label="Status" options="Open, In progress, Done" multiple="true" @bind="filter_status" />
+                <ui.Slider label="Price" :max="500" :step="10" range="true" format="${}" value_label="side" @bind="filter_price" />
+                <ui.Switch label="Only items in stock" @bind="filter_stock" />
               </ui.Column>
               <Fill name="actions">
-                <ui.Button variant="ghost" @click="delivery_open = False">Cancel</ui.Button>
-                <ui.Button @click="delivery_open = False">Save</ui.Button>
+                <ui.Button variant="ghost" @click="reset_filters">Reset</ui.Button>
+                <ui.Button variant="primary" @click="filtering = False">Show results</ui.Button>
               </Fill>
-            </ui.Expansion>
+            </ui.BottomSheet>
+            <pre class="code">{{ CODE['sheet'] }}</pre>
+          </ui.Card>
+
+          <ui.Card title="Popover and tooltip" id="popover-and-tooltip" ref="popover-and-tooltip" subtitle="Your own content beside a button; short labels on hover">
+            <ui.Column gap="lg">
+              <ui.Row align="center">
+                <ui.Popover label="Share" icon="send" title="Share this page" @bind="share_pop">
+                  <ui.Column gap="sm">
+                    <ui.TextField label="Link" :value="SHARE_LINK" readonly="true" />
+                    <ui.Row justify="end">
+                      <ui.Button variant="primary" icon="copy" @click="copied()">Copy link</ui.Button>
+                    </ui.Row>
+                  </ui.Column>
+                </ui.Popover>
+                <ui.Popover label="Details" icon="info" variant="ghost" position="end" align="center" width="16rem">
+                  Popovers can sit below, above or to either side, and stay inside the window.
+                </ui.Popover>
+                <span class="note">
+                  Made by
+                  <ui.Popover open_on="hover" variant="link" label="Ada Lovelace" align="center" width="17rem">
+                    <Fill name="trigger">@ada</Fill>
+                    <div class="person-row">
+                      <span class="avatar">AL</span>
+                      <span class="person">
+                        <span class="person-name">Ada Lovelace</span>
+                        <span class="person-mail">Owner · 12 projects</span>
+                      </span>
+                    </div>
+                  </ui.Popover>
+                  (hover or Tab to it)
+                </span>
+              </ui.Row>
+              <ui.Row align="center">
+                <ui.Tooltip text="Bold (Ctrl+B)"><ui.Button variant="ghost" icon="bold" aria-label="Bold"></ui.Button></ui.Tooltip>
+                <ui.Tooltip text="Italic (Ctrl+I)"><ui.Button variant="ghost" icon="italic" aria-label="Italic"></ui.Button></ui.Tooltip>
+                <ui.Divider vertical="true" />
+                <ui.Tooltip text="Download as PDF" position="below"><ui.Button variant="ghost" icon="download" aria-label="Download"></ui.Button></ui.Tooltip>
+                <ui.Tooltip text="Delete forever: there is no undo" tip_id="delete-tip" position="end">
+                  <ui.Button variant="ghost" icon="trash" aria-label="Delete" aria-describedby="delete-tip"></ui.Button>
+                </ui.Tooltip>
+              </ui.Row>
+              <pre class="code">{{ CODE['popover'] }}</pre>
+            </ui.Column>
+          </ui.Card>
+        </Defer>
+
+        <Defer when="idle" height="900px" :ready="opened_groups >= 5">
+          <h2 class="group-title" id="group-navigation" ref="group-navigation">Navigation</h2>
+
+          <ui.Card title="Tabs" id="tabs" ref="tabs">
+            <ui.Column gap="lg">
+              <ui.Tabs label="Project" options="Overview, Activity, Settings" @bind="tab">
+                <If cond="tab == 'Overview'"><p class="panel-text">Three people are working on this project.</p></If>
+                <ElseIf cond="tab == 'Activity'"><p class="panel-text">Ada pushed 4 commits an hour ago.</p></ElseIf>
+                <Else><ui.Switch label="Email me about changes" @bind="updates" /></Else>
+              </ui.Tabs>
+              <ui.Tabs variant="pills" :options="[('day', 'Day'), ('week', 'Week'), ('month', 'Month')]">
+                <p class="panel-text">Showing one {{ tab }}.</p>
+              </ui.Tabs>
+            </ui.Column>
+            <pre class="code">{{ CODE['tabs'] }}</pre>
+          </ui.Card>
+
+          <ui.Card title="Breadcrumbs" id="breadcrumbs" ref="breadcrumbs" subtitle="Where a page sits; in a routed app, auto=&quot;true&quot; builds the trail from the URL">
+            <ui.Column gap="lg">
+              <ui.Breadcrumbs :items="crumb_trail" @select="go_crumb(event)" />
+              <ui.Breadcrumbs :items="LONG_TRAIL" max="4" separator="slash" @select="go_crumb(event)" />
+              <ui.Breadcrumbs :items="ICON_TRAIL" @select="go_crumb(event)" />
+              <p class="note">{{ 'Went to ' + crumb_to if crumb_to else 'Click a level, or the … to see the hidden ones.' }}</p>
+              <pre class="code">{{ CODE['breadcrumbs'] }}</pre>
+            </ui.Column>
+          </ui.Card>
+
+          <ui.Card title="Tree" id="tree" ref="tree" subtitle="Folders load as they open; search; checkboxes with partly checked parents">
+            <Trees />
+            <pre class="code">{{ CODE['tree'] }}</pre>
+          </ui.Card>
+        </Defer>
+
+        <Defer when="idle" height="900px" :ready="opened_groups >= 6">
+          <h2 class="group-title" id="group-data" ref="group-data">Data</h2>
+
+          <ui.Card title="Table" id="table" ref="table" subtitle="Click a heading to sort, a row to pick it">
+            <ui.Table :rows="ORDERS" row_key="id" sortable="true" sort="-total" @select="picked = event"
+                      :columns="[('id', '#'), 'customer', 'status', {'key': 'total', 'format': ',.2f'}]">
+              <Fill name="cell">
+                <If cond="column == 'status'"><ui.Badge :kind="STATUS_KINDS[value]">{{ text }}</ui.Badge></If>
+                <Else>{{ text }}</Else>
+              </Fill>
+            </ui.Table>
+            <p class="note below">Picked: {{ picked['customer'] + ', order ' + str(picked['id']) if picked else 'nothing yet' }}</p>
+            <pre class="code">{{ CODE['table'] }}</pre>
+          </ui.Card>
+
+          <!-- Dozens of charts, laid out in Python: only once scrolled near. -->
+          <Defer height="2400px" :ready="nav_selected == 'charts'">
+            <ui.Card title="Charts" id="charts" ref="charts" subtitle="Dashboards, everyday charts and data science: hover, use the arrow keys, click the legend">
+              <Charts />
+              <pre class="code">{{ CODE['charts'] }}</pre>
+            </ui.Card>
+          </Defer>
+
+          <ui.Card title="Calendars" id="calendars" ref="calendars" subtitle="Choosing a date, and showing events">
+            <ui.Column gap="lg">
+              <ui.Row gap="xl" align="start" wrap="true">
+                <ui.Calendar @bind="picked_day" />
+                <ui.Column gap="sm">
+                  <p class="note">A <b>Calendar</b> on the page, always open. Its month and year
+                    are buttons too.</p>
+                  <pre class="state">picked_day={{ repr(picked_day) }}</pre>
+                </ui.Column>
+              </ui.Row>
+              <ui.Switch label="Show two months" @bind="two_months" />
+              <ui.EventCalendar label="Team calendar" :events="calendar_events" :months="2 if two_months else 1"
+                                @select="picked_event = event['title']" @day="add_event(event)" />
+              <p class="note">{{ 'You opened: ' + picked_event if picked_event else 'Click an event, or an empty day to add one.' }}</p>
+              <pre class="code">{{ CODE['calendars'] }}</pre>
+            </ui.Column>
+          </ui.Card>
+        </Defer>
+
+        <Defer when="idle" height="900px" :ready="opened_groups >= 7">
+          <h2 class="group-title" id="group-layout" ref="group-layout">Layout</h2>
+
+          <ui.Card title="Layout" id="layout" ref="layout" subtitle="Row, Column, Grid, Card and Divider: no CSS needed">
+            <ui.Grid cols="3" gap="sm">
+              <For each="n in range(1, 7)" key="n"><div class="tile">{{ n }}</div></For>
+            </ui.Grid>
+            <ui.Divider spacing="lg" />
+            <div class="people">
+              <For each="p in PEOPLE[:3]" key="p['value']" index="i">
+                <div>
+                  <If cond="i &gt; 0"><ui.Divider inset="3.1rem" spacing="none" /></If>
+                  <div class="person-row">
+                    <span class="avatar">{{ p['initials'] }}</span>
+                    <span class="person">
+                      <span class="person-name">{{ p['label'] }}</span>
+                      <span class="person-mail">{{ p['email'] }}</span>
+                    </span>
+                  </div>
+                </div>
+              </For>
+            </div>
+            <ui.Divider label="or" spacing="lg" />
             <ui.Row align="center">
-              <ui.Switch label="Several open at once" @bind="many_open" />
+              <ui.Button variant="ghost" icon="bold" aria-label="Bold"></ui.Button>
+              <ui.Button variant="ghost" icon="italic" aria-label="Italic"></ui.Button>
+              <ui.Divider vertical="true" />
+              <ui.Button variant="ghost" icon="align-left" aria-label="Align left"></ui.Button>
+              <ui.Button variant="ghost" icon="align-center" aria-label="Align centre"></ui.Button>
+              <ui.Divider vertical="true" />
+              <ui.Button variant="ghost" icon="trash" aria-label="Delete"></ui.Button>
             </ui.Row>
-            <If cond="many_open">
-              <ui.Accordion :options="FAQ" multiple="true" @bind="faq_open">
-                <p class="faq">{{ FAQ_ANSWERS[panel] }}</p>
-              </ui.Accordion>
-            </If>
-            <Else>
-              <ui.Accordion :options="FAQ" @bind="faq">
-                <p class="faq">{{ FAQ_ANSWERS[panel] }}</p>
-              </ui.Accordion>
-            </Else>
-            <pre class="state">delivery_open={{ delivery_open }}  street={{ repr(street) }}  speed={{ repr(speed) }}
-faq={{ repr(faq_open if many_open else faq) }}</pre>
-            <pre class="code">{{ CODE['expansion'] }}</pre>
-          </ui.Column>
-        </ui.Card>
+            <pre class="code">{{ CODE['layout'] }}</pre>
+          </ui.Card>
 
-        <ui.Card title="Carousel" id="carousel" ref="carousel" subtitle="Arrows, dots, a swipe or a drag; the second one plays by itself">
-          <ui.Column gap="lg">
-            <ui.Carousel label="Places" :items="PLACES" @bind="place" loop="true">
-              <Fill name="slide">
-                <div class="place" :style="'background: ' + slide['bg']">
-                  <span class="place-name">{{ slide['name'] }}</span>
-                  <span class="place-note">{{ slide['note'] }}</span>
-                </div>
-              </Fill>
-            </ui.Carousel>
-            <p class="note">Showing {{ PLACES[place]['name'] }} ({{ place + 1 }} of {{ len(PLACES) }})</p>
-            <ui.Carousel label="Products" :items="PRODUCTS" per_view="3" autoplay="4" gap="12px">
-              <Fill name="slide">
-                <div class="product">
-                  <span class="product-icon"><ui.Icon :name="slide['icon']" size="1.6em" /></span>
-                  <b>{{ slide['name'] }}</b>
-                  <span class="note">{{ slide['price'] }}</span>
-                </div>
-              </Fill>
-            </ui.Carousel>
-            <pre class="code">{{ CODE['carousel'] }}</pre>
-          </ui.Column>
-        </ui.Card>
+          <ui.Card title="Expansion panels" id="expansion-panels" ref="expansion-panels" subtitle="Open one, or a stack where one is open at a time">
+            <ui.Column gap="lg">
+              <ui.Expansion title="Delivery" description="Address and speed" icon="send" @bind="delivery_open">
+                <ui.Column>
+                  <ui.TextField label="Street" @bind="street" />
+                  <ui.RadioGroup label="Speed" options="Standard, Express" @bind="speed" />
+                </ui.Column>
+                <Fill name="actions">
+                  <ui.Button variant="ghost" @click="delivery_open = False">Cancel</ui.Button>
+                  <ui.Button @click="delivery_open = False">Save</ui.Button>
+                </Fill>
+              </ui.Expansion>
+              <ui.Row align="center">
+                <ui.Switch label="Several open at once" @bind="many_open" />
+              </ui.Row>
+              <If cond="many_open">
+                <ui.Accordion :options="FAQ" multiple="true" @bind="faq_open">
+                  <p class="faq">{{ FAQ_ANSWERS[panel] }}</p>
+                </ui.Accordion>
+              </If>
+              <Else>
+                <ui.Accordion :options="FAQ" @bind="faq">
+                  <p class="faq">{{ FAQ_ANSWERS[panel] }}</p>
+                </ui.Accordion>
+              </Else>
+              <pre class="state">delivery_open={{ delivery_open }}  street={{ repr(street) }}  speed={{ repr(speed) }}
+  faq={{ repr(faq_open if many_open else faq) }}</pre>
+              <pre class="code">{{ CODE['expansion'] }}</pre>
+            </ui.Column>
+          </ui.Card>
 
-        <ui.Card title="Splitter" id="splitter" ref="splitter" subtitle="Drag a divider, or focus it and use the arrow keys; Enter or a double-click collapses the folders">
-          <ui.Splitter @bind="split_sizes" collapsible="true" height="260px" class="split-demo">
-            <Fill name="first">
-              <div class="split-pane"><b>Folders</b><For each="f in ['Inbox', 'Sent', 'Archive']"><span>{{ f }}</span></For></div>
-            </Fill>
-            <Fill name="second">
-              <ui.Splitter direction="vertical" :sizes="[55, 45]" height="100%" label="Resize the preview">
-                <Fill name="first"><div class="split-pane"><b>Messages</b><span>Lunch on Friday?</span><span>Your order shipped</span></div></Fill>
-                <Fill name="second"><div class="split-pane"><b>Preview</b><span>Panes nest: this one splits top and bottom.</span></div></Fill>
-              </ui.Splitter>
-            </Fill>
-          </ui.Splitter>
-          <pre class="state">split_sizes={{ split_sizes }}</pre>
-          <pre class="code">{{ CODE['splitter'] }}</pre>
-        </ui.Card>
+          <ui.Card title="Carousel" id="carousel" ref="carousel" subtitle="Arrows, dots, a swipe or a drag; the second one plays by itself">
+            <ui.Column gap="lg">
+              <ui.Carousel label="Places" :items="PLACES" @bind="place" loop="true">
+                <Fill name="slide">
+                  <div class="place" :style="'background: ' + slide['bg']">
+                    <span class="place-name">{{ slide['name'] }}</span>
+                    <span class="place-note">{{ slide['note'] }}</span>
+                  </div>
+                </Fill>
+              </ui.Carousel>
+              <p class="note">Showing {{ PLACES[place]['name'] }} ({{ place + 1 }} of {{ len(PLACES) }})</p>
+              <ui.Carousel label="Products" :items="PRODUCTS" per_view="3" autoplay="4" gap="12px">
+                <Fill name="slide">
+                  <div class="product">
+                    <span class="product-icon"><ui.Icon :name="slide['icon']" size="1.6em" /></span>
+                    <b>{{ slide['name'] }}</b>
+                    <span class="note">{{ slide['price'] }}</span>
+                  </div>
+                </Fill>
+              </ui.Carousel>
+              <pre class="code">{{ CODE['carousel'] }}</pre>
+            </ui.Column>
+          </ui.Card>
+
+          <ui.Card title="Splitter" id="splitter" ref="splitter" subtitle="Drag a divider, or focus it and use the arrow keys; Enter or a double-click collapses the folders">
+            <ui.Splitter @bind="split_sizes" collapsible="true" height="260px" class="split-demo">
+              <Fill name="first">
+                <div class="split-pane"><b>Folders</b><For each="f in ['Inbox', 'Sent', 'Archive']"><span>{{ f }}</span></For></div>
+              </Fill>
+              <Fill name="second">
+                <ui.Splitter direction="vertical" :sizes="[55, 45]" height="100%" label="Resize the preview">
+                  <Fill name="first"><div class="split-pane"><b>Messages</b><span>Lunch on Friday?</span><span>Your order shipped</span></div></Fill>
+                  <Fill name="second"><div class="split-pane"><b>Preview</b><span>Panes nest: this one splits top and bottom.</span></div></Fill>
+                </ui.Splitter>
+              </Fill>
+            </ui.Splitter>
+            <pre class="state">split_sizes={{ split_sizes }}</pre>
+            <pre class="code">{{ CODE['splitter'] }}</pre>
+          </ui.Card>
+        </Defer>
 
       </ui.Column>
     </ui.AppShell>
@@ -810,8 +827,17 @@ def nav_tree(self):
                          "icon": icon, "children": kids})
     return tree
 
+opened_groups: int = 0   # groups shown ahead of the idle loading (see go)
+
+
 def go(self, slug):
-    """A section (or a group's heading) picked in the sidebar: show it."""
+    """A section (or a group's heading) picked in the sidebar: show it,
+    with every group above it rendered first (the later groups load when
+    the page is idle), so nothing above shifts it afterwards."""
+    for index, (group, _, names) in enumerate(GROUPS):
+        slugs = {"group-" + group.lower().replace(" ", "-")} | {n.lower().replace(" ", "-") for n in names}
+        if slug in slugs:
+            self.opened_groups = max(self.opened_groups, index)
     self.nav_selected = slug
     self.scroll_to(slug, align="start")
 

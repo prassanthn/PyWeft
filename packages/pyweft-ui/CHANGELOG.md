@@ -8,6 +8,9 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- The gallery renders its first group at once and the others when the
+  page is idle (its charts once scrolled near), with `<Defer>`.
+
 - **`Splitter`:** two or three panes, side by side or stacked, with
   draggable dividers; keyboard (arrows, Home/End, Enter to collapse),
   `min`/`max`, `@bind` to the sizes in %, `storage_key` to remember them,

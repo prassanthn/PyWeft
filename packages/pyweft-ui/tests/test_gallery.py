@@ -9,12 +9,33 @@ from pyweft.vdom import Element
 GALLERY = Path(__file__).parent.parent / "gallery" / "app.weft"
 
 
+def show_deferred(renderer, tree):
+    """Fire every <Defer> placeholder, as the page does when idle."""
+    while True:
+        ids = []
+        stack = list(tree)
+        while stack:
+            node = stack.pop()
+            if isinstance(node, Element):
+                if "defer" in node.events:
+                    ids.append(node.events["defer"])
+                stack.extend(node.children)
+        if not ids:
+            return tree
+        renderer.dispatch(ids[0], {"type": "defer", "also": ids[1:]})
+        tree = renderer.render()
+
+
 def test_the_gallery_renders_every_section():
     App = load_component(GALLERY)
     app = App()
     renderer = Renderer(app)
     renderer.init_root()
     tree = renderer.render()
+    # Only the first group at first; the rest follow when the page is idle.
+    first = sum(1 for n in _walk_all(tree) if "defer" in n.events)
+    assert first == len(App.GROUPS) - 1
+    tree = show_deferred(renderer, tree)
 
     ids = set()
 
@@ -110,7 +131,10 @@ def test_the_section_list_searches_controls_too():
     app.nav_query = "slider"
     renderer.render()
     app.jump_to_first()
+    renderer.render()  # as a host does before carrying commands out
     commands = renderer.take_commands()
+    # Sliders is in a group that loads when idle: jumping there opened it.
+    assert app.opened_groups == 1
     assert [(c["op"], c.get("align")) for c in commands] == [("scroll_to", "start")]
 
 
@@ -123,6 +147,7 @@ def test_the_sidebar_tree_groups_sections_in_page_order():
     renderer.init_root()
     tree = renderer.render()
     assert _groups(tree) == [g for g, _, _ in App.GROUPS]
+    tree = show_deferred(renderer, tree)
     # Each group has a heading on the page, in the same order as the cards.
     ids = []
 
@@ -145,3 +170,10 @@ def test_the_sidebar_tree_groups_sections_in_page_order():
     renderer.render()
     assert app.nav_selected == "charts"
     assert [(c["op"], c.get("align")) for c in renderer.take_commands()] == [("scroll_to", "start")]
+
+
+def _walk_all(nodes):
+    for node in nodes:
+        if isinstance(node, Element):
+            yield node
+            yield from _walk_all(node.children)
