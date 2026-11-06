@@ -154,6 +154,21 @@ class THead:
     line: int = field(default=0, compare=False, repr=False, kw_only=True)
 
 
+@dataclass
+class TDefer:
+    """``<Defer when="visible" height="400px">content</Defer>``: the
+    content renders only once it is about to scroll into view (``visible``)
+    or the page has a quiet moment (``idle``); until then a placeholder
+    (its ``<Placeholder>`` child, else nothing) at least ``height`` high."""
+
+    when: str = "visible"
+    height: str = ""
+    ready: str | None = None  # :ready="expr": show the content as soon as it's true
+    children: list[Any] = field(default_factory=list)
+    placeholder: list[Any] = field(default_factory=list)
+    line: int = field(default=0, compare=False, repr=False, kw_only=True)
+
+
 def subtrees(node: Any) -> list[list[Any]]:
     """The child lists of any template node, for code that walks a template
     without caring what each control element means."""
@@ -161,6 +176,8 @@ def subtrees(node: Any) -> list[list[Any]]:
         return [children for _, children in node.branches]
     if isinstance(node, TAwait):
         return node.blocks
+    if isinstance(node, TDefer):
+        return [node.children, node.placeholder]
     return [node.children] if isinstance(node, (TElement, TFor, TSlot, TFill, THead)) else []
 
 
@@ -409,6 +426,13 @@ def _convert_children(el: ET.Element) -> list[Any]:
             raise TemplateError(f"<{child.tag}> must directly follow an <If>")
         if child.tag in ("Then", "Catch"):
             raise TemplateError(f"<{child.tag}> must be directly inside an <Await>")
+        if child.tag == "Placeholder":
+            raise TemplateError("<Placeholder> must be directly inside a <Defer>")
+        if child.tag == "Defer":
+            out.append(_convert_defer(child))
+            out += _text_nodes(child.tail)
+            i += 1
+            continue
         if child.tag == "Head":
             out.append(_convert_head(child))
             out += _text_nodes(child.tail)
@@ -519,6 +543,35 @@ def _convert_await(el: ET.Element) -> TAwait:
         else:
             holder.append(kid)
     node.pending = _convert_children(holder)
+    return node
+
+
+def _convert_defer(el: ET.Element) -> TDefer:
+    extra = sorted(set(el.attrib) - {"when", "height", "py-colon-ready"})
+    if extra:
+        names = [n.replace("py-colon-", ":") for n in extra]
+        raise TemplateError(f"<Defer> takes when=, height= and :ready=, not {', '.join(names)}")
+    when = el.get("when", "visible")
+    if when not in ("visible", "idle"):
+        raise TemplateError(f'<Defer when="{when}">: use when="visible" or when="idle"')
+    node = TDefer(when=when, height=el.get("height", ""), ready=el.get("py-colon-ready"), line=_line(el))
+    holder = ET.Element("Defer")
+    holder.text = el.text
+    for kid in el:
+        if kid.tag == "Placeholder":
+            if node.placeholder:
+                raise TemplateError("<Defer> has two <Placeholder>s")
+            if kid.attrib:
+                raise TemplateError("<Placeholder> takes no attributes")
+            node.placeholder = _convert_children(kid) or [TStatic([("static", "")])]
+            tail = kid.tail or ""
+            if len(holder):
+                holder[-1].tail = (holder[-1].tail or "") + tail
+            else:
+                holder.text = (holder.text or "") + tail
+        else:
+            holder.append(kid)
+    node.children = _convert_children(holder)
     return node
 
 

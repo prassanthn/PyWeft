@@ -658,6 +658,63 @@ const PyWeftRuntime = (() => {
     restoreSplit(s);
   }
 
+  // ------------------------------------------------------------------ defer
+  // <Defer> renders a placeholder (data-pw-defer) with a `defer` handler:
+  // not a DOM event. when="visible": an IntersectionObserver reports it
+  // once it is within 400px of the window, together with every other
+  // placeholder that is (one dispatch, `also` naming the rest, so they
+  // cost one render). when="idle": one placeholder per idle moment, in
+  // page order, so a long page fills in without holding up a click.
+  let deferObserver = null;
+  const idleQueue = [];
+  let idleScheduled = false;
+  const whenIdle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 1000 }) : setTimeout(fn, 30));
+
+  function deferHandler(el) {
+    const events = el._pyweftEvents || {};
+    return el.isConnected && events.defer ? events.defer : null;
+  }
+
+  function fireDefers(els) {
+    const ids = [...new Set(els.map(deferHandler).filter(Boolean))];
+    if (ids.length) dispatch(ids[0], { type: "defer", also: ids.slice(1) });
+  }
+
+  function observeDefer(el) {
+    const when = el.getAttribute("data-pw-defer") || "visible";
+    if (when === "visible" && typeof IntersectionObserver !== "undefined") {
+      if (!deferObserver) {
+        deferObserver = new IntersectionObserver((entries) => {
+          const ready = entries.filter((e) => e.isIntersecting).map((e) => e.target);
+          ready.forEach((t) => deferObserver.unobserve(t));
+          fireDefers(ready);
+        }, { rootMargin: "400px 0px" });
+      }
+      deferObserver.observe(el);
+      return;
+    }
+    if (!idleQueue.includes(el)) idleQueue.push(el);
+    if (!idleScheduled) {
+      idleScheduled = true;
+      whenIdle(runIdle);
+    }
+  }
+
+  function runIdle() {
+    idleScheduled = false;
+    while (idleQueue.length) {
+      const el = idleQueue.shift();
+      if (deferHandler(el)) {
+        fireDefers([el]);
+        break; // one per idle moment
+      }
+    }
+    if (idleQueue.length) {
+      idleScheduled = true;
+      whenIdle(runIdle);
+    }
+  }
+
   // ------------------------------------------------------------------ files
   // A drop of files from the computer, or a file <input>'s change: the
   // files are read (as base64, so they travel as JSON) before the handler
@@ -760,8 +817,11 @@ const PyWeftRuntime = (() => {
       delete el._pyweftEvents[spec];
     }
     for (const [spec, handlerId] of Object.entries(set)) {
-      ensureListener(el, spec);
       el._pyweftEvents[spec] = handlerId;
+      // A <Defer> placeholder: watched every time one is set, since the
+      // same element may turn into a placeholder again later.
+      if (spec === "defer") observeDefer(el);
+      else ensureListener(el, spec);
     }
   }
 

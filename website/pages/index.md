@@ -128,7 +128,8 @@ then `pyweft new myapp` and `pyweft run myapp`.
     `<Await>` shows loading, result and error states of async calls;
     `transition="fade"` and `animate="flip"` animate elements and lists;
     `<Html>` shows sanitized Markdown output; `<Head>` sets each page's
-    title and meta tags; `sortable` lists reorder by dragging;
+    title and meta tags; `<Defer>` keeps big pages quick to start;
+    `sortable` lists reorder by dragging;
     `provide`/`inject` pass values down the tree.
 
     [:octicons-arrow-right-24: Template syntax](guide/templates.md)

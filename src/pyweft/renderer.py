@@ -27,7 +27,9 @@ from .component import Component, component_named, declared_props, is_component_
 from .effects import dispose_effects, run_effects
 from .events import Event
 from .expressions import ExpressionError, Scope, eval_expr, render_parts, run_handler
-from .parser import TAwait, TElement, TemplateError, TFill, TFor, THead, THtml, TIf, TSlot, TStatic, subtrees
+from .parser import (
+    TAwait, TDefer, TElement, TemplateError, TFill, TFor, THead, THtml, TIf, TSlot, TStatic, subtrees,
+)
 from .rawhtml import html_nodes
 from .store import _renderers as _live_renderers
 from .styles import marker
@@ -240,6 +242,9 @@ class Renderer:
         # instances so a render doesn't restart what they wait for.
         self._awaits: dict[tuple, _Awaited] = {}
         self._awaits_seen: dict[tuple, int] = {}
+        # <Defer> blocks whose content is shown, by where they are.
+        self._deferred: set[tuple] = set()
+        self._defers_seen: dict[tuple, int] = {}
         # The component whose template is being rendered right now: the
         # parent, for context (inject), of any component it creates.
         self._rendering: list[Any] = [component]
@@ -417,6 +422,7 @@ class Renderer:
             self._refs = {}
             self._seen = set()
             self._awaits_seen = {}
+            self._defers_seen = {}
             self._rendering = [self.component]
             self._head_nodes = []
             out: list[Node] = []
@@ -434,6 +440,8 @@ class Renderer:
                 self._commands.append((None, "head", None, {"nodes": head}))
             for inst_id in [i for i in self.instances if i not in self._seen]:
                 _dispose(self.instances.pop(inst_id))
+            # A <Defer> that left the page defers again if it comes back.
+            self._deferred = {i for i in self._deferred if i[-1] < self._defers_seen.get(i[:-1], 0)}
             for ident in [i for i in self._awaits if i[-1] >= self._awaits_seen.get(i[:-1], 0)]:
                 entry = self._awaits.pop(ident)
                 if entry.task is not None:
@@ -524,6 +532,9 @@ class Renderer:
 
             elif isinstance(tnode, TAwait):
                 self._await(tnode, scope, path, out, key)
+
+            elif isinstance(tnode, TDefer):
+                self._defer(tnode, scope, path, out, key)
 
             elif isinstance(tnode, THead):
                 # Not in place: into the page's <head>, by way of the host.
@@ -641,6 +652,51 @@ class Renderer:
                 self._emit(tnode.then, scope.child(**{tnode.then_var: entry.value}), path, out, key)
         elif tnode.catch is not None:
             self._emit(tnode.catch, scope.child(**{tnode.catch_var: entry.value}), path, out, key)
+
+    def _defer(
+        self, tnode: TDefer, scope: Scope, path: list[str], out: list[Node], key: Any
+    ) -> None:
+        """``<Defer>``: a placeholder element until the host says it is
+        time (a ``defer`` event: scrolled near, or the page idle), then the
+        content, from then on."""
+        owner = scope.component
+        where = (
+            "/".join(path),
+            getattr(type(owner), "__weft_file__", None) or type(owner).__qualname__,
+            tnode.line,
+            key,
+        )
+        nth = self._defers_seen.get(where, 0)
+        self._defers_seen[where] = nth + 1
+        ident = (*where, nth)
+        if tnode.ready and eval_expr(tnode.ready, scope):
+            self._deferred.add(ident)  # and it stays shown when ready turns false
+        if ident in self._deferred:
+            self._emit(tnode.children, scope, path, out, key)
+            return
+        segment = f"k:{key}" if key is not None else f"i:{len(out)}"
+        handler_id = "/".join(path + [segment]) + "#defer"
+
+        def show(event: Any = None) -> None:
+            self._deferred.add(ident)
+            # The host reports every Defer that became due at once, so they
+            # cost one render: the others' handler ids come along.
+            for other in (event or {}).get("also") or []:
+                handler = self.handlers.get(other)
+                if handler is not None and handler is not show:
+                    handler(None)
+            owner.state_has_changed()
+
+        self.handlers[handler_id] = show
+        attrs = {"data-pw-defer": tnode.when}
+        if tnode.height:
+            attrs["style"] = f"min-height: {tnode.height}"
+        scope_id = getattr(type(owner), "__scope__", None)
+        if scope_id:
+            attrs[marker(scope_id)] = ""
+        children: list[Node] = []
+        self._emit(tnode.placeholder, scope, path + [segment], children)
+        out.append(Element(tag="div", attrs=attrs, events={"defer": handler_id}, children=children, key=key))
 
     def _begin_await(self, owner: Any, source: Any, key: Any, catches: bool) -> _Awaited:
         entry = _Awaited(key=key, source=source)

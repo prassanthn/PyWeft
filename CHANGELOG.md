@@ -8,6 +8,18 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **Faster start for big apps:** templates compile in the page's idle time
+  instead of before the first render (hosts set
+  `Renderer.compile_when_idle` and call `compile_templates()`), field types
+  are read once per class, and the template compiler no longer re-parses
+  expressions. The pyweft-ui gallery's first render went from 2.0 s to
+  0.95 s with all of it on screen.
+- **`<Defer>`:** renders its content when it's about to scroll into view
+  (`when="visible"`) or when the page is idle (`when="idle"`, one at a
+  time), with a placeholder (`height`, `<Placeholder>`) until then;
+  `:ready` shows it at once. The gallery's first render is now 82 ms,
+  and it becomes usable about 40% sooner in the browser.
+
 - **Splitters:** a `splitter` element between two others in a flex
   container is a divider the user drags to resize them; the runtime moves
   it live and `@split` reports `ratio`, `before` and `after` once, on

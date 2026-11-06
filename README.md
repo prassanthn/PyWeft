@@ -221,7 +221,9 @@ To see every control live, clone this repository and run
   errors that point to your `.weft` file and line.
 - **Fast first load:** your app's first screen is rendered ahead of time and
   shows at once, while Python starts in the background. Templates are
-  compiled to Python functions, so rendering stays quick.
+  compiled to Python functions (while the page is idle, so the first
+  screen isn't kept waiting), and `<Defer>` leaves what's below the fold
+  until it's scrolled near.
 - **Inside any website:** `<pyweft-app>` puts a built app into another page
   (a blog, an intranet, docs), with events and data passing both ways.
 - **Checked before it runs:** `pyweft check` finds unknown names, props,
@@ -238,6 +240,7 @@ To see every control live, clone this repository and run
 | Build an app with several pages | [Pages and navigation](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#pages-and-navigation) |
 | Load data and show loading and error states | [`<Await>`](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#waiting-in-the-template-await) |
 | Reorder by dragging, drop files | [Sortable lists](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#drag-to-reorder-sortable-lists), [files dragged onto the page](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#files-and-dialogs) |
+| Make a big page start faster | [`<Defer>`](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#big-pages-defer) |
 | Animate elements and list rows | [Transitions and animations](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#transitions-and-animations) |
 | Show Markdown or other HTML | [`<Html>`](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#showing-html-from-elsewhere-html) |
 | Give each page its own title and meta tags | [`<Head>`](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#per-page-tags-head) |

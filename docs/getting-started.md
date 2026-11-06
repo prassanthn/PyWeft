@@ -39,6 +39,7 @@ later mobile: only the transport differs.
    [focus and scrolling](#moving-focus-and-scrolling-ref), component styles,
    [transitions and animations](#transitions-and-animations),
    [drag to reorder (sortable)](#drag-to-reorder-sortable-lists),
+   [big pages (Defer)](#big-pages-defer),
    [resizable panes (splitter)](#resizable-panes-splitter),
    [showing HTML (Html)](#showing-html-from-elsewhere-html)
 4. [Composing components](#4-composing-components): props, events,
@@ -605,6 +606,7 @@ async def load_user(self, uid):
 | `<If cond="...">` / `<ElseIf cond="...">` / `<Else>` | Conditional rendering. Branch elements must be adjacent siblings |
 | `<For each="item in items" key="item['id']" index="i">` | Loop. `key` gives rows stable identity across reorders (always use it for dynamic lists); `index` is optional |
 | `<Await task="load(id)" key="id">` ... `<Then as="data">` ... `<Catch as="error">` | Wait for an async call: the content shown while it runs, then the `<Then>` or `<Catch>` block. See [waiting in the template](#waiting-in-the-template-await) |
+| `<Defer when="visible" height="400px">...</Defer>` | Render the content only when it's about to scroll into view (or `when="idle"`), with a placeholder until then. See [big pages](#big-pages-defer) |
 | `<Head>...</Head>` | `<title>`, `<meta>`, `<link>` and `<style>` for the page's head while the component is shown. See [per-page tags](#per-page-tags-head) |
 | `<Html :content="expr" />` | Show an HTML string (rendered Markdown, say) as markup, sanitized. See [showing HTML](#showing-html-from-elsewhere-html) |
 | `<PascalCaseTag ... />` | Renders a child component (see below) |
@@ -617,10 +619,14 @@ see those names too: `{{ sum(i['price'] * qty for i in items) }}` works.
 exception: a generator or lambda there can't see them, so move such a
 statement into a method.)
 
-Each component's template is compiled into a Python function the first time
-the component renders, which makes rendering about twice as fast as walking
-the template. You don't have to do anything for it. Should you ever suspect
-it, `PYWEFT_INTERPRET=1` in the environment turns it off.
+Each component's template is compiled into a Python function, which makes
+rendering about twice as fast as walking the template. In the browser and in
+a desktop app the first screen is rendered without compiling (for a big app,
+compiling costs more than one render), and the templates are compiled
+afterwards, a few at a time, while the page is idle. You don't have to do
+anything for it. Should you ever suspect it, `PYWEFT_INTERPRET=1` in the
+environment turns compiling off. For pages with a lot on them, see also
+[Defer](#big-pages-defer).
 
 ### Inline handlers
 
@@ -1041,6 +1047,45 @@ def move(self, event):
   list. Key the `<For>`, and `animate="flip"` makes the final move slide.
 - Your handler decides: it may refuse a move (leave the list as it is) and
   the item slides back.
+
+### Big pages: Defer
+
+A page with a lot on it (a long settings page, a dashboard, a gallery of
+controls) spends most of its start-up rendering things nobody can see yet.
+`<Defer>` renders its content only once it's needed, with a placeholder
+until then:
+
+```xml
+<h1>Dashboard</h1>
+<Summary />                                   <!-- on screen: renders at once -->
+
+<Defer height="600px">                        <!-- when scrolled near -->
+  <SalesCharts />
+  <Placeholder><p class="muted">Loading charts…</p></Placeholder>
+</Defer>
+
+<Defer when="idle" height="900px">            <!-- when the page is quiet -->
+  <OrderHistory />
+</Defer>
+```
+
+- **`when="visible"`** (the default) renders the content once its
+  placeholder comes within 400px of the window, so it is usually there
+  before it's seen. Several that come near at once cost one render.
+- **`when="idle"`** renders it when the browser has nothing else to do,
+  one `<Defer>` at a time, top to bottom, so the whole page fills in soon
+  after start without delaying the first screen or a click.
+- **`height`** is the placeholder's minimum height. Make it close to the
+  content's, so the scroll bar is about right and nothing jumps much when
+  the content arrives. `<Placeholder>` gives it something to show.
+- **`:ready="condition"`** shows the content as soon as the condition is
+  true, whatever `when` says: for a link that jumps to a section that may
+  not be rendered yet (render it, then `scroll_to` it).
+- Once shown, the content stays. A `<Defer>` that leaves the page (inside
+  an `<If>` that turns false) defers again when it comes back.
+- The first screen, [rendered ahead of time](#the-first-screen-before-python-starts),
+  shows placeholders where the deferred content will be, so keep what's at
+  the top of the page out of `<Defer>`.
 
 ### Resizable panes: splitter
 
@@ -2986,7 +3031,8 @@ Working today:
   inline statements) with modifiers (`@submit.prevent`, `@keydown.enter`)
   and a detailed event object (keys, modifier keys, mouse, form fields),
   `<If>`/`<For>` with keyed lists, `<Await>` for async data, `<Html>` for
-  sanitized HTML, `<Head>` for per-page tags, lists sorted by dragging, `class:`/`style:` toggles, transitions and list
+  sanitized HTML, `<Head>` for per-page tags, `<Defer>` for big pages, lists
+  sorted by dragging, `class:`/`style:` toggles, transitions and list
   animations, `<Window>`/`<Document>` events, checkbox groups bound to a
   list, `@property` computed values, `ref=` with `focus()`, `scroll_to()`
   and `keep_in_view()`, and input masks (`data-mask`).
