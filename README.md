@@ -223,7 +223,8 @@ To see every control live, clone this repository and run
   shows at once, while Python starts in the background. Templates are
   compiled to Python functions (while the page is idle, so the first
   screen isn't kept waiting), and `<Defer>` leaves what's below the fold
-  until it's scrolled near.
+  until it's scrolled near. `pyweft build` parses every component ahead of
+  time, and the page downloads its files all at once while Python loads.
 - **Inside any website:** `<pyweft-app>` puts a built app into another page
   (a blog, an intranet, docs), with events and data passing both ways.
 - **Checked before it runs:** `pyweft check` finds unknown names, props,

@@ -3075,7 +3075,9 @@ Working today:
   app runs.
 - **Tooling:** `pyweft new` / `run` / `build`; hot reload that keeps state,
   with an error overlay; the first screen rendered ahead of time, so pages
-  appear at once; a customizable loading screen that shows real progress;
+  appear at once; components parsed at build time and files downloaded in
+  parallel, so even big apps start quickly; a customizable loading screen
+  that shows real progress;
   PyPI dependencies from `pyproject.toml`, installed in the browser.
 - **Data in and out:** `pyweft.http` calls web APIs (with sign-in
   headers through `http.Client`), follows live data with server-sent

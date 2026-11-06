@@ -151,7 +151,8 @@ then `pyweft new myapp` and `pyweft run myapp`.
     Hot reload that keeps your app's state, readable errors that point to
     your `.weft` file and line, `pyweft check` for mistakes and
     accessibility problems, and a first screen that shows before Python
-    has even started.
+    has even started. Big apps start quickly too: components are parsed at
+    build time and `<Defer>` leaves the rest of a long page for later.
 
     [:octicons-arrow-right-24: Hot reload](guide/projects.md#hot-reload)
 
