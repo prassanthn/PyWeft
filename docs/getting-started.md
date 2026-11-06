@@ -2719,10 +2719,14 @@ uv run pyweft build myapp              # writes myapp/dist/
 uv run pyweft build myapp --out site   # or pick the output folder
 ```
 
-`dist/` is a fully static site. There is no compile step: your `.weft` files
-ship verbatim and are parsed in the browser at load, and the dependencies
-from your `pyproject.toml` are written into `index.html` for micropip to
-install on first visit.
+`dist/` is a fully static site. Your `.weft` files ship as they are, and the
+dependencies from your `pyproject.toml` are written into `index.html` for
+micropip to install on first visit. The build also parses every `.weft`
+file (the component libraries' too) ahead of time, into
+`pyweft-bundle.bin`: the page loads it first and skips that work, which
+halves the time to load a big app's components. A file the bundle doesn't
+match (edited since) is simply parsed in the browser, so it can't go
+stale; `pyweft run` makes one on the fly.
 
 ```
 dist/
@@ -2731,6 +2735,8 @@ dist/
   worker.js         the Web Worker for run_in_background (started on first use)
   pyweft-src/*.py   the framework, served to the browser
   app/              your .weft components, .py modules and .css files, as-is
+  pyweft-bundle.bin the .weft files parsed ahead of time (optional to the page)
+  embed.js          <pyweft-app>, to put the app inside another website
   assets/           your assets/ folder, copied as-is
 ```
 

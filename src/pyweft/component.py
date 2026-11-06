@@ -27,6 +27,7 @@ from .parser import (
     subtrees,
     split_source,
 )
+from . import precompiled
 from .store import Store
 from .styles import scope_css
 
@@ -263,10 +264,20 @@ def component_from_source(
     """``scope`` is the style scope id; it defaults to the snake-cased ``name``
     and only matters when the source has a ``<style>`` block. ``filename`` is
     what tracebacks show for errors in the code block."""
-    template_src, _, style_src = split_source(src)
-    # Lines in the template tree (and its error messages) are file lines.
-    first_line = src.count(chr(10), 0, block_spans(src)["template"][0]) + 1
-    nodes = parse_template(template_src, first_line)
+    # Parsed ahead of time (pyweft build/run) when the text is unchanged.
+    ready = precompiled.lookup(src)
+    if ready is not None:
+        nodes = ready["template"]
+        style_src = ready["style"]
+        if "generated" in ready:
+            from .compiler import prepared_template  # (compiler imports this module)
+
+            prepared_template(nodes, *ready["generated"])
+    else:
+        template_src, _, style_src = split_source(src)
+        # Lines in the template tree (and its error messages) are file lines.
+        first_line = src.count(chr(10), 0, block_spans(src)["template"][0]) + 1
+        nodes = parse_template(template_src, first_line)
 
     code_globals: dict[str, Any] = {}
     exec(compile_code_block(src, filename or f"<{name}.weft>"), code_globals)
@@ -281,7 +292,10 @@ def component_from_source(
     if style_src.strip():
         scope = scope or _snake(name)
         namespace["__scope__"] = scope
-        namespace["__style__"] = scope_css(style_src, scope).strip()
+        if ready is not None:  # scoped already, with a stand-in for the scope
+            namespace["__style__"] = style_src.replace(precompiled.SCOPE, scope)
+        else:
+            namespace["__style__"] = scope_css(style_src, scope).strip()
     else:
         namespace["__scope__"] = None
         namespace["__style__"] = ""

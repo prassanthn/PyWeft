@@ -337,16 +337,6 @@ def pyweft_hot_reload():
       return src;
     }
 
-    async function writeLibraries(pyodide, libraries) {
-      for (const lib of libraries) {
-        for (const name of lib.files) {
-          const path = `/pyweft-libs/${lib.name}/${name}`;
-          pyodide.FS.mkdirTree(path.slice(0, path.lastIndexOf("/")));
-          pyodide.FS.writeFile(path, await (await fetch(`lib/${lib.name}/${name}`)).text());
-        }
-      }
-    }
-
     // run_in_background's browser half: one Web Worker (static/worker.js)
     // running its own Python, started on first use. Calls run one at a time,
     // in order. The queue lives here rather than in the worker so that a
@@ -547,7 +537,25 @@ def pyweft_hot_reload():
       };
     }
 
+    // Every file the page needs, asked for at once and while Python loads,
+    // rather than one after another once it has. (Unawaited, a failure
+    // would be reported twice; it is reported when awaited.)
+    function prefetch(url, kind = "text") {
+      const promise = fetch(url).then((r) => {
+        if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
+        return kind === "text" ? r.text() : r.arrayBuffer();
+      });
+      promise.catch(() => {});
+      return promise;
+    }
+
     async function main() {
+      const modules = MODULES.map((name) => prefetch(`pyweft-src/${name}`));
+      const libraries = LIBRARIES.map((lib) => lib.files.map((name) => prefetch(`lib/${lib.name}/${name}`)));
+      const appFiles = APP_FILES.map((name) => prefetch(`app/${name}`));
+      // Templates parsed ahead of time (precompiled.py); optional.
+      const bundle = fetch("pyweft-bundle.bin").then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null);
+
       setStep("python");
       setStatus("Loading Python…");
       const pyodide = await loadPyodide();
@@ -564,18 +572,30 @@ def pyweft_hot_reload():
       setStep("app");
       setStatus("Loading app…");
       pyodide.FS.mkdirTree("/pyweft-src/pyweft");
-      for (const name of MODULES) {
-        const src = await (await fetch(`pyweft-src/${name}`)).text();
-        pyodide.FS.writeFile(`/pyweft-src/pyweft/${name}`, src);
+      const moduleTexts = await Promise.all(modules);
+      MODULES.forEach((name, i) => pyodide.FS.writeFile(`/pyweft-src/pyweft/${name}`, moduleTexts[i]));
+      for (const [i, lib] of LIBRARIES.entries()) {
+        const texts = await Promise.all(libraries[i]);
+        lib.files.forEach((name, j) => {
+          const path = `/pyweft-libs/${lib.name}/${name}`;
+          pyodide.FS.mkdirTree(path.slice(0, path.lastIndexOf("/")));
+          pyodide.FS.writeFile(path, texts[j]);
+        });
       }
-      await writeLibraries(pyodide, LIBRARIES);
       // /app too, so a component can `import helpers` from helpers.py next
       // to app.weft. A changed .py reloads the page: imports are cached.
       pyodide.runPython(`import sys; sys.path[:0] = ["/pyweft-src", "/pyweft-libs", "/app"]`);
 
       pyodide.FS.mkdirTree("/app");
-      for (const name of APP_FILES) {
-        await writeAppFile(pyodide, name);
+      const appTexts = await Promise.all(appFiles);
+      APP_FILES.forEach((name, i) => {
+        if (name.includes("/")) pyodide.FS.mkdirTree(`/app/${name.slice(0, name.lastIndexOf("/"))}`);
+        pyodide.FS.writeFile(`/app/${name}`, appTexts[i]);
+      });
+      const bundled = await bundle;
+      if (bundled) {
+        pyodide.globals.set("_pyweft_bundle", new Uint8Array(bundled));
+        pyodide.runPython("from pyweft import precompiled as _p\n_p.install(_pyweft_bundle.to_bytes())\ndel _pyweft_bundle, _p");
       }
 
       // Called from Python whenever state changed outside a handler. Many

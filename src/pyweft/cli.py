@@ -453,6 +453,30 @@ def linked_app_css(head: str) -> set[str]:
 
 
 _PRERENDER_TIMEOUT = 20  # seconds; past this the app gets its loading screen
+_bundles: dict[str, tuple[frozenset, bytes]] = {}
+_bundle_lock = threading.Lock()
+
+
+def app_bundle(app_dir: Path) -> bytes:
+    """Every .weft file the app ships (its libraries' too), parsed, scoped
+    and generated ahead of time (precompiled.py): the page installs it before
+    loading the app. Made once per state of the app's files."""
+    from . import precompiled
+
+    key = frozenset(snapshot(app_dir).items())
+    with _bundle_lock:
+        cached = _bundles.get(str(app_dir))
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        texts = [(app_dir / rel).read_text(encoding="utf-8")
+                 for rel in app_shipped_files(app_dir) if rel.endswith(".weft")]
+        for lib in app_libraries(app_dir):
+            texts += [(lib.folder / rel).read_text(encoding="utf-8") for rel in lib.files if rel.endswith(".weft")]
+        data = precompiled.bundle(texts)
+        _bundles[str(app_dir)] = (key, data)
+        return data
+
+
 _prerendered: dict[str, tuple[frozenset, dict | None]] = {}
 _prerender_lock = threading.Lock()
 
@@ -715,6 +739,8 @@ def cmd_build(app_dir: Path, out: Path, prerender: bool = True) -> None:
     shutil.copy(_STATIC / "worker.js", out / "worker.js")
     # For other sites: <script src=".../embed.js"> + <pyweft-app>.
     shutil.copy(_STATIC / "embed.js", out / "embed.js")
+    # Templates parsed ahead of time; the page loads without it too.
+    (out / "pyweft-bundle.bin").write_bytes(app_bundle(app_dir))
     for name in pyweft_modules():
         shutil.copy(_PKG_DIR / name, out / "pyweft-src" / name)
     for name in files + app_css_files(app_dir):
@@ -880,7 +906,6 @@ def make_dev_server(
     # A new id per server run: a page that reconnects to a restarted server
     # reloads, since the server may have been restarted for a reason.
     server_id = uuid.uuid4().hex
-
     class Handler(SimpleHTTPRequestHandler):
         def do_GET(self):  # noqa: N802 (stdlib naming)
             route = self.path.split("?", 1)[0]
@@ -896,6 +921,8 @@ def make_dev_server(
                     self.send_error(500, explain=str(exc))
                     return
                 return self._send("text/html", page.encode())
+            if route == "/pyweft-bundle.bin":
+                return self._send("application/octet-stream", app_bundle(app_dir))
             if route == "/__pyweft/events":
                 return self._events()
             if route in ("/runtime.js", "/worker.js", "/embed.js"):
