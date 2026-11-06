@@ -625,6 +625,33 @@ keywords. It binds a list:
 - `label`, `hint`, `error`, `disabled` and `name` work as on the other
   fields (a range sends `name_min` and `name_max`), so it works with `Form`.
 
+### Files: FileDrop
+
+**`FileDrop`** takes files dragged onto it from the computer, or chosen
+with its button, and hands them to your handler as `PickedFile`s, the same
+objects `pyweft.dialogs` returns:
+
+```xml
+<ui.FileDrop accept="csv, xlsx" max_mb="5" @files="import_files(event)" />
+```
+
+```python
+async def import_files(self, files):
+    for file in files:                  # name, data (bytes), text, size, type
+        self.rows += parse_csv(file.text)
+```
+
+- **`accept`** lists extensions (`"csv, xlsx"` or a list); others are
+  turned away. **`max_mb`** caps the size. **`multiple="false"`** takes one
+  file at a time. What it turns away goes to `@reject` as
+  `[(name, reason)]` and is shown under the box, unless you pass `error`.
+- The box lights up while files are dragged over it, and while one is on
+  the page a file dropped beside it doesn't make the browser open it.
+- The button opens the browser's file picker, or the system's in a desktop
+  app, limited to `accept`. Keyboard users use the button.
+- To sort a list by dragging instead, see [sortable
+  lists](../../../docs/getting-started.md#drag-to-reorder-sortable-lists).
+
 ### Checkbox and Switch labels with links
 
 Put the label between the tags when it needs more than text:

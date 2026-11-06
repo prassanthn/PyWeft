@@ -115,6 +115,7 @@ All have `label`, `hint`, `error`, `required`, `disabled`, `name`, and take
 | `Slider` | an `int` or `float`; `range="true"`: `(low, high)` | `min`, `max`, `step`, `range`, `value_label` (drag/always/side/none), `format`, `ticks`, `marks`, `lazy`, `name`; emits `change`, `blur` |
 | `DateRangePicker` | `(start, end)` dates or `None` | `min`, `max`, `min_days`, `max_days`, `months`, `placeholder`, `format`, `week_start`, `align`; `name` sends `<name>_start` and `<name>_end` |
 | `Calendar` | `datetime.date`, or with `range="true"` `(start, end)` | always open on the page: `range`, `months`, `min`, `max`, `min_days`, `max_days`, `week_start` |
+| `FileDrop` | nothing: emits `files`, a list of `PickedFile` (`name`, `data`, `text`, `size`, `type`) | drop zone plus a "Choose files" button: `accept` (`"csv, xlsx"`), `max_mb`, `multiple`, `label`, `button`; emits `reject` with `[(name, reason)]` |
 | `DatePicker` | `datetime.date` or `None` | `min`, `max` (a date or `"YYYY-MM-DD"`), `placeholder`, `format` (strftime), `week_start` (monday, sunday), `align` |
 
 `options` can be a comma-separated string (`"Small, Medium, Large"`), a list

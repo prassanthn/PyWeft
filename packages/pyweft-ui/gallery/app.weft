@@ -198,6 +198,23 @@ tags={{ repr(tags) }}  invitees={{ repr(invitees) }}</pre>
           <pre class="code">{{ CODE['sliders'] }}</pre>
         </ui.Card>
 
+        <ui.Card title="Drag and drop" id="drag-and-drop" ref="drag-and-drop" subtitle="Drag rows by their grip (or Alt+arrow keys); drop files on the box">
+          <ui.Grid min_width="16rem" gap="lg">
+            <ul class="sortable" sortable="" @sort="move_task(event)" aria-label="Tasks in order">
+              <For each="task in tasks" key="task">
+                <li class="sortable-row" tabindex="0" animate="flip">
+                  <span class="grip" sortable-handle="" aria-hidden="true"><ui.Icon name="menu" /></span>
+                  {{ task }}
+                </li>
+              </For>
+            </ul>
+            <ui.FileDrop accept="csv, txt, json" max_mb="2" @files="dropped_files(event)" />
+          </ui.Grid>
+          <pre class="state">tasks={{ tasks }}
+files={{ file_list or 'none yet' }}</pre>
+          <pre class="code">{{ CODE['drag-and-drop'] }}</pre>
+        </ui.Card>
+
         <ui.Card title="Expansion panels" id="expansion-panels" ref="expansion-panels" subtitle="Open one, or a stack where one is open at a time">
           <ui.Column gap="lg">
             <ui.Expansion title="Delivery" description="Address and speed" icon="send" @bind="delivery_open">
@@ -559,6 +576,7 @@ SECTION_CONTROLS = {
     "Chips": ["Chips", "ChipInput"],
     "Button toggle": ["ButtonToggle"],
     "Sliders": ["Slider"],
+    "Drag and drop": ["FileDrop", "sortable", "drag", "drop", "upload", "reorder", "kanban"],
     "Expansion panels": ["Expansion", "Accordion"],
     "Dates and menus": ["DatePicker", "DateRangePicker", "Menu"],
     "Menus": ["Menu", "ContextMenu"],
@@ -581,7 +599,7 @@ SECTION_CONTROLS = {
     "Toasts": ["Toaster", "toast", "Snackbar"],
     "Layout": ["Row", "Column", "Grid", "Card", "Divider", "AppShell"],
 }
-SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Cascade select", "Chips", "Button toggle", "Sliders", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Progress", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Breadcrumbs", "Table", "Charts", "Tree", "Carousel", "Toasts", "Layout"]
+SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Cascade select", "Chips", "Button toggle", "Sliders", "Drag and drop", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Progress", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Breadcrumbs", "Table", "Charts", "Tree", "Carousel", "Toasts", "Layout"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -667,6 +685,15 @@ LONG_TRAIL = [("/", "Home"), ("/shop", "Shop"), ("/shop/garden", "Garden"), ("/s
               ("/shop/garden/tools/hand", "Hand tools"), "Trowel, stainless steel"]
 ICON_TRAIL = [{"to": "/", "label": "Home", "icon": "home"}, {"to": "/files", "label": "Files", "icon": "folder"},
               {"to": "/files/2026", "label": "2026", "icon": "folder"}, {"label": "budget.xlsx", "icon": "file"}]
+
+def move_task(self, event):
+    task = self.tasks.pop(event.from_index)
+    self.tasks.insert(event.to_index, task)
+
+
+def dropped_files(self, files):
+    self.file_list = ", ".join(f"{f.name} ({f.size} bytes)" for f in files)
+
 
 @property
 def crumb_trail(self):
@@ -794,6 +821,8 @@ filters: list = ["Open", "Assigned to me", "This week"]
 tags: list = ["python", "ui"]
 invitees: list = []
 volume: int = 40
+tasks: list = ["Write the plan", "Build it", "Test it", "Ship it"]
+file_list: str = ""
 layout: str = "list"
 range_view: str = "Week"
 text_styles: list = ["bold"]
@@ -1093,6 +1122,21 @@ async def load_folder(self, value):
 <ui.Slider label="Rating" :min="1" :max="5" ticks="true"
            value_label="always" marks="1, 3, 5" @bind="rating" />
 <ui.Slider label="Opacity" :max="1" :step="0.05" lazy="true" @bind="opacity" />""",
+    "drag-and-drop": """<ul sortable="" @sort="move_task(event)">
+  <For each="task in tasks" key="task">
+    <li tabindex="0" animate="flip">
+      <span sortable-handle="">⠿</span> {{ task }}
+    </li>
+  </For>
+</ul>
+<ui.FileDrop accept="csv, txt, json" max_mb="2" @files="dropped_files(event)" />
+
+def move_task(self, event):
+    task = self.tasks.pop(event.from_index)
+    self.tasks.insert(event.to_index, task)
+
+def dropped_files(self, files):      # PickedFile: name, data, text, size
+    self.file_list = ", ".join(f.name for f in files)""",
     "chips": """<ui.Chips options="Small, Medium, Large" @bind="size" />
 <ui.Chips :options="interests" multiple="true" @bind="chosen" />
 <ui.Chips :options="filters" removable="true" selectable="false"
@@ -1256,6 +1300,13 @@ toast("Item deleted.", action="Undo", on_action=self.undo)""",
   border-radius: var(--ui-radius); white-space: pre;
 }
 .state { white-space: pre-wrap; }
+.sortable { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.sortable-row {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--ui-radius, 8px);
+  border: 1px solid var(--ui-border, #d1d9e0); background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+}
+.sortable-row:focus-visible { outline: 2px solid var(--ui-primary, #4f46e5); outline-offset: 2px; }
+.grip { color: var(--ui-muted, #59636e); display: inline-flex; }
 .tile {
   display: grid; place-items: center; height: 56px; font-weight: 650;
   border-radius: var(--ui-radius);

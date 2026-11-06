@@ -8,6 +8,12 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- **`FileDrop`:** a drop zone for files, with a "Choose files" button
+  (`pyweft.dialogs`), `accept` (extensions), `max_mb` and `multiple`;
+  emits `files` (PickedFile list) and `reject` (name, reason), and keeps
+  a file dropped beside it from opening in the browser. Needs pyweft's
+  dropped-file support.
+
 ## 0.6.0
 
 - Needs `pyweft` 0.7.

@@ -136,6 +136,8 @@ def remove(self, item):
 | `@keydown.enter.ctrl.prevent="send"` | modifiers: key names (`enter`, `esc`, `up`, `page-down`, `a`), `ctrl alt shift meta exact`, `prevent stop self once capture passive`; `click.right` |
 | `@resize="fit"` | not a DOM event: the element's `event.width`/`event.height` when laid out and on every size change (never in tests or pre-rendering). Mouse events carry `event.localX`/`localY`, the position inside the handler's element |
 | `<Window @keydown.ctrl.k.prevent="open_search" />` | events on the window (`keydown`, `scroll`, `resize`, ...) or `<Document @visibilitychange=...>`: handlers only, active while their component is shown |
+| `<ul sortable="" @sort="move(event)">` | drag to reorder the children (mouse, touch, Alt+arrows): `event.from_index`/`to_index`; same `sortable="board"` on several lists moves between them (`:sortable-name`, `event.from_list`/`to_list`); `sortable-handle=""` on a grip. Reorder your list in the handler |
+| `@drop.prevent="add(event.files)"` | dropped files (and a file `<input>`'s `@change`) as `PickedFile`s (`name`, `data`, `text`, `size`, `type`); needs `@dragover.prevent=""` too, or use `ui.FileDrop` |
 | `transition="fade"`, `in=`, `out=`, `animate="flip"` | animate an element appearing/leaving (`fade`, `fly y=-20`, `slide`, `scale`, `blur`; `duration=300`) and keyed-list moves; also on component tags |
 | `ref="name"` | name an element for `self.focus("name")`, `self.scroll_to("name")` |
 | `key="..."` | identity for a `<For>` row (or a component) |
@@ -344,7 +346,8 @@ lists take `"A, B, C"`, a list of values, `(value, label)` pairs or dicts.
 - Fields: `TextField` (`mask="(999) 999-9999"`), `TextArea`, `NumberField`,
   `Select`, `Autocomplete`, `CascadeSelect`, `Chips`, `ChipInput`, `ButtonToggle`, `Slider`,
   `RadioGroup`, `Checkbox`, `Switch`, `DatePicker`, `DateRangePicker`,
-  `Calendar`.
+  `Calendar`, `FileDrop` (`accept="csv"`, `max_mb`; `@files` gets
+  PickedFiles, `@reject` the ones turned away).
 - Data and navigation: `Table` (sortable), `Tree`, `EventCalendar`,
   `Breadcrumbs`.
 - Charts (SVG, themed, sized to their container): `BarChart`

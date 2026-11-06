@@ -1,0 +1,146 @@
+<template>
+  <div class="host">
+    <!-- A file dropped beside the zone would make the browser open it,
+         leaving the app: not while a drop zone is on the page. -->
+    <Window @dragover.prevent="" @drop.prevent="" />
+    <div class="zone" class:over="_over" class:disabled="disabled"
+         :aria-describedby="hint_id"
+         @dragenter.prevent="entered(event)" @dragover.prevent="" @dragleave="left"
+         @drop.prevent="dropped(event)">
+      <span class="icon" aria-hidden="true"><Icon name="upload" /></span>
+      <p class="label">{{ label }}</p>
+      <p class="hint" :id="hint_id">{{ hint or default_hint }}</p>
+      <button type="button" class="choose" :disabled="disabled" @click="choose">{{ button }}</button>
+    </div>
+    <If cond="error or _problem"><p class="error" role="alert">{{ error or _problem }}</p></If>
+  </div>
+</template>
+
+<code>
+# <ui.FileDrop accept="csv, xlsx" @files="load(event)" />: drop files here,
+# or choose them with the button (pyweft.dialogs). Emits "files" with a list
+# of PickedFile (name, data, text, size, type) and "reject" with the
+# [(name, reason)] of files it turned away (wrong type, too big, one too
+# many). The same in the browser and in a desktop window.
+import itertools
+from pyweft import dialogs
+
+label: str = "Drop files here"
+button: str = "Choose files"
+hint: str = ""            # under the label; by default says what's accepted
+accept = ""               # extensions: "csv, png" or ["csv", "png"]; empty = any
+multiple: bool = True
+max_mb: float = 0         # the largest file accepted, in MB; 0 = any size
+error: str = ""           # shown in red (instead of FileDrop's own message)
+disabled: bool = False
+
+_depth: int = 0
+_over: bool = False
+_problem: str = ""
+_ids = itertools.count(1)
+
+
+def on_init(self):
+    self._id = f"ui-file-drop-{next(self._ids)}"
+
+
+@property
+def hint_id(self):
+    return self._id + "-hint"
+
+
+@property
+def extensions(self):
+    kinds = self.accept.split(",") if isinstance(self.accept, str) else list(self.accept or [])
+    return [k.strip().lstrip("*").lstrip(".").lower() for k in kinds if k.strip()]
+
+
+@property
+def default_hint(self):
+    parts = []
+    if self.extensions:
+        parts.append(", ".join(e.upper() for e in self.extensions))
+    if self.max_mb:
+        parts.append(f"up to {self.max_mb:g} MB")
+    if not self.multiple:
+        parts.append("one file")
+    return " · ".join(parts) or ("Any files" if self.multiple else "Any file")
+
+
+def entered(self, event):
+    if self.disabled:
+        return
+    self._depth += 1
+    # Only files light it up: not text, or an item being sorted.
+    self._over = "Files" in (event.get("kinds") or [])
+
+
+def left(self):
+    self._depth = max(0, self._depth - 1)
+    if not self._depth:
+        self._over = False
+
+
+def dropped(self, event):
+    self._depth = 0
+    self._over = False
+    if not self.disabled:
+        self.take(event.files)
+
+
+async def choose(self):
+    if self.multiple:
+        files = await dialogs.open_files(types=self.extensions)
+    else:
+        file = await dialogs.open_file(types=self.extensions)
+        files = [file] if file else []
+    if files:
+        self.take(files)
+
+
+def take(self, files):
+    """Sort ``files`` into accepted and turned away, and tell the parent."""
+    accepted, rejected = [], []
+    for file in files:
+        ext = file.name.rpartition(".")[2].lower() if "." in file.name else ""
+        if self.extensions and ext not in self.extensions:
+            rejected.append((file.name, f"not one of {', '.join(self.extensions)}"))
+        elif self.max_mb and file.size > self.max_mb * 1024 * 1024:
+            rejected.append((file.name, f"over {self.max_mb:g} MB"))
+        elif accepted and not self.multiple:
+            rejected.append((file.name, "only one file at a time"))
+        else:
+            accepted.append(file)
+    self._problem = "; ".join(f"{name}: {why}" for name, why in rejected)
+    if rejected:
+        self.emit("reject", rejected)
+    if accepted:
+        self.emit("files", accepted)
+</code>
+
+<style>
+.host { display: block; }
+.zone {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 24px 16px; border: 2px dashed var(--ui-border, #d1d9e0); border-radius: var(--ui-radius, 8px);
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328); text-align: center;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.zone.over {
+  border-color: var(--ui-primary, #4f46e5);
+  background: color-mix(in oklab, var(--ui-primary, #4f46e5) 8%, var(--ui-surface, #fff));
+}
+.zone.disabled { opacity: 0.6; }
+.icon { color: var(--ui-primary, #4f46e5); font-size: 1.6rem; line-height: 1; }
+.label { margin: 0; font-weight: 600; }
+.hint { margin: 0; font-size: 0.85rem; color: var(--ui-muted, #59636e); }
+.choose {
+  margin-top: 6px; font: inherit; font-size: 0.9rem; padding: 6px 14px; cursor: pointer;
+  border: 1px solid var(--ui-border, #d1d9e0); border-radius: var(--ui-radius, 8px);
+  background: var(--ui-surface, #fff); color: var(--ui-text, #1f2328);
+}
+.choose:hover:not(:disabled) { border-color: var(--ui-primary, #4f46e5); }
+.choose:focus-visible { outline: 2px solid var(--ui-primary, #4f46e5); outline-offset: 2px; }
+.choose:disabled { cursor: not-allowed; }
+.error { margin: 6px 0 0; font-size: 0.82rem; color: var(--ui-danger, #d1242f); }
+</style>
