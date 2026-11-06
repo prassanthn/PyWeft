@@ -7,16 +7,20 @@
         <ui.Select :options="RADII" @bind="radius" aria-label="Corners" />
       </Fill>
       <Fill name="nav">
-        <div class="nav-top">
+        <div class="nav-top" @resize="nav_width(event)">
           <input class="nav-search" type="search" placeholder="Search controls" aria-label="Search controls"
                  aria-controls="gallery-nav" @bind="nav_query" @keydown.enter.prevent="jump_to_first" />
         </div>
         <div class="nav-list" id="gallery-nav">
-          <For each="item in nav_items" key="item['slug']">
-            <a class="nav-link" :href="'#' + item['slug']">
-              {{ item['name'] }}<If cond="item['hits']"><span class="nav-hits">{{ ', '.join(item['hits']) }}</span></If>
-            </a>
-          </For>
+          <ui.Tree label="Sections" :nodes="nav_tree" :value="nav_selected"
+                   :expand_all="not _narrow or bool(nav_query.strip())"
+                   style="--indent: 0.8rem"
+                   empty="" @update="go(event)" @activate="go(event)">
+            <Fill name="node">
+              <span class="nav-label">{{ node['label'] }}</span>
+              <If cond="node['data'].get('hits')"><span class="nav-hits">{{ ', '.join(node['data']['hits']) }}</span></If>
+            </Fill>
+          </ui.Tree>
           <If cond="not nav_items"><p class="nav-empty">No controls match “{{ nav_query.strip() }}”</p></If>
         </div>
       </Fill>
@@ -24,6 +28,8 @@
       <ui.Column gap="xl">
         <p class="intro">Every control from <b>pyweft-ui</b>, live. Change the theme at the
           top; the code under each section is what produced it.</p>
+
+        <h2 class="group-title" id="group-buttons-and-menus" ref="group-buttons-and-menus">Buttons and menus</h2>
 
         <ui.Card title="Buttons" id="buttons" ref="buttons">
           <ui.Column>
@@ -44,6 +50,55 @@
           </ui.Column>
         </ui.Card>
 
+        <ui.Card title="Button toggle" id="button-toggle" ref="button-toggle" subtitle="A joined row of buttons: one choice, or several">
+          <ui.Column gap="lg">
+            <ui.Row align="end">
+              <ui.ButtonToggle aria_label="Layout" :options="LAYOUTS" @bind="layout" />
+              <ui.ButtonToggle label="Range" options="Day, Week, Month" @bind="range_view" size="sm" />
+            </ui.Row>
+            <ui.Row align="center">
+              <ui.ButtonToggle aria_label="Text style" multiple="true" :options="TEXT_STYLES" @bind="text_styles" />
+              <ui.ButtonToggle aria_label="Alignment" :options="ALIGNS" @bind="text_align" />
+            </ui.Row>
+            <p :class="'sample ' + ' '.join(text_styles)" :style="'text-align: ' + text_align">
+              The weft is the thread woven through the warp to make fabric.
+            </p>
+            <ui.ButtonToggle label="Plan" options="Monthly, Yearly, Lifetime" full_width="true" @bind="plan_period"
+                             hint="full_width stretches the buttons evenly" />
+            <pre class="state">layout={{ repr(layout) }}  range={{ repr(range_view) }}  styles={{ repr(text_styles) }}  align={{ repr(text_align) }}</pre>
+            <pre class="code">{{ CODE['toggle'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
+        <ui.Card title="Menus" id="menus" ref="menus" subtitle="Submenus, custom items and triggers, right-click">
+          <ui.Column gap="lg">
+            <ui.Row align="center">
+              <ui.Menu label="File" :items="FILE_MENU" @select="menu_choice = event" />
+              <ui.Menu label="Opens above" position="above" :items="['Rename', 'Move', '-', 'Delete']"
+                       @select="menu_choice = event" />
+              <ui.Menu label="Account" align="end" :items="ACCOUNT_MENU" @select="menu_choice = event">
+                <Fill name="trigger"><span class="avatar">AL</span></Fill>
+                <Fill name="item">
+                  <If cond="item['data'].get('email')">
+                    <span class="person">
+                      <span class="person-name">{{ item['label'] }}</span>
+                      <span class="person-mail">{{ item['data']['email'] }}</span>
+                    </span>
+                  </If>
+                  <Else><ui.Icon :name="item['icon'] or 'user'" size="1.1em" />{{ item['label'] }}</Else>
+                </Fill>
+              </ui.Menu>
+            </ui.Row>
+            <ui.ContextMenu :items="CONTEXT_MENU" @select="menu_choice = event">
+              <div class="drop-zone" tabindex="0">Right-click here (or focus it and press Shift+F10)</div>
+            </ui.ContextMenu>
+            <p class="note">{{ 'You chose: ' + str(menu_choice) if menu_choice else 'Nothing chosen yet.' }}</p>
+            <pre class="code">{{ CODE['menus'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
+        <h2 class="group-title" id="group-form-fields" ref="group-form-fields">Form fields</h2>
+
         <ui.Card title="Form fields" id="form" ref="form" subtitle="Each one is bound with @bind">
           <ui.Grid min_width="16rem" gap="lg">
             <ui.TextField label="Name" placeholder="Ada Lovelace" required="true" @bind="name"
@@ -59,16 +114,6 @@
           <ui.TextArea label="Notes" rows="3" @bind="notes" placeholder="Anything else?" />
           <pre class="state">{{ form_state }}</pre>
           <pre class="code">{{ CODE['form'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Validation" id="validation" ref="validation" subtitle="Form and rules: try submitting it empty">
-          <Signup />
-          <pre class="code">{{ CODE['validation'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Stepper" id="stepper" ref="stepper" subtitle="A checkout in steps; Next checks each one">
-          <OrderSteps />
-          <pre class="code">{{ CODE['stepper'] }}</pre>
         </ui.Card>
 
         <ui.Card title="Choices" id="choices" ref="choices">
@@ -164,26 +209,6 @@ tags={{ repr(tags) }}  invitees={{ repr(invitees) }}</pre>
           </ui.Column>
         </ui.Card>
 
-        <ui.Card title="Button toggle" id="button-toggle" ref="button-toggle" subtitle="A joined row of buttons: one choice, or several">
-          <ui.Column gap="lg">
-            <ui.Row align="end">
-              <ui.ButtonToggle aria_label="Layout" :options="LAYOUTS" @bind="layout" />
-              <ui.ButtonToggle label="Range" options="Day, Week, Month" @bind="range_view" size="sm" />
-            </ui.Row>
-            <ui.Row align="center">
-              <ui.ButtonToggle aria_label="Text style" multiple="true" :options="TEXT_STYLES" @bind="text_styles" />
-              <ui.ButtonToggle aria_label="Alignment" :options="ALIGNS" @bind="text_align" />
-            </ui.Row>
-            <p :class="'sample ' + ' '.join(text_styles)" :style="'text-align: ' + text_align">
-              The weft is the thread woven through the warp to make fabric.
-            </p>
-            <ui.ButtonToggle label="Plan" options="Monthly, Yearly, Lifetime" full_width="true" @bind="plan_period"
-                             hint="full_width stretches the buttons evenly" />
-            <pre class="state">layout={{ repr(layout) }}  range={{ repr(range_view) }}  styles={{ repr(text_styles) }}  align={{ repr(text_align) }}</pre>
-            <pre class="code">{{ CODE['toggle'] }}</pre>
-          </ui.Column>
-        </ui.Card>
-
         <ui.Card title="Sliders" id="sliders" ref="sliders" subtitle="Drag, or use the arrow keys">
           <ui.Grid min_width="16rem" gap="lg">
             <ui.Slider label="Volume" @bind="volume" format="{}%" />
@@ -196,54 +221,6 @@ tags={{ repr(tags) }}  invitees={{ repr(invitees) }}</pre>
           </ui.Grid>
           <pre class="state">volume={{ volume }}  price={{ repr(price) }}  rating={{ rating }}  opacity={{ opacity }}</pre>
           <pre class="code">{{ CODE['sliders'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Drag and drop" id="drag-and-drop" ref="drag-and-drop" subtitle="Drag rows by their grip (or Alt+arrow keys); drop files on the box">
-          <ui.Grid min_width="16rem" gap="lg">
-            <ul class="sortable" sortable="" @sort="move_task(event)" aria-label="Tasks in order">
-              <For each="task in tasks" key="task">
-                <li class="sortable-row" tabindex="0" animate="flip">
-                  <span class="grip" sortable-handle="" aria-hidden="true"><ui.Icon name="menu" /></span>
-                  {{ task }}
-                </li>
-              </For>
-            </ul>
-            <ui.FileDrop accept="csv, txt, json" max_mb="2" @files="dropped_files(event)" />
-          </ui.Grid>
-          <pre class="state">tasks={{ tasks }}
-files={{ file_list or 'none yet' }}</pre>
-          <pre class="code">{{ CODE['drag-and-drop'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Expansion panels" id="expansion-panels" ref="expansion-panels" subtitle="Open one, or a stack where one is open at a time">
-          <ui.Column gap="lg">
-            <ui.Expansion title="Delivery" description="Address and speed" icon="send" @bind="delivery_open">
-              <ui.Column>
-                <ui.TextField label="Street" @bind="street" />
-                <ui.RadioGroup label="Speed" options="Standard, Express" @bind="speed" />
-              </ui.Column>
-              <Fill name="actions">
-                <ui.Button variant="ghost" @click="delivery_open = False">Cancel</ui.Button>
-                <ui.Button @click="delivery_open = False">Save</ui.Button>
-              </Fill>
-            </ui.Expansion>
-            <ui.Row align="center">
-              <ui.Switch label="Several open at once" @bind="many_open" />
-            </ui.Row>
-            <If cond="many_open">
-              <ui.Accordion :options="FAQ" multiple="true" @bind="faq_open">
-                <p class="faq">{{ FAQ_ANSWERS[panel] }}</p>
-              </ui.Accordion>
-            </If>
-            <Else>
-              <ui.Accordion :options="FAQ" @bind="faq">
-                <p class="faq">{{ FAQ_ANSWERS[panel] }}</p>
-              </ui.Accordion>
-            </Else>
-            <pre class="state">delivery_open={{ delivery_open }}  street={{ repr(street) }}  speed={{ repr(speed) }}
-faq={{ repr(faq_open if many_open else faq) }}</pre>
-            <pre class="code">{{ CODE['expansion'] }}</pre>
-          </ui.Column>
         </ui.Card>
 
         <ui.Card title="Dates and menus" id="dates-and-menus" ref="dates-and-menus">
@@ -265,50 +242,36 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           </ui.Column>
         </ui.Card>
 
-        <ui.Card title="Menus" id="menus" ref="menus" subtitle="Submenus, custom items and triggers, right-click">
-          <ui.Column gap="lg">
-            <ui.Row align="center">
-              <ui.Menu label="File" :items="FILE_MENU" @select="menu_choice = event" />
-              <ui.Menu label="Opens above" position="above" :items="['Rename', 'Move', '-', 'Delete']"
-                       @select="menu_choice = event" />
-              <ui.Menu label="Account" align="end" :items="ACCOUNT_MENU" @select="menu_choice = event">
-                <Fill name="trigger"><span class="avatar">AL</span></Fill>
-                <Fill name="item">
-                  <If cond="item['data'].get('email')">
-                    <span class="person">
-                      <span class="person-name">{{ item['label'] }}</span>
-                      <span class="person-mail">{{ item['data']['email'] }}</span>
-                    </span>
-                  </If>
-                  <Else><ui.Icon :name="item['icon'] or 'user'" size="1.1em" />{{ item['label'] }}</Else>
-                </Fill>
-              </ui.Menu>
-            </ui.Row>
-            <ui.ContextMenu :items="CONTEXT_MENU" @select="menu_choice = event">
-              <div class="drop-zone" tabindex="0">Right-click here (or focus it and press Shift+F10)</div>
-            </ui.ContextMenu>
-            <p class="note">{{ 'You chose: ' + str(menu_choice) if menu_choice else 'Nothing chosen yet.' }}</p>
-            <pre class="code">{{ CODE['menus'] }}</pre>
-          </ui.Column>
+        <ui.Card title="Drag and drop" id="drag-and-drop" ref="drag-and-drop" subtitle="Drag rows by their grip (or Alt+arrow keys); drop files on the box">
+          <ui.Grid min_width="16rem" gap="lg">
+            <ul class="sortable" sortable="" @sort="move_task(event)" aria-label="Tasks in order">
+              <For each="task in tasks" key="task">
+                <li class="sortable-row" tabindex="0" animate="flip">
+                  <span class="grip" sortable-handle="" aria-hidden="true"><ui.Icon name="menu" /></span>
+                  {{ task }}
+                </li>
+              </For>
+            </ul>
+            <ui.FileDrop accept="csv, txt, json" max_mb="2" @files="dropped_files(event)" />
+          </ui.Grid>
+          <pre class="state">tasks={{ tasks }}
+files={{ file_list or 'none yet' }}</pre>
+          <pre class="code">{{ CODE['drag-and-drop'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Calendars" id="calendars" ref="calendars" subtitle="Choosing a date, and showing events">
-          <ui.Column gap="lg">
-            <ui.Row gap="xl" align="start" wrap="true">
-              <ui.Calendar @bind="picked_day" />
-              <ui.Column gap="sm">
-                <p class="note">A <b>Calendar</b> on the page, always open. Its month and year
-                  are buttons too.</p>
-                <pre class="state">picked_day={{ repr(picked_day) }}</pre>
-              </ui.Column>
-            </ui.Row>
-            <ui.Switch label="Show two months" @bind="two_months" />
-            <ui.EventCalendar label="Team calendar" :events="calendar_events" :months="2 if two_months else 1"
-                              @select="picked_event = event['title']" @day="add_event(event)" />
-            <p class="note">{{ 'You opened: ' + picked_event if picked_event else 'Click an event, or an empty day to add one.' }}</p>
-            <pre class="code">{{ CODE['calendars'] }}</pre>
-          </ui.Column>
+        <h2 class="group-title" id="group-forms" ref="group-forms">Forms</h2>
+
+        <ui.Card title="Validation" id="validation" ref="validation" subtitle="Form and rules: try submitting it empty">
+          <Signup />
+          <pre class="code">{{ CODE['validation'] }}</pre>
         </ui.Card>
+
+        <ui.Card title="Stepper" id="stepper" ref="stepper" subtitle="A checkout in steps; Next checks each one">
+          <OrderSteps />
+          <pre class="code">{{ CODE['stepper'] }}</pre>
+        </ui.Card>
+
+        <h2 class="group-title" id="group-feedback" ref="group-feedback">Feedback</h2>
 
         <ui.Card title="Feedback" id="feedback" ref="feedback">
           <ui.Column>
@@ -357,6 +320,23 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
             <pre class="code">{{ CODE['progress'] }}</pre>
           </ui.Column>
         </ui.Card>
+
+        <ui.Card title="Toasts" id="toasts" ref="toasts" subtitle="Messages that go away by themselves">
+          <ui.Column>
+          <ui.ButtonToggle label="Look" :options="[('toast', 'Toast'), ('snackbar', 'Snackbar')]" @bind="toast_look"
+                           hint="Snackbar: a compact dark bar at the bottom, one at a time" />
+          <ui.Row>
+            <ui.Button variant="primary" icon="check" @click="toast('Changes saved.', 'success')">Save</ui.Button>
+            <ui.Button icon="info" @click="toast('A new version is ready.', title='Update')">Info</ui.Button>
+            <ui.Button icon="alert" @click="toast('Disk almost full.', 'warning', duration=None)">Stays until closed</ui.Button>
+            <ui.Button variant="danger" icon="trash" @click="delete_item">Delete with undo</ui.Button>
+          </ui.Row>
+          <p class="note">Items: {{ items }}</p>
+          </ui.Column>
+          <pre class="code">{{ CODE['toasts'] }}</pre>
+        </ui.Card>
+
+        <h2 class="group-title" id="group-overlays" ref="group-overlays">Overlays</h2>
 
         <ui.Card title="Dialog" id="dialog" ref="dialog">
           <ui.Row>
@@ -437,6 +417,8 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           </ui.Column>
         </ui.Card>
 
+        <h2 class="group-title" id="group-navigation" ref="group-navigation">Navigation</h2>
+
         <ui.Card title="Tabs" id="tabs" ref="tabs">
           <ui.Column gap="lg">
             <ui.Tabs label="Project" options="Overview, Activity, Settings" @bind="tab">
@@ -461,6 +443,13 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           </ui.Column>
         </ui.Card>
 
+        <ui.Card title="Tree" id="tree" ref="tree" subtitle="Folders load as they open; search; checkboxes with partly checked parents">
+          <Trees />
+          <pre class="code">{{ CODE['tree'] }}</pre>
+        </ui.Card>
+
+        <h2 class="group-title" id="group-data" ref="group-data">Data</h2>
+
         <ui.Card title="Table" id="table" ref="table" subtitle="Click a heading to sort, a row to pick it">
           <ui.Table :rows="ORDERS" row_key="id" sortable="true" sort="-total" @select="picked = event"
                     :columns="[('id', '#'), 'customer', 'status', {'key': 'total', 'format': ',.2f'}]">
@@ -478,49 +467,25 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           <pre class="code">{{ CODE['charts'] }}</pre>
         </ui.Card>
 
-        <ui.Card title="Tree" id="tree" ref="tree" subtitle="Folders load as they open; search; checkboxes with partly checked parents">
-          <Trees />
-          <pre class="code">{{ CODE['tree'] }}</pre>
-        </ui.Card>
-
-        <ui.Card title="Carousel" id="carousel" ref="carousel" subtitle="Arrows, dots, a swipe or a drag; the second one plays by itself">
+        <ui.Card title="Calendars" id="calendars" ref="calendars" subtitle="Choosing a date, and showing events">
           <ui.Column gap="lg">
-            <ui.Carousel label="Places" :items="PLACES" @bind="place" loop="true">
-              <Fill name="slide">
-                <div class="place" :style="'background: ' + slide['bg']">
-                  <span class="place-name">{{ slide['name'] }}</span>
-                  <span class="place-note">{{ slide['note'] }}</span>
-                </div>
-              </Fill>
-            </ui.Carousel>
-            <p class="note">Showing {{ PLACES[place]['name'] }} ({{ place + 1 }} of {{ len(PLACES) }})</p>
-            <ui.Carousel label="Products" :items="PRODUCTS" per_view="3" autoplay="4" gap="12px">
-              <Fill name="slide">
-                <div class="product">
-                  <span class="product-icon"><ui.Icon :name="slide['icon']" size="1.6em" /></span>
-                  <b>{{ slide['name'] }}</b>
-                  <span class="note">{{ slide['price'] }}</span>
-                </div>
-              </Fill>
-            </ui.Carousel>
-            <pre class="code">{{ CODE['carousel'] }}</pre>
+            <ui.Row gap="xl" align="start" wrap="true">
+              <ui.Calendar @bind="picked_day" />
+              <ui.Column gap="sm">
+                <p class="note">A <b>Calendar</b> on the page, always open. Its month and year
+                  are buttons too.</p>
+                <pre class="state">picked_day={{ repr(picked_day) }}</pre>
+              </ui.Column>
+            </ui.Row>
+            <ui.Switch label="Show two months" @bind="two_months" />
+            <ui.EventCalendar label="Team calendar" :events="calendar_events" :months="2 if two_months else 1"
+                              @select="picked_event = event['title']" @day="add_event(event)" />
+            <p class="note">{{ 'You opened: ' + picked_event if picked_event else 'Click an event, or an empty day to add one.' }}</p>
+            <pre class="code">{{ CODE['calendars'] }}</pre>
           </ui.Column>
         </ui.Card>
 
-        <ui.Card title="Toasts" id="toasts" ref="toasts" subtitle="Messages that go away by themselves">
-          <ui.Column>
-          <ui.ButtonToggle label="Look" :options="[('toast', 'Toast'), ('snackbar', 'Snackbar')]" @bind="toast_look"
-                           hint="Snackbar: a compact dark bar at the bottom, one at a time" />
-          <ui.Row>
-            <ui.Button variant="primary" icon="check" @click="toast('Changes saved.', 'success')">Save</ui.Button>
-            <ui.Button icon="info" @click="toast('A new version is ready.', title='Update')">Info</ui.Button>
-            <ui.Button icon="alert" @click="toast('Disk almost full.', 'warning', duration=None)">Stays until closed</ui.Button>
-            <ui.Button variant="danger" icon="trash" @click="delete_item">Delete with undo</ui.Button>
-          </ui.Row>
-          <p class="note">Items: {{ items }}</p>
-          </ui.Column>
-          <pre class="code">{{ CODE['toasts'] }}</pre>
-        </ui.Card>
+        <h2 class="group-title" id="group-layout" ref="group-layout">Layout</h2>
 
         <ui.Card title="Layout" id="layout" ref="layout" subtitle="Row, Column, Grid, Card and Divider: no CSS needed">
           <ui.Grid cols="3" gap="sm">
@@ -553,6 +518,62 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           </ui.Row>
           <pre class="code">{{ CODE['layout'] }}</pre>
         </ui.Card>
+
+        <ui.Card title="Expansion panels" id="expansion-panels" ref="expansion-panels" subtitle="Open one, or a stack where one is open at a time">
+          <ui.Column gap="lg">
+            <ui.Expansion title="Delivery" description="Address and speed" icon="send" @bind="delivery_open">
+              <ui.Column>
+                <ui.TextField label="Street" @bind="street" />
+                <ui.RadioGroup label="Speed" options="Standard, Express" @bind="speed" />
+              </ui.Column>
+              <Fill name="actions">
+                <ui.Button variant="ghost" @click="delivery_open = False">Cancel</ui.Button>
+                <ui.Button @click="delivery_open = False">Save</ui.Button>
+              </Fill>
+            </ui.Expansion>
+            <ui.Row align="center">
+              <ui.Switch label="Several open at once" @bind="many_open" />
+            </ui.Row>
+            <If cond="many_open">
+              <ui.Accordion :options="FAQ" multiple="true" @bind="faq_open">
+                <p class="faq">{{ FAQ_ANSWERS[panel] }}</p>
+              </ui.Accordion>
+            </If>
+            <Else>
+              <ui.Accordion :options="FAQ" @bind="faq">
+                <p class="faq">{{ FAQ_ANSWERS[panel] }}</p>
+              </ui.Accordion>
+            </Else>
+            <pre class="state">delivery_open={{ delivery_open }}  street={{ repr(street) }}  speed={{ repr(speed) }}
+faq={{ repr(faq_open if many_open else faq) }}</pre>
+            <pre class="code">{{ CODE['expansion'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
+        <ui.Card title="Carousel" id="carousel" ref="carousel" subtitle="Arrows, dots, a swipe or a drag; the second one plays by itself">
+          <ui.Column gap="lg">
+            <ui.Carousel label="Places" :items="PLACES" @bind="place" loop="true">
+              <Fill name="slide">
+                <div class="place" :style="'background: ' + slide['bg']">
+                  <span class="place-name">{{ slide['name'] }}</span>
+                  <span class="place-note">{{ slide['note'] }}</span>
+                </div>
+              </Fill>
+            </ui.Carousel>
+            <p class="note">Showing {{ PLACES[place]['name'] }} ({{ place + 1 }} of {{ len(PLACES) }})</p>
+            <ui.Carousel label="Products" :items="PRODUCTS" per_view="3" autoplay="4" gap="12px">
+              <Fill name="slide">
+                <div class="product">
+                  <span class="product-icon"><ui.Icon :name="slide['icon']" size="1.6em" /></span>
+                  <b>{{ slide['name'] }}</b>
+                  <span class="note">{{ slide['price'] }}</span>
+                </div>
+              </Fill>
+            </ui.Carousel>
+            <pre class="code">{{ CODE['carousel'] }}</pre>
+          </ui.Column>
+        </ui.Card>
+
       </ui.Column>
     </ui.AppShell>
     <ui.Toaster :look="toast_look" />
@@ -599,7 +620,18 @@ SECTION_CONTROLS = {
     "Toasts": ["Toaster", "toast", "Snackbar"],
     "Layout": ["Row", "Column", "Grid", "Card", "Divider", "AppShell"],
 }
-SECTIONS = ["Buttons", "Form", "Validation", "Stepper", "Choices", "Autocomplete", "Cascade select", "Chips", "Button toggle", "Sliders", "Drag and drop", "Expansion panels", "Dates and menus", "Menus", "Calendars", "Feedback", "Progress", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Breadcrumbs", "Table", "Charts", "Tree", "Carousel", "Toasts", "Layout"]
+# The sidebar's groups, in page order: (name, icon, sections).
+GROUPS = [
+    ("Buttons and menus", "menu", ["Buttons", "Button toggle", "Menus"]),
+    ("Form fields", "edit", ["Form", "Choices", "Autocomplete", "Cascade select", "Chips", "Sliders", "Dates and menus", "Drag and drop"]),
+    ("Forms", "check", ["Validation", "Stepper"]),
+    ("Feedback", "info", ["Feedback", "Progress", "Toasts"]),
+    ("Overlays", "copy", ["Dialog", "Bottom sheet", "Popover and tooltip"]),
+    ("Navigation", "home", ["Tabs", "Breadcrumbs", "Tree"]),
+    ("Data", "list", ["Table", "Charts", "Calendars"]),
+    ("Layout", "grid", ["Layout", "Expansion panels", "Carousel"]),
+]
+SECTIONS = ["Buttons", "Button toggle", "Menus", "Form", "Choices", "Autocomplete", "Cascade select", "Chips", "Sliders", "Dates and menus", "Drag and drop", "Validation", "Stepper", "Feedback", "Progress", "Toasts", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Breadcrumbs", "Tree", "Table", "Charts", "Calendars", "Layout", "Expansion panels", "Carousel"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -735,10 +767,41 @@ def nav_items(self):
             out.append({"name": name, "slug": name.lower().replace(" ", "-"), "hits": shown})
     return out
 
+nav_selected = None
+_narrow: bool = False
+
+def nav_width(self, event):
+    # Beside the page the sidebar is ~190px wide; above it (phones) it is
+    # the page's width. There, the groups start closed (opened while
+    # searching), or the list would push the controls a screen down.
+    self._narrow = event.width > 250
+
+@property
+def nav_tree(self):
+    """The sections found by the search (nav_items), under their groups;
+    a group stays only while it has a section left."""
+    found = {item["slug"]: item for item in self.nav_items}
+    tree = []
+    for group, icon, names in GROUPS:
+        kids = []
+        for name in names:
+            item = found.get(name.lower().replace(" ", "-"))
+            if item:
+                kids.append({"value": item["slug"], "label": name, "hits": item["hits"]})
+        if kids:
+            tree.append({"value": "group-" + group.lower().replace(" ", "-"), "label": group,
+                         "icon": icon, "children": kids})
+    return tree
+
+def go(self, slug):
+    """A section (or a group's heading) picked in the sidebar: show it."""
+    self.nav_selected = slug
+    self.scroll_to(slug, align="start")
+
 def jump_to_first(self):
     items = self.nav_items
     if items and self.nav_query.strip():
-        self.scroll_to(items[0]["slug"], align="start")
+        self.go(items[0]["slug"])
 uploaded: int = 0
 uploading: bool = False
 
@@ -1282,17 +1345,15 @@ toast("Item deleted.", action="Undo", on_action=self.undo)""",
   background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--ui-radius, 8px);
 }
 .nav-search:focus { outline: none; border-color: var(--ui-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-primary) 25%, transparent); }
-.nav-list { display: flex; flex-direction: column; gap: 4px; }
+.nav-list { display: flex; flex-direction: column; gap: 4px; flex-basis: 100%; min-width: 0; }
+/* Wrapped rather than cut short: the sidebar is narrow. */
+.nav-label { display: block; white-space: normal; line-height: 1.3; padding: 3px 0; }
+.group-title {
+  margin: 12px 0 -8px; font-size: 0.8rem; font-weight: 650; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ui-muted);
+}
 .nav-hits { display: block; font-size: 0.75rem; color: var(--ui-muted); }
 .nav-empty { margin: 4px 2px; font-size: 0.85rem; color: var(--ui-muted); }
-@media (max-width: 720px) {
-  .nav-list { flex-direction: row; flex-wrap: wrap; }
-}
-.nav-link {
-  color: var(--ui-text); text-decoration: none;
-  padding: 6px 10px; border-radius: var(--ui-radius);
-}
-.nav-link:hover { background: var(--ui-subtle); }
 .code, .state {
   margin: 12px 0 0; padding: 12px 14px; overflow-x: auto;
   font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;

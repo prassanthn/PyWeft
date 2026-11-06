@@ -41,7 +41,8 @@ the browser tab with `<Head>`.
 ## Controls gallery
 
 Every control in `pyweft-ui`, with light and dark themes, and the code that
-produced each one.
+produced each one. The sidebar is itself a `ui.Tree`, grouping the controls
+by kind, with a search that also finds controls by name.
 
 <a class="md-button md-button--primary" href="../live/gallery/" target="_blank">Open the app</a>
 [Source](https://github.com/prassanthn/PyWeft/blob/main/packages/pyweft-ui/gallery/app.weft){ .md-button }
