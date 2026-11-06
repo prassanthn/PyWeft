@@ -81,7 +81,8 @@ number 3 and `disabled="true"` is `True`.
 | Control | Fields | Notes |
 |---|---|---|
 | `Theme` | `mode` (light, dark, auto), `primary`, `radius`, `font` | Wrap your app in it to set colours and corners for everything inside. Optional. |
-| `AppShell` | `title`, `width` (narrow, normal, wide, full), `sticky_nav` | Header, optional sidebar and content; the sidebar stays in view while the page scrolls. Fills: `brand`, `actions`, `nav`. |
+| `AppShell` | `title`, `width` (narrow, normal, wide, full), `sticky_nav`, `resizable_nav`, `nav_width`, `nav_min`, `nav_max` | Header, optional sidebar and content; the sidebar stays in view while the page scrolls, and with `resizable_nav="true"` can be dragged wider (remembered between visits). Fills: `brand`, `actions`, `nav`. |
+| `Splitter` | `direction` (horizontal, vertical), `sizes`, `min`, `max` (%), `height`, `step`, `collapsible`, `storage_key`, `stack_below` (px), `label` | Panes with a divider to drag between each pair, also by keyboard. `@bind` to the sizes in %. Fills: `first`, `second`, `third`. |
 | `Row` | `gap`, `align`, `justify` (start, center, end, between), `wrap` | Children side by side. |
 | `Column` | `gap`, `align` | Children stacked. |
 | `Grid` | `cols`, `min_width`, `gap` | Fixed columns, or as many as fit. |

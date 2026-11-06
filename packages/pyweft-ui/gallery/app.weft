@@ -1,6 +1,6 @@
 <template>
   <ui.Theme :mode="mode" :primary="primary" :radius="radius">
-    <ui.AppShell title="pyweft-ui gallery" width="wide">
+    <ui.AppShell title="pyweft-ui gallery" width="wide" resizable_nav="true">
       <Fill name="actions">
         <ui.Select :options="MODES" @bind="mode" aria-label="Colour mode" />
         <ui.Select :options="ACCENTS" @bind="primary" aria-label="Accent colour" />
@@ -574,6 +574,22 @@ faq={{ repr(faq_open if many_open else faq) }}</pre>
           </ui.Column>
         </ui.Card>
 
+        <ui.Card title="Splitter" id="splitter" ref="splitter" subtitle="Drag a divider, or focus it and use the arrow keys; Enter or a double-click collapses the folders">
+          <ui.Splitter @bind="split_sizes" collapsible="true" height="260px" class="split-demo">
+            <Fill name="first">
+              <div class="split-pane"><b>Folders</b><For each="f in ['Inbox', 'Sent', 'Archive']"><span>{{ f }}</span></For></div>
+            </Fill>
+            <Fill name="second">
+              <ui.Splitter direction="vertical" :sizes="[55, 45]" height="100%" label="Resize the preview">
+                <Fill name="first"><div class="split-pane"><b>Messages</b><span>Lunch on Friday?</span><span>Your order shipped</span></div></Fill>
+                <Fill name="second"><div class="split-pane"><b>Preview</b><span>Panes nest: this one splits top and bottom.</span></div></Fill>
+              </ui.Splitter>
+            </Fill>
+          </ui.Splitter>
+          <pre class="state">split_sizes={{ split_sizes }}</pre>
+          <pre class="code">{{ CODE['splitter'] }}</pre>
+        </ui.Card>
+
       </ui.Column>
     </ui.AppShell>
     <ui.Toaster :look="toast_look" />
@@ -597,6 +613,7 @@ SECTION_CONTROLS = {
     "Chips": ["Chips", "ChipInput"],
     "Button toggle": ["ButtonToggle"],
     "Sliders": ["Slider"],
+    "Splitter": ["Splitter", "resize", "panes", "divider", "split"],
     "Drag and drop": ["FileDrop", "sortable", "drag", "drop", "upload", "reorder", "kanban"],
     "Expansion panels": ["Expansion", "Accordion"],
     "Dates and menus": ["DatePicker", "DateRangePicker", "Menu"],
@@ -629,9 +646,9 @@ GROUPS = [
     ("Overlays", "copy", ["Dialog", "Bottom sheet", "Popover and tooltip"]),
     ("Navigation", "home", ["Tabs", "Breadcrumbs", "Tree"]),
     ("Data", "list", ["Table", "Charts", "Calendars"]),
-    ("Layout", "grid", ["Layout", "Expansion panels", "Carousel"]),
+    ("Layout", "grid", ["Layout", "Expansion panels", "Carousel", "Splitter"]),
 ]
-SECTIONS = ["Buttons", "Button toggle", "Menus", "Form", "Choices", "Autocomplete", "Cascade select", "Chips", "Sliders", "Dates and menus", "Drag and drop", "Validation", "Stepper", "Feedback", "Progress", "Toasts", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Breadcrumbs", "Tree", "Table", "Charts", "Calendars", "Layout", "Expansion panels", "Carousel"]
+SECTIONS = ["Buttons", "Button toggle", "Menus", "Form", "Choices", "Autocomplete", "Cascade select", "Chips", "Sliders", "Dates and menus", "Drag and drop", "Validation", "Stepper", "Feedback", "Progress", "Toasts", "Dialog", "Bottom sheet", "Popover and tooltip", "Tabs", "Breadcrumbs", "Tree", "Table", "Charts", "Calendars", "Layout", "Expansion panels", "Carousel", "Splitter"]
 ORDERS = [
     {"id": 1041, "customer": "Ada Lovelace", "status": "paid", "total": 1250.0},
     {"id": 1042, "customer": "Grace Hopper", "status": "pending", "total": 89.9},
@@ -884,6 +901,7 @@ filters: list = ["Open", "Assigned to me", "This week"]
 tags: list = ["python", "ui"]
 invitees: list = []
 volume: int = 40
+split_sizes: list = [28, 72]
 tasks: list = ["Write the plan", "Build it", "Test it", "Ship it"]
 file_list: str = ""
 layout: str = "list"
@@ -1185,6 +1203,19 @@ async def load_folder(self, value):
 <ui.Slider label="Rating" :min="1" :max="5" ticks="true"
            value_label="always" marks="1, 3, 5" @bind="rating" />
 <ui.Slider label="Opacity" :max="1" :step="0.05" lazy="true" @bind="opacity" />""",
+    "splitter": """<ui.Splitter @bind="sizes" collapsible="true" height="260px">
+  <Fill name="first">...folders...</Fill>
+  <Fill name="second">
+    <ui.Splitter direction="vertical" :sizes="[55, 45]" height="100%">
+      <Fill name="first">...messages...</Fill>
+      <Fill name="second">...preview...</Fill>
+    </ui.Splitter>
+  </Fill>
+</ui.Splitter>
+
+sizes: list = [28, 72]      # percentages; dragging updates them
+
+<!-- and the sidebar: <ui.AppShell resizable_nav="true"> -->""",
     "drag-and-drop": """<ul sortable="" @sort="move_task(event)">
   <For each="task in tasks" key="task">
     <li tabindex="0" animate="flip">
@@ -1361,6 +1392,9 @@ toast("Item deleted.", action="Undo", on_action=self.undo)""",
   border-radius: var(--ui-radius); white-space: pre;
 }
 .state { white-space: pre-wrap; }
+.split-demo { border: 1px solid var(--ui-border); border-radius: var(--ui-radius); }
+.split-pane { display: flex; flex-direction: column; gap: 6px; padding: 12px; color: var(--ui-text); }
+.split-pane b { font-size: 0.85rem; color: var(--ui-muted); }
 .sortable { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .sortable-row {
   display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--ui-radius, 8px);

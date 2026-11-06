@@ -341,8 +341,10 @@ Pages = router("pages")         # one page per .weft file in pages/
 `label`, `hint`, `error`, `required`, `disabled`, `name` and `@bind`; option
 lists take `"A, B, C"`, a list of values, `(value, label)` pairs or dicts.
 
-- Layout: `AppShell` (header, sticky `nav` fill), `Row`, `Column`, `Grid`,
-  `Card`, `Divider`, `Carousel`, `Expansion`, `Accordion`, `Tabs`, `Stepper`.
+- Layout: `AppShell` (header, sticky `nav` fill; `resizable_nav="true"`),
+  `Row`, `Column`, `Grid`, `Card`, `Divider`, `Carousel`, `Expansion`,
+  `Accordion`, `Tabs`, `Stepper`, `Splitter` (`@bind` to pane sizes in %,
+  fills `first`/`second`/`third`, `direction="vertical"` + `height`).
 - Fields: `TextField` (`mask="(999) 999-9999"`), `TextArea`, `NumberField`,
   `Select`, `Autocomplete`, `CascadeSelect`, `Chips`, `ChipInput`, `ButtonToggle`, `Slider`,
   `RadioGroup`, `Checkbox`, `Switch`, `DatePicker`, `DateRangePicker`,

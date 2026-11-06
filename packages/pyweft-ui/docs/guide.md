@@ -175,6 +175,50 @@ current: str = "Dashboard"
   scroll with the page.)
 - `width` is how wide the content may grow: `narrow` (40rem), `normal`
   (64rem, the default), `wide` (80rem), `full`, or any CSS width.
+- `resizable_nav="true"` puts a divider beside the sidebar to drag it
+  wider or narrower (between `nav_min` and `nav_max` px, starting at
+  `nav_width`); the arrow keys move it too, and a double-click puts it
+  back. The width is remembered between visits.
+
+### Panes you can resize: Splitter
+
+**`Splitter`** puts two or three panes side by side, or stacked, with a
+divider between each pair that the user drags to share the space, like a
+mail app's folders, list and preview:
+
+```xml
+<ui.Splitter @bind="sizes" collapsible="true" height="480px">
+  <Fill name="first"><FolderList /></Fill>
+  <Fill name="second">
+    <ui.Splitter direction="vertical" :sizes="[60, 40]" height="100%">
+      <Fill name="first"><MessageList /></Fill>
+      <Fill name="second"><Preview /></Fill>
+    </ui.Splitter>
+  </Fill>
+</ui.Splitter>
+```
+
+```python
+sizes: list = [25, 75]          # percentages, one per pane
+```
+
+- **Sizes** are percentages. `@bind` keeps them in a field; without it,
+  `:sizes` gives the start (else the panes share equally). `min` and `max`
+  (10 and 90 by default) limit every pane.
+- **Dragging is smooth on any page:** the divider moves in the browser and
+  your code hears the new sizes once, on release. Elements that listen to
+  their own size (`@resize`, the charts) also hear only the final size.
+- **Keyboard:** each divider is a focusable separator. The arrow keys move
+  it by `step` (5%), Home and End to the limits, and with
+  `collapsible="true"` Enter (or a double-click) folds the pane before it
+  away and brings it back.
+- **`direction="vertical"`** stacks the panes; it needs a `height`, since a
+  page has no fixed height to share. Splitters nest: a pane can hold
+  another one, as above.
+- **`storage_key="mail"`** remembers the sizes between visits.
+- **Small screens:** narrower than `stack_below` (600px), the panes stack
+  at their natural height and the dividers go, since dragging a thin line
+  on a phone is fiddly. `stack_below="0"` keeps them side by side.
 
 ### Arranging things: Row, Column, Grid
 

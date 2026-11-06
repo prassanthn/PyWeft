@@ -8,6 +8,14 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- **`Splitter`:** two or three panes, side by side or stacked, with
+  draggable dividers; keyboard (arrows, Home/End, Enter to collapse),
+  `min`/`max`, `@bind` to the sizes in %, `storage_key` to remember them,
+  nesting, and stacking below `stack_below` px on phones.
+- **`AppShell resizable_nav="true"`:** drag the sidebar wider or narrower
+  (`nav_width`, `nav_min`, `nav_max`), also by keyboard; remembered between
+  visits. The gallery uses it.
+
 - **`FileDrop`:** a drop zone for files, with a "Choose files" button
   (`pyweft.dialogs`), `accept` (extensions), `max_mb` and `multiple`;
   emits `files` (PickedFile list) and `reject` (name, reason), and keeps

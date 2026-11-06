@@ -6,7 +6,15 @@
     </header>
     <div class="frame">
       <If cond="has_slot('nav')">
-        <nav :class="'side sticky' if sticky_nav else 'side'"><div class="side-inner"><Slot name="nav" /></div></nav>
+        <nav :class="side_classes" :style="side_style"><div class="side-inner"><Slot name="nav" /></div></nav>
+        <If cond="resizable_nav">
+          <div class="nav-divider" splitter="" role="separator" tabindex="0" aria-orientation="vertical"
+               aria-label="Resize the sidebar" :aria-valuenow="str(nav_px)" :aria-valuemin="str(nav_min)"
+               :aria-valuemax="str(nav_max)" @split="nav_dragged(event)"
+               @keydown.left.prevent="set_nav(nav_px - 16)" @keydown.right.prevent="set_nav(nav_px + 16)"
+               @keydown.home.prevent="set_nav(nav_min)" @keydown.end.prevent="set_nav(nav_max)"
+               @dblclick="set_nav(nav_width)"><span class="nav-line" aria-hidden="true"></span></div>
+        </If>
       </If>
       <main class="main" :style="f'max-width: {_WIDTHS.get(width, width)}'"><Slot /></main>
     </div>
@@ -21,6 +29,56 @@
 title: str = ""
 width: str = "normal"   # narrow, normal, wide, full, or any CSS width
 sticky_nav: bool = True
+# resizable_nav="true": a divider to drag the sidebar wider or narrower
+# (arrow keys too; a double-click goes back to nav_width), remembered
+# between visits.
+resizable_nav: bool = False
+nav_width: int = 220      # px
+nav_min: int = 160
+nav_max: int = 480
+
+_nav_px = None
+
+
+def on_init(self):
+    if self.resizable_nav:
+        from pyweft import storage
+
+        saved = storage.get("ui-app-shell:nav-width")
+        if isinstance(saved, int):
+            self._nav_px = saved
+
+
+@property
+def nav_px(self):
+    px = self._nav_px if self._nav_px is not None else self.nav_width
+    return sorted((self.nav_min, int(px), self.nav_max))[1]
+
+
+@property
+def side_classes(self):
+    return "side" + (" sticky" if self.sticky_nav else "") + (" resizable" if self.resizable_nav else "")
+
+
+@property
+def side_style(self):
+    if not self.resizable_nav:
+        return None
+    return f"--nav-width: {self.nav_px}px; --nav-min: {self.nav_min}px; --nav-max: {self.nav_max}px"
+
+
+def set_nav(self, px):
+    self._nav_px = sorted((self.nav_min, int(px), self.nav_max))[1]
+    from pyweft import storage
+
+    try:
+        storage.set("ui-app-shell:nav-width", self._nav_px)
+    except Exception:  # noqa: BLE001 - no storage here: the width still applies
+        pass
+
+
+def nav_dragged(self, event):
+    self.set_nav(event.before)
 
 _WIDTHS = {"narrow": "40rem", "normal": "64rem", "wide": "80rem", "full": "none"}
 </code>
@@ -41,6 +99,15 @@ _WIDTHS = {"narrow": "40rem", "normal": "64rem", "wide": "80rem", "full": "none"
 /* The nav column runs the page's full height (its border with it); what's
    inside sticks to the top of the window and scrolls on its own. */
 .side { width: 220px; flex-shrink: 0; border-right: 1px solid var(--ui-border, #d1d9e0); }
+.side.resizable { width: var(--nav-width); min-width: var(--nav-min); max-width: var(--nav-max); border-right: 0; }
+.nav-divider {
+  flex: none; width: 9px; margin: 0 -4px; position: relative; z-index: 2; cursor: col-resize;
+  display: flex; justify-content: center; outline: none;
+}
+.nav-line { width: 1px; background: var(--ui-border, #d1d9e0); transition: background-color 0.15s, width 0.15s; }
+.nav-divider:hover > .nav-line, .nav-divider:focus-visible > .nav-line, .nav-divider[data-pw-splitting] > .nav-line {
+  width: 3px; background: var(--ui-primary, #4f46e5);
+}
 .side-inner { box-sizing: border-box; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
 .sticky > .side-inner {
   position: sticky; top: 0; max-height: 100vh; overflow-y: auto; overscroll-behavior: contain;
@@ -51,7 +118,8 @@ _WIDTHS = {"narrow": "40rem", "normal": "64rem", "wide": "80rem", "full": "none"
 .main { flex: 1; min-width: 0; width: 100%; margin: 0 auto; padding: 24px; box-sizing: border-box; }
 @media (max-width: 720px) {
   .frame { flex-direction: column; }
-  .side { width: auto; border-right: 0; border-bottom: 1px solid var(--ui-border, #d1d9e0); }
+  .side, .side.resizable { width: auto; min-width: 0; max-width: none; border-right: 0; border-bottom: 1px solid var(--ui-border, #d1d9e0); }
+  .nav-divider { display: none; }
   /* Above the content, pinning it would cover the page. */
   .side-inner, .sticky > .side-inner { position: static; max-height: none; overflow: visible; flex-direction: row; flex-wrap: wrap; }
   .top, .main { padding-left: 16px; padding-right: 16px; }

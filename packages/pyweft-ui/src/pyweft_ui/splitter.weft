@@ -1,0 +1,211 @@
+<template>
+  <div :class="classes" :style="f'height: {height}' if height and not stacked else None"
+       @resize="measured(event)">
+    <For each="i in pane_indexes">
+      <div class="pane" :id="pane_id(i)" class:collapsed="is_collapsed(i)"
+           :inert="is_collapsed(i)" :style="pane_style(i)">
+        <If cond="i == 0"><Slot name="first" /></If>
+        <ElseIf cond="i == 1"><Slot name="second" /></ElseIf>
+        <Else><Slot name="third" /></Else>
+      </div>
+      <If cond="count - 1 > i and not stacked">
+        <div class="divider" splitter="" role="separator" tabindex="0"
+             :aria-orientation="'horizontal' if vertical else 'vertical'"
+             :aria-controls="pane_id(i)" :aria-label="label or None"
+             :aria-valuenow="str(round(current[i]))" :aria-valuemin="str(round(low(i)))"
+             :aria-valuemax="str(round(high(i)))"
+             @split="dragged(i, event)"
+             @keydown.left.prevent="nudge(i, -step)" @keydown.up.prevent="nudge(i, -step)"
+             @keydown.right.prevent="nudge(i, step)" @keydown.down.prevent="nudge(i, step)"
+             @keydown.home.prevent="nudge(i, -100)" @keydown.end.prevent="nudge(i, 100)"
+             @keydown.enter.prevent="toggle(i)" @dblclick="toggle(i)">
+          <span class="line" aria-hidden="true"></span>
+        </div>
+      </If>
+    </For>
+  </div>
+</template>
+
+<code>
+# <ui.Splitter @bind="sizes">
+#   <Fill name="first">...</Fill> <Fill name="second">...</Fill>
+# </ui.Splitter>
+# Panes side by side (direction="vertical": stacked) with a divider to drag
+# between each pair; a <Fill name="third"> makes three. Sizes are
+# percentages, one per pane: @bind (or sizes= to start from, else equal).
+# The divider is keyboard-operable too: arrow keys move it by step, Home
+# and End to the limits, Enter (and a double-click) collapses the pane
+# before it when collapsible="true". min/max: each pane's limits, in %.
+# storage_key remembers the sizes between visits (pyweft.storage).
+# Narrower than stack_below px, the panes stack and the dividers go.
+import itertools
+from pyweft import storage
+
+# Kept first: the min and max fields below hide the builtins in this file.
+_builtin_min, _builtin_max, _builtin_round = min, max, round
+
+value = None              # the sizes, for @bind
+sizes = None              # sizes to start from, without @bind: [30, 70]
+direction: str = "horizontal"   # horizontal (side by side) or vertical
+min: float = 10           # no pane smaller than this, in %
+max: float = 90           # nor larger
+height: str = ""          # the splitter's height (needed when vertical): "420px"
+step: float = 5           # % per arrow key
+collapsible: bool = False
+storage_key: str = ""
+stack_below: int = 600    # px; 0 never stacks
+label: str = "Resize"     # what screen readers call the dividers
+
+_picked = None
+_collapsed = None         # {pane index: its size before collapsing}
+_width: int = 0
+_ids = itertools.count(1)
+
+
+def on_init(self):
+    self._id = f"ui-splitter-{next(self._ids)}"
+    self._collapsed = {}
+    self._saved = None
+    if self.storage_key:
+        saved = storage.get("ui-splitter:" + self.storage_key)
+        if isinstance(saved, list) and all(isinstance(x, (int, float)) for x in saved):
+            self._saved = saved
+
+
+@property
+def count(self):
+    return 3 if self.has_slot("third") else 2
+
+
+@property
+def pane_indexes(self):
+    return list(range(self.count))
+
+
+@property
+def vertical(self):
+    return self.direction == "vertical"
+
+
+@property
+def stacked(self):
+    return bool(self.stack_below and self._width and self._width < self.stack_below)
+
+
+@property
+def classes(self):
+    return "splitter " + ("stacked" if self.stacked else "vertical" if self.vertical else "horizontal")
+
+
+@property
+def current(self):
+    """The sizes in force: bound, else picked here, else remembered, else
+    sizes=, else equal."""
+    for candidate in (self.value, self._picked, self._saved, self.sizes):
+        if isinstance(candidate, (list, tuple)) and len(candidate) == self.count:
+            return [float(x) for x in candidate]
+    return [100 / self.count] * self.count
+
+
+def pane_id(self, i):
+    return f"{self._id}-pane-{i}"
+
+
+def is_collapsed(self, i):
+    return i in self._collapsed
+
+
+def pane_style(self, i):
+    if self.stacked:
+        return None
+    grow = 0 if self.is_collapsed(i) else self.current[i]
+    edge = "min-height" if self.vertical else "min-width"
+    limit = "0" if self.is_collapsed(i) else f"{self.min}%"
+    # Grown in proportion from nothing, so the dividers' own width comes
+    # out of the panes evenly.
+    return f"flex: {grow:g} 1 0; {edge}: {limit}"
+
+
+def low(self, i):
+    """The smallest pane i may be while its neighbour i + 1 stays legal."""
+    pair = self.current[i] + self.current[i + 1]
+    return _builtin_max(self.min, pair - self.max)
+
+
+def high(self, i):
+    pair = self.current[i] + self.current[i + 1]
+    return _builtin_min(self.max, pair - self.min)
+
+
+def _set(self, i, first):
+    """Pane i becomes ``first`` %, its neighbour i + 1 takes the rest."""
+    sizes = self.current
+    pair = sizes[i] + sizes[i + 1]
+    first = _builtin_min(self.high(i), _builtin_max(self.low(i), first))
+    sizes[i], sizes[i + 1] = _builtin_round(first, 2), _builtin_round(pair - first, 2)
+    self._collapsed.pop(i, None)
+    self._apply(sizes)
+
+
+def _apply(self, sizes):
+    self._picked = sizes
+    if self.storage_key:
+        try:
+            storage.set("ui-splitter:" + self.storage_key, sizes)
+        except Exception:  # noqa: BLE001 - no storage here: the sizes still apply
+            pass
+    self.emit("update", sizes)
+
+
+def dragged(self, i, event):
+    pair = self.current[i] + self.current[i + 1]
+    self._set(i, pair * float(event.ratio))
+
+
+def nudge(self, i, delta):
+    self._set(i, self.current[i] + delta)
+
+
+def toggle(self, i):
+    """Collapse the pane before divider i, or bring it back."""
+    if not self.collapsible:
+        return
+    sizes = self.current
+    if i in self._collapsed:
+        restore = self._collapsed.pop(i)
+        sizes[i + 1] = _builtin_max(self.min, sizes[i + 1] - restore)
+        sizes[i] = restore
+    else:
+        self._collapsed[i] = sizes[i]
+        sizes[i + 1] += sizes[i]
+        sizes[i] = 0
+    self._apply(sizes)
+
+
+def measured(self, event):
+    self._width = int(event.width)
+</code>
+
+<style>
+.splitter { display: flex; min-width: 0; min-height: 0; }
+.horizontal { flex-direction: row; }
+.vertical, .stacked { flex-direction: column; }
+.pane { min-width: 0; min-height: 0; overflow: auto; box-sizing: border-box; }
+.collapsed { overflow: hidden; }
+.stacked > .pane { flex: none; }
+.divider {
+  flex: none; position: relative; display: flex; align-items: center; justify-content: center;
+  outline: none; z-index: 1;
+}
+.horizontal > .divider { width: 9px; margin: 0 -4px; cursor: col-resize; }
+.vertical > .divider { height: 9px; margin: -4px 0; cursor: row-resize; }
+.line { background: var(--ui-border, #d1d9e0); transition: background-color 0.15s; }
+.horizontal > .divider > .line { width: 1px; height: 100%; }
+.vertical > .divider > .line { height: 1px; width: 100%; }
+.divider:hover > .line, .divider[data-pw-splitting] > .line { background: var(--ui-primary, #4f46e5); }
+.horizontal > .divider:hover > .line, .horizontal > .divider[data-pw-splitting] > .line,
+.horizontal > .divider:focus-visible > .line { width: 3px; }
+.vertical > .divider:hover > .line, .vertical > .divider[data-pw-splitting] > .line,
+.vertical > .divider:focus-visible > .line { height: 3px; }
+.divider:focus-visible > .line { background: var(--ui-primary, #4f46e5); }
+</style>
