@@ -29,6 +29,7 @@ const PyWeftRuntime = (() => {
       container.addEventListener("input", applyMask, true);
       container._pyweftMasks = true;
     }
+    initSorting();
   }
 
   // ------------------------------------------------------------- input masks
@@ -241,6 +242,347 @@ const PyWeftRuntime = (() => {
     }
   }
 
+  // ---------------------------------------------------------------- sorting
+  // <ul sortable @sort="..."> (data-pw-sortable): its element children can
+  // be dragged to new places with a mouse, a finger or Alt+arrow keys, and
+  // into another list of the same group (sortable="tasks" on each). While an
+  // item is dragged nothing in the page's structure changes: it and its
+  // neighbours only move by the CSS `translate` property. The drop is one
+  // @sort event (from_index, to_index, from_list, to_list); Python reorders
+  // its list, and when the patches arrive the translations are swapped for
+  // a short slide to the new places. No patch op is involved, so dommodel.py
+  // has nothing to mirror.
+  const SORT_START = 5; // px a press travels before it is a drag
+  const TOUCH_HOLD = 250; // ms a finger rests on an item that has no handle
+  const EDGE = 40; // px from the window's edge where a drag scrolls it
+  const NOT_A_GRIP = "input, textarea, select, button, a[href], label, [contenteditable]";
+  let press = null; // a pointer down on an item, not yet a drag
+  let drag = null; // the drag in progress
+  let dropped = null; // a drop waiting for Python's patches
+  let refocus = null; // an item moved with the keyboard, to focus again
+
+  const sortItems = (list) =>
+    kids(list).filter((n) => n.nodeType === 1 && !n.hasAttribute("data-pw-sortable-ignore"));
+
+  function sortGroup(list) {
+    const group = list.getAttribute("data-pw-sortable") || "";
+    if (group === "" || group === "true") return [list];
+    return [...document.querySelectorAll("[data-pw-sortable]")].filter(
+      (other) => other.getAttribute("data-pw-sortable") === group
+    );
+  }
+
+  // [list, item] for the innermost sortable list holding the target.
+  function itemOf(target) {
+    for (let el = target; el && el !== document.body; el = el.parentElement) {
+      const list = el.parentElement;
+      if (list && list.hasAttribute("data-pw-sortable") && !el.hasAttribute("data-pw-sortable-ignore") && !el._pyweftLeaving) {
+        return [list, el];
+      }
+    }
+    return null;
+  }
+
+  const sortHandler = (list) => {
+    const events = list._pyweftEvents || {};
+    const spec = Object.keys(events).find((s) => s.split(".")[0] === "sort");
+    return spec ? events[spec] : null;
+  };
+  const listName = (list) => list.getAttribute("data-pw-sortable-name") || "";
+
+  function pageBox(el) {
+    const r = el.getBoundingClientRect();
+    return { left: r.left + scrollX, top: r.top + scrollY, width: r.width, height: r.height };
+  }
+
+  function axisOf(items) {
+    if (items.length < 2) return "y";
+    const [a, b] = items;
+    return Math.abs(b.box.left - a.box.left) > Math.abs(b.box.top - a.box.top) ? "x" : "y";
+  }
+
+  let announcer = null;
+  function announce(text) {
+    if (!announcer) {
+      announcer = document.createElement("div");
+      announcer.setAttribute("aria-live", "assertive");
+      announcer.style.cssText = "position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap";
+      document.body.appendChild(announcer);
+    }
+    announcer.textContent = "";
+    requestAnimationFrame(() => (announcer.textContent = text));
+  }
+
+  function sortStyles() {
+    if (document.getElementById("pyweft-sort-styles")) return;
+    const style = document.createElement("style");
+    style.id = "pyweft-sort-styles";
+    style.textContent =
+      "[data-pw-sortable] > :not([data-pw-sortable-ignore]):not(:has([data-pw-handle])) { cursor: grab; }\n" +
+      "[data-pw-handle] { cursor: grab; touch-action: none; }\n" +
+      // Lifted while dragged; an app's own [data-pw-dragging] rule wins.
+      ":where([data-pw-dragging]) { box-shadow: 0 8px 24px rgb(0 0 0 / 0.18); }\n" +
+      "html.pyweft-sorting, html.pyweft-sorting * { cursor: grabbing !important; user-select: none !important; }";
+    document.head.appendChild(style);
+  }
+
+  function onPointerDown(ev) {
+    if (ev.button !== 0 || !ev.isPrimary || drag || !container.contains(ev.target)) return;
+    const found = itemOf(ev.target);
+    if (!found) return;
+    const [list, item] = found;
+    const hasHandle = !!item.querySelector("[data-pw-handle]");
+    const handle = ev.target.closest("[data-pw-handle]");
+    if (hasHandle ? !(handle && item.contains(handle)) : ev.target.closest(NOT_A_GRIP)) return;
+    const hold = ev.pointerType === "touch" && !hasHandle;
+    press = { list, item, pointerId: ev.pointerId, x: ev.clientX, y: ev.clientY, ready: !hold };
+    if (hold) press.timer = setTimeout(() => press && (press.ready = true), TOUCH_HOLD);
+  }
+
+  function onPointerMove(ev) {
+    if (press && ev.pointerId === press.pointerId && !drag) {
+      const moved = Math.hypot(ev.clientX - press.x, ev.clientY - press.y);
+      if (!press.ready) {
+        if (moved > 8) cancelPress(); // the finger moved first: it's scrolling
+        return;
+      }
+      if (moved >= SORT_START) startDrag();
+    }
+    if (drag && ev.pointerId === drag.pointerId) {
+      drag.clientX = ev.clientX;
+      drag.clientY = ev.clientY;
+      moveDrag();
+    }
+  }
+
+  function cancelPress() {
+    if (press) clearTimeout(press.timer);
+    press = null;
+  }
+
+  function startDrag() {
+    const { list, item, pointerId, x, y } = press;
+    cancelPress();
+    const lists = sortGroup(list).map((l) => {
+      const items = sortItems(l).map((el) => ({ el, box: pageBox(el) }));
+      return { list: l, items, box: pageBox(l), axis: axisOf(items) };
+    });
+    const source = lists.find((m) => m.list === list);
+    const from = source.items.findIndex((i) => i.el === item);
+    drag = {
+      pointerId, item, source, lists, from, target: source, to: from,
+      startX: x + scrollX, startY: y + scrollY, clientX: x, clientY: y,
+    };
+    item.setAttribute("data-pw-dragging", "");
+    if (getComputedStyle(item).position === "static") item.style.position = "relative";
+    item.style.zIndex = "1000";
+    item.style.pointerEvents = "none";
+    document.documentElement.classList.add("pyweft-sorting");
+    moveDrag();
+    scrollLoop();
+  }
+
+  // The space an item takes along its list's axis, gap included.
+  function footprint(m, box) {
+    const size = m.axis === "x" ? box.width : box.height;
+    if (m.items.length < 2) return size;
+    const [a, b] = m.items;
+    const gap = m.axis === "x" ? b.box.left - (a.box.left + a.box.width) : b.box.top - (a.box.top + a.box.height);
+    return size + Math.max(0, gap);
+  }
+
+  function moveDrag() {
+    const d = drag;
+    const px = d.clientX + scrollX;
+    const py = d.clientY + scrollY;
+    d.item.style.translate = `${px - d.startX}px ${py - d.startY}px`;
+    const inside = (b) => px >= b.left && px <= b.left + b.width && py >= b.top && py <= b.top + b.height;
+    d.target = d.lists.find((m) => inside(m.box)) || d.target;
+    const m = d.target;
+    const pos = m.axis === "x" ? px : py;
+    const others = m.items.filter((i) => i.el !== d.item);
+    const at = others.findIndex((i) =>
+      pos < (m.axis === "x" ? i.box.left + i.box.width / 2 : i.box.top + i.box.height / 2)
+    );
+    d.to = at < 0 ? others.length : at;
+    const dragged = d.source.items[d.from].box;
+    for (const list of d.lists) {
+      const step = footprint(list, dragged);
+      let k = 0;
+      list.items.forEach((i, j) => {
+        if (i.el === d.item) return;
+        // Where this item ends up if the drop happened now, in slots.
+        let slot = list === d.source ? k : j;
+        if (list === d.target && k >= d.to) slot += 1;
+        const delta = (slot - j) * step;
+        i.el.style.transition = "translate 150ms ease";
+        i.el.style.translate = list.axis === "x" ? `${delta}px 0` : `0 ${delta}px`;
+        k += 1;
+      });
+    }
+  }
+
+  function scrollLoop() {
+    if (!drag) return;
+    const y = drag.clientY;
+    const dy = y < EDGE ? -(EDGE - y) / 2 : y > innerHeight - EDGE ? (y - innerHeight + EDGE) / 2 : 0;
+    if (dy) {
+      scrollBy(0, dy);
+      moveDrag();
+    }
+    requestAnimationFrame(scrollLoop);
+  }
+
+  function clearStyles(el) {
+    el.style.translate = "";
+    el.style.transition = "";
+    el.style.zIndex = "";
+    el.style.pointerEvents = "";
+    el.style.opacity = "";
+    if (el.style.position === "relative" && el.hasAttribute("data-pw-dragging")) el.style.position = "";
+    el.removeAttribute("data-pw-dragging");
+  }
+
+  function onPointerUp(ev) {
+    if (press && ev.pointerId === press.pointerId) cancelPress();
+    if (drag && ev.pointerId === drag.pointerId) endDrag(ev.type === "pointercancel");
+  }
+
+  function endDrag(cancelled) {
+    const d = drag;
+    drag = null;
+    document.documentElement.classList.remove("pyweft-sorting");
+    // The click that ends a drag isn't a click on the item.
+    const swallow = (e) => { e.stopPropagation(); e.preventDefault(); };
+    window.addEventListener("click", swallow, { capture: true, once: true });
+    setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
+
+    const elements = d.lists.flatMap((m) => m.items.map((i) => i.el));
+    const before = new Map(elements.map((el) => [el, el.getBoundingClientRect()]));
+    const handler = sortHandler(d.target.list);
+    const moved = d.target !== d.source || d.to !== d.from;
+    if (cancelled || !moved || !handler) {
+      elements.forEach(clearStyles);
+      slideFrom(before);
+      return;
+    }
+    const cross = d.target !== d.source;
+    if (cross) d.item.style.opacity = "0"; // the item reappears as a new node in the other list
+    dropped = { before, elements, cross, item: d.item, list: d.target.list, to: d.to };
+    // Python may answer with no change (it refused the move): slide back.
+    dropped.timer = setTimeout(() => settleDrop(dropped), 400);
+    const n = sortItems(d.target.list).length + (cross ? 1 : 0);
+    announce(`Moved to position ${d.to + 1} of ${n}`);
+    dispatch(handler, {
+      type: "sort", from_index: d.from, to_index: d.to,
+      from_list: listName(d.source.list), to_list: listName(d.target.list), keyboard: false,
+    });
+  }
+
+  // Called by applyOps before it changes anything: the drag's translations
+  // go, in the same task as the patches, so no frame shows them undone.
+  function takeDrop() {
+    const settling = dropped;
+    if (!settling) return null;
+    dropped = null;
+    clearTimeout(settling.timer);
+    settling.elements.forEach(clearStyles);
+    return settling;
+  }
+
+  function settleDrop(settling) {
+    if (settling !== dropped) return;
+    takeDrop();
+    slideFrom(settling.before);
+  }
+
+  // Each element slides from where it was seen (`before`) to where it is.
+  function slideFrom(before, extra) {
+    if (reducedMotion()) return;
+    for (const [el, was] of before) {
+      if (!el.isConnected || el._pyweftLeaving || typeof el.animate !== "function") continue;
+      const now = el.getBoundingClientRect();
+      const dx = was.left - now.left;
+      const dy = was.top - now.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
+      el.animate([{ translate: `${dx}px ${dy}px` }, { translate: "0 0" }], { duration: 180, easing: "ease-out" });
+    }
+  }
+
+  function afterDrop(settling) {
+    if (settling.cross) {
+      // The moved item is a new node in its new list: slide it from the drop.
+      const fresh = sortItems(settling.list)[settling.to];
+      const was = settling.before.get(settling.item);
+      if (fresh && was && !settling.before.has(fresh)) settling.before.set(fresh, was);
+    }
+    slideFrom(settling.before);
+  }
+
+  function onSortKey(ev) {
+    if (ev.key === "Escape" && drag) {
+      ev.preventDefault();
+      endDrag(true);
+      return;
+    }
+    if (!ev.altKey || !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(ev.key)) return;
+    const found = itemOf(ev.target);
+    if (!found) return;
+    const [list, item] = found;
+    const handler = sortHandler(list);
+    if (!handler) return;
+    const items = sortItems(list);
+    const from = items.indexOf(item);
+    const to = from + (ev.key === "ArrowUp" || ev.key === "ArrowLeft" ? -1 : 1);
+    ev.preventDefault();
+    if (to < 0 || to >= items.length) return;
+    refocus = document.activeElement;
+    announce(`Moved to position ${to + 1} of ${items.length}`);
+    dispatch(handler, {
+      type: "sort", from_index: from, to_index: to,
+      from_list: listName(list), to_list: listName(list), keyboard: true,
+    });
+  }
+
+  function initSorting() {
+    if (container._pyweftSorting) return;
+    container._pyweftSorting = true;
+    sortStyles();
+    container.addEventListener("pointerdown", onPointerDown);
+    container.addEventListener("keydown", onSortKey);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+    // A drag owns the touch: no scrolling, and no native drag of an image
+    // or link inside the item.
+    window.addEventListener("touchmove", (e) => drag && e.preventDefault(), { passive: false });
+    container.addEventListener("dragstart", (e) => (press || drag) && e.preventDefault());
+  }
+
+  // ------------------------------------------------------------------ files
+  // A drop of files from the computer, or a file <input>'s change: the
+  // files are read (as base64, so they travel as JSON) before the handler
+  // is called. events.Event.files turns them into PickedFile objects.
+  function filesOf(ev) {
+    if (ev.type === "drop" && ev.dataTransfer && ev.dataTransfer.files.length) return [...ev.dataTransfer.files];
+    if (ev.type === "change" && ev.target && ev.target.type === "file" && ev.target.files) return [...ev.target.files];
+    return null;
+  }
+
+  function base64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let text = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(text);
+  }
+
+  const readFiles = (files) =>
+    Promise.all(files.map(async (file) => ({
+      name: file.name, type: file.type, size: file.size, data: base64(await file.arrayBuffer()),
+    })));
+
   const SVG_NS = "http://www.w3.org/2000/svg";
 
   // Children of an <svg> must be created in the SVG namespace or the
@@ -404,6 +746,7 @@ const PyWeftRuntime = (() => {
     const [name, ...mods] = spec.split(".");
     const global = GLOBAL_TARGETS[el.tagName];
     if (name === "resize" && !global) return observeSize(el, spec);
+    if (name === "sort" && !global) return; // dispatched by the sorting code
     const target = global ? global() : el;
     // Browsers fire no click for the right or middle button.
     let type = name;
@@ -426,7 +769,11 @@ const PyWeftRuntime = (() => {
       if (mods.includes("prevent")) ev.preventDefault();
       if (mods.includes("stop")) ev.stopPropagation();
       const handlerId = events[spec];
-      if (handlerId) dispatch(handlerId, eventPayload(ev));
+      if (!handlerId) return;
+      const files = filesOf(ev);
+      if (!files) return dispatch(handlerId, eventPayload(ev));
+      const payload = eventPayload(ev);
+      readFiles(files).then((read) => dispatch(handlerId, { ...payload, files: read }));
     };
     target.addEventListener(type, listener, options);
   }
@@ -474,6 +821,7 @@ const PyWeftRuntime = (() => {
     } else if (ev.currentTarget === document) {
       payload.hidden = document.hidden;
     }
+    if (ev.dataTransfer) payload.kinds = [...ev.dataTransfer.types];
     if ("deltaY" in ev) {
       payload.deltaX = ev.deltaX;
       payload.deltaY = ev.deltaY;
@@ -496,7 +844,9 @@ const PyWeftRuntime = (() => {
   }
 
   function applyOps(ops) {
-    const flips = container.querySelector("[data-pw-animate]") ? measureFlips() : null;
+    // After a drag-and-drop: its own slide replaces the list's flip.
+    const settling = takeDrop();
+    const flips = !settling && container.querySelector("[data-pw-animate]") ? measureFlips() : null;
     for (const op of ops) {
       switch (op.op) {
         case "insert": {
@@ -549,6 +899,13 @@ const PyWeftRuntime = (() => {
       }
     }
     if (flips && flips.size) playFlips(flips);
+    if (settling) afterDrop(settling);
+    if (refocus) {
+      // Moving a node takes focus off it: give it back after a keyboard move.
+      const el = refocus;
+      refocus = null;
+      if (el.isConnected && document.activeElement !== el) el.focus();
+    }
   }
 
   // Elements the keyboard can reach. Focus guards (a dialog's Tab-wrapping

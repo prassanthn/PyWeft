@@ -47,6 +47,17 @@ class PickedFile:
         """The contents as text (UTF-8)."""
         return self.data.decode("utf-8")
 
+    @property
+    def size(self) -> int:
+        """The size in bytes."""
+        return len(self.data)
+
+    @property
+    def type(self) -> str:
+        """The media type its name suggests (``image/png``), or
+        ``application/octet-stream``."""
+        return mime_type(self.name)
+
 
 class _NoHost:
     async def _missing(self, *args: Any) -> Any:

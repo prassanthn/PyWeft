@@ -184,6 +184,9 @@ To see every control live, clone this repository and run
     `<Await>` to show loading, result and error states of an async call.
   - **Motion:** `transition="fade"` animates elements in and out, and
     `animate="flip"` slides a list's rows into their new places.
+  - **Drag and drop:** `sortable` lists reorder by dragging (mouse, touch
+    or keyboard, and between lists for a kanban board); dropped files
+    arrive as `event.files`, and `ui.FileDrop` is a ready drop zone.
   - **HTML and the page head:** `<Html :content="...">` shows HTML such as
     rendered Markdown, sanitized; `<Head>` sets the title and meta tags per
     page.
@@ -234,6 +237,7 @@ To see every control live, clone this repository and run
 | Split an app into components, use slots | [Composing components](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#4-composing-components) |
 | Build an app with several pages | [Pages and navigation](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#pages-and-navigation) |
 | Load data and show loading and error states | [`<Await>`](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#waiting-in-the-template-await) |
+| Reorder by dragging, drop files | [Sortable lists](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#drag-to-reorder-sortable-lists), [files dragged onto the page](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#files-and-dialogs) |
 | Animate elements and list rows | [Transitions and animations](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#transitions-and-animations) |
 | Show Markdown or other HTML | [`<Html>`](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#showing-html-from-elsewhere-html) |
 | Give each page its own title and meta tags | [`<Head>`](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#per-page-tags-head) |
@@ -351,7 +355,8 @@ both targets; the app's title and icon, and window settings; scoped styles
 and CSS framework support; the `pyweft` CLI with hot reload, static builds
 and pre-rendered first screens; calling web APIs and saving data between
 visits (`pyweft.http`, `pyweft.storage`), with sign-in headers and live data
-(server-sent events, WebSockets, streams); `pyweft-ui` with 63
+(server-sent events, WebSockets, streams); drag and drop (sortable lists,
+dropped files); `pyweft-ui` with 64
 keyboard-accessible controls (autocomplete, chips, sliders, date and date-range pickers, an
 event calendar, charts and a menu among them), form
 validation and a gallery; both released

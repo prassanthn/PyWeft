@@ -97,7 +97,34 @@ class Event(dict):
       ``<Window>``; ``hidden``: events on ``<Document>``
     - ``form``: on ``submit``, the form's fields as ``{name: value}`` (a list
       when several fields share a name)
+    - ``files``: on ``drop`` (files dragged in from the computer) and on
+      ``change`` of an ``<input type="file">``, the files as
+      :class:`pyweft.dialogs.PickedFile` objects (read before the handler
+      runs); ``kinds``: on drag events, what is being dragged
+      (``["Files"]`` for files, as the browser's ``dataTransfer.types``)
+    - ``from_index``, ``to_index``, ``from_list``, ``to_list``,
+      ``keyboard``: ``@sort`` on a ``sortable`` list, which is not a DOM
+      event: an item was dragged (or moved with Alt+arrow keys) from one
+      position to another, possibly from another list of the same group
+      (``from_list``/``to_list`` are the lists' ``sortable-name``)
     """
+
+    @property
+    def files(self) -> list[Any]:
+        """``drop`` and file ``<input>`` events: the files, as PickedFile
+        objects; an empty list for any other event."""
+        cached = self.__dict__.get("_files")
+        if cached is None:
+            import base64
+
+            from .dialogs import PickedFile
+
+            cached = [
+                PickedFile(str(f.get("name", "file")), base64.b64decode(f.get("data", "")))
+                for f in self.get("files") or []
+            ]
+            self.__dict__["_files"] = cached
+        return cached
 
     def __getattr__(self, name: str) -> Any:
         try:

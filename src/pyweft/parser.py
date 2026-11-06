@@ -635,9 +635,21 @@ _MOTION = {
     "animate": ("data-pw-animate",),
 }
 
+# Drag to reorder (runtime.js "sorting"): the list, its name in @sort
+# events, the grip that starts a drag, and children that aren't items. On
+# plain elements only: a component may have a prop of that name
+# (<ui.Table sortable="true">).
+_SORTING = {
+    "sortable": ("data-pw-sortable",),
+    "sortable-name": ("data-pw-sortable-name",),
+    "sortable-handle": ("data-pw-handle",),
+    "sortable-ignore": ("data-pw-sortable-ignore",),
+}
+
 
 def _motion(tag: str, table: dict) -> None:
-    for name, targets in _MOTION.items():
+    plain = not tag.rsplit(".", 1)[-1][:1].isupper()
+    for name, targets in (_MOTION | _SORTING if plain else _MOTION).items():
         # SVG filter primitives (<feBlend in="SourceGraphic">) own "in".
         if name in table and not (name == "in" and tag.startswith("fe")):
             value = table.pop(name)

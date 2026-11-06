@@ -8,6 +8,17 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **Drag to reorder:** `sortable` on a list makes its children draggable
+  into a new order with a mouse, a finger (after a short hold without a
+  grip) or Alt+arrow keys; `@sort` gets `from_index`/`to_index`. Lists
+  sharing `sortable="name"` exchange items (`from_list`/`to_list` from
+  `sortable-name`), `sortable-handle` marks a grip, `sortable-ignore`
+  leaves a child out. Items move by CSS while dragged, so the page's
+  structure only changes through Python's patches.
+- **Dropped files:** `event.files` on `drop` (and on a file `<input>`'s
+  `change`) gives the files as `PickedFile`s, read before the handler
+  runs; drag events carry `kinds`. `PickedFile` gained `size` and `type`.
+
 - **Live data in `pyweft.http`:** `http.events(url)` reads server-sent
   events (reconnecting with `Last-Event-ID` after the server's `retry`
   time, headers included, unlike the browser's EventSource);

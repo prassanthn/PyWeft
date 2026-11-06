@@ -38,6 +38,7 @@ later mobile: only the transport differs.
    [input masks](#input-masks),
    [focus and scrolling](#moving-focus-and-scrolling-ref), component styles,
    [transitions and animations](#transitions-and-animations),
+   [drag to reorder (sortable)](#drag-to-reorder-sortable-lists),
    [showing HTML (Html)](#showing-html-from-elsewhere-html)
 4. [Composing components](#4-composing-components): props, events,
    components in folders, [slots](#passing-content-slots),
@@ -59,7 +60,7 @@ later mobile: only the transport differs.
    [ready-made controls (pyweft-ui)](#ready-made-controls-pyweft-ui),
    [PyPI packages](#using-pypi-packages),
    [calling JavaScript](#calling-javascript),
-   [files and dialogs](#files-and-dialogs),
+   [files and dialogs, dropped files](#files-and-dialogs),
    [loading data (http)](#loading-data-pywefthttp),
    [live data: events, WebSockets, streams](#live-data-server-sent-events-websockets-and-streams),
    [saving data between visits (storage)](#saving-data-between-visits-pyweftstorage),
@@ -680,6 +681,9 @@ def on_key(self, event):
 | `width`, `height`, `scrollX`, `scrollY` | events on `<Window>`: the window's size and how far it is scrolled |
 | `hidden` | events on `<Document>`: whether the page is hidden (`visibilitychange`) |
 | `form` | `submit`: the form's fields as `{name: value}`, a list when several fields share a name (file inputs are left out) |
+| `files` | `drop` and a file `<input>`'s `change`: the files, as `PickedFile`s (see [files dragged onto the page](#files-and-dialogs)) |
+| `kinds` | drag events: what is being dragged, `["Files"]` for files from the computer |
+| `from_index`, `to_index`, `from_list`, `to_list`, `keyboard` | `@sort` on a [sortable list](#drag-to-reorder-sortable-lists) |
 
 Asking for a key the event doesn't have raises an `AttributeError` that
 lists the keys it does have.
@@ -975,6 +979,66 @@ everything inside a block that does, and not on the page's first render.
 Anyone who asks their system for reduced motion gets none. On a component
 tag, they apply to the component's root element; `:transition="..."`
 works too (`None` for no transition).
+
+### Drag to reorder: sortable lists
+
+Mark a list `sortable` and its items can be dragged into a new order, with
+a mouse, a finger, or the keyboard. When one is dropped, the list's `@sort`
+handler gets where it came from and where it went; reorder your list there
+and the page follows:
+
+```xml
+<ul sortable="" @sort="move(event)">
+  <For each="task in tasks" key="task['id']">
+    <li tabindex="0" animate="flip">{{ task['title'] }}</li>
+  </For>
+</ul>
+```
+
+```python
+def move(self, event):
+    task = self.tasks.pop(event.from_index)
+    self.tasks.insert(event.to_index, task)
+```
+
+- **While dragging**, the item follows the pointer and the others slide
+  aside to show where it would land; nothing changes in your state until
+  the drop. The window scrolls when the pointer nears its edge, and Esc
+  cancels. An item being dragged has a `data-pw-dragging` attribute, for
+  your own style (it gets a shadow by default).
+- **A grip:** put `sortable-handle=""` on an element inside each item (an
+  icon) and only that starts a drag, so the rest of the item can be
+  clicked and selected as usual. Without one, the whole item drags, except
+  from its buttons, links and fields. On a phone, an item without a grip
+  starts dragging after the finger rests on it for a moment, so the list
+  still scrolls.
+- **Keyboard:** Alt+↑/↓ (or ←/→ in a row) moves the focused item one place,
+  and a screen reader hears its new position. Give items `tabindex="0"`
+  (or put a focusable element in them) so they can be reached.
+- **Between lists**, for a kanban board: lists with the same name in
+  `sortable="board"` share their items. `sortable-name` says which list is
+  which, and arrives as `event.from_list` and `event.to_list`:
+
+  ```xml
+  <For each="col in ['todo', 'doing', 'done']" key="col">
+    <ul sortable="board" :sortable-name="col" @sort="move_card(event)">
+      <For each="card in cards[col]" key="card['id']"><li>{{ card['title'] }}</li></For>
+    </ul>
+  </For>
+  ```
+
+  ```python
+  def move_card(self, event):
+      card = self.cards[event.from_list].pop(event.from_index)
+      self.cards[event.to_list].insert(event.to_index, card)
+  ```
+
+  `@sort` goes to the list the item was dropped on.
+- The items are the list's child elements; mark one that isn't (a heading
+  inside the list) with `sortable-ignore=""` so the positions match your
+  list. Key the `<For>`, and `animate="flip"` makes the final move slide.
+- Your handler decides: it may refuse a move (leave the list as it is) and
+  the item slides back.
 
 ### Showing HTML from elsewhere: Html
 
@@ -2349,6 +2413,19 @@ async def clear(self):
 - **In tests**, `dialogs.set_host()` installs a stand-in that answers
   instead of the user; without one, the calls raise an error saying so.
 
+**Files dragged onto the page.** A `drop` event's `event.files` holds the
+dropped files as the same `PickedFile`s, read before your handler runs;
+`<input type="file" @change="...">` gets them the same way. `PickedFile`
+also has `size` (bytes) and `type` (the media type its name suggests,
+`image/png`). A drop zone needs `@dragover.prevent=""` and
+`@drop.prevent="..."`, or the browser opens the file instead.
+[`ui.FileDrop`](#ready-made-controls-pyweft-ui) does all of that, plus a
+"Choose files" button, types and sizes:
+
+```xml
+<ui.FileDrop accept="csv, xlsx" max_mb="5" @files="import_files(event)" />
+```
+
 ### Loading data: pyweft.http
 
 `pyweft.http` calls web APIs and loads files, the same way in the browser
@@ -2880,7 +2957,7 @@ Working today:
   inline statements) with modifiers (`@submit.prevent`, `@keydown.enter`)
   and a detailed event object (keys, modifier keys, mouse, form fields),
   `<If>`/`<For>` with keyed lists, `<Await>` for async data, `<Html>` for
-  sanitized HTML, `<Head>` for per-page tags, `class:`/`style:` toggles, transitions and list
+  sanitized HTML, `<Head>` for per-page tags, lists sorted by dragging, `class:`/`style:` toggles, transitions and list
   animations, `<Window>`/`<Document>` events, checkbox groups bound to a
   list, `@property` computed values, `ref=` with `focus()`, `scroll_to()`
   and `keep_in_view()`, and input masks (`data-mask`).
@@ -2924,8 +3001,8 @@ Working today:
   events, WebSockets and streamed responses, and loads the app's
   data files; `pyweft.storage` keeps data between visits. Same code on
   both targets.
-- **Controls:** `pyweft-ui`, 63 ready-made, themeable controls: layout,
-  form fields with validation, autocomplete, chips, sliders and masks, date and date-range pickers,
+- **Controls:** `pyweft-ui`, 64 ready-made, themeable controls: layout,
+  form fields with validation, autocomplete, chips, sliders and masks, a file drop zone, date and date-range pickers,
   calendars of events, charts, menus, tabs, tables, dialogs, toasts (see
   "Ready-made controls" in section 5), with a live gallery.
 - **Embedding:** `<pyweft-app>` (from the build's `embed.js`) puts an app
