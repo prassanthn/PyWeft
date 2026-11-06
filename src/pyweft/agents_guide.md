@@ -250,6 +250,17 @@ def save_theme(self, name):
 - `pyweft.http`: `await http.get(url)` / `post(url, json=...)` return a
   `Response` (`.status`, `.ok`, `.text`, `.json()`); `await http.get_json(url)`.
   Relative URLs (`assets/data.json`) work. Browser rules (CORS) apply.
+- **Sign-in headers on every call:** `api = http.Client("https://api.example.com",
+  headers={"Authorization": f"Bearer {token}"})` (or `headers=lambda: {...}`
+  for a token that changes); `await api.get_json("/orders")`.
+- **Live data**, in a task (`self.start_task(self.follow())`; it stops with
+  the component), calling `self.state_has_changed()` after each change:
+  `async for event in http.events(url): event.data / event.json()`
+  (server-sent events; reconnects by itself, headers work);
+  `async with await http.websocket(url) as ws:` then `await ws.send(...)`,
+  `async for message in ws` (no headers in the browser: put the token in
+  the URL); `async with http.stream("POST", url, json=...) as reply: async
+  for text in reply.iter_text()` for a streamed answer.
 - `pyweft.storage`: `get(key, default)`, `set(key, value)`, `delete`, `keys`,
   `has`, `clear`; JSON values, kept in the browser (a file on the desktop).
 - `pyweft.dialogs`: `await dialogs.open_file(types=["csv"])` returns a

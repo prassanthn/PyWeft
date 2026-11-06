@@ -115,8 +115,9 @@ then `pyweft new myapp` and `pyweft run myapp`.
 
     ---
 
-    `async def` handlers, and `run_in_background()` to run heavy Python in
-    a Web Worker so the page never freezes.
+    `async def` handlers, `run_in_background()` to run heavy Python in a
+    Web Worker so the page never freezes, and live data from server-sent
+    events, WebSockets and streamed responses.
 
     [:octicons-arrow-right-24: Async handlers](guide/first-component.md#async-handlers-and-background-work)
 

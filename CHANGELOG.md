@@ -8,6 +8,17 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **Live data in `pyweft.http`:** `http.events(url)` reads server-sent
+  events (reconnecting with `Last-Event-ID` after the server's `retry`
+  time, headers included, unlike the browser's EventSource);
+  `http.websocket(url)` opens a WebSocket (text, bytes, JSON, subprotocols,
+  close codes; the browser's own, and a standard-library client on the
+  desktop and in tests); `http.stream(method, url)` reads a response as it
+  arrives (`iter_bytes`, `iter_text`, `iter_lines`).
+- **`http.Client(base_url, headers=...)`:** an address and headers (such as
+  `Authorization`) for every request; `headers` may be a function, async
+  too, for tokens that change.
+
 ## 0.7.0
 
 - **Embedding in other websites:** `pyweft build` writes an `embed.js`;

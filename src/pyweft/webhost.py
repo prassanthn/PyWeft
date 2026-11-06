@@ -9,6 +9,8 @@ the bootstrap so the page and the worker share it.
 
 from __future__ import annotations
 
+import asyncio
+
 from . import embed, http, storage
 
 
@@ -36,6 +38,131 @@ class Fetch:
                 "allow requests from this page (CORS)"
             ) from exc
         return reply.status, dict(reply.headers), await reply.bytes(), reply.url
+
+    async def open_stream(self, method, url, headers, body, timeout):
+        # fetch itself, for its body's reader: the stream is read as it
+        # arrives, and an AbortController stops it.
+        from pyodide.ffi import to_js  # type: ignore[import-not-found]
+
+        js = _js()
+        controller = js.AbortController.new()
+        init = {"method": method, "headers": headers, "signal": controller.signal}
+        if body is not None:
+            init["body"] = to_js(body)
+        try:
+            reply = await js.fetch(url, to_js(init, dict_converter=js.Object.fromEntries))
+        except Exception as exc:
+            raise http.NetworkError(
+                f"couldn't reach {url}: the network is down, or the server doesn't "
+                "allow requests from this page (CORS)"
+            ) from exc
+        reader = reply.body.getReader()
+
+        async def chunks():
+            try:
+                while True:
+                    try:
+                        part = await reader.read()
+                    except Exception as exc:  # aborted, or the connection dropped
+                        raise http.NetworkError(f"lost the connection to {url}") from exc
+                    if part.done:
+                        return
+                    yield part.value.to_bytes()
+            finally:
+                controller.abort()
+
+        names = {str(k): str(v) for k, v in (entry.to_py() for entry in reply.headers.entries())}
+        return reply.status, names, str(reply.url), chunks(), controller.abort
+
+    async def open_websocket(self, url, protocols, headers, timeout):
+        if headers:
+            raise ValueError(
+                "browsers don't let a page send headers with a WebSocket: put the "
+                "token in the address (?token=...) or send it as the first message"
+            )
+        socket = _BrowserSocket(url, protocols)
+        try:
+            await asyncio.wait_for(socket.opened, timeout)
+        except asyncio.TimeoutError:
+            socket.close_now()
+            raise TimeoutError(f"no answer from {url} within {timeout} s") from None
+        return socket
+
+
+class _BrowserSocket:
+    """The browser's WebSocket behind pyweft.http.WebSocket: its events
+    land on an asyncio queue."""
+
+    def __init__(self, url, protocols):
+        from pyodide.ffi import create_proxy, to_js  # type: ignore[import-not-found]
+
+        js = _js()
+        loop = asyncio.get_running_loop()
+        # Relative to the page, with http(s) turned into ws(s).
+        address = js.URL.new(url, js.location.href)
+        if address.protocol in ("http:", "https:"):
+            address.protocol = "ws:" if address.protocol == "http:" else "wss:"
+        self.url = str(address.href)
+        self.protocol = ""
+        self.close_code = None
+        self.close_reason = ""
+        self.opened = loop.create_future()
+        self.finished = loop.create_future()
+        self.queue: asyncio.Queue = asyncio.Queue()
+
+        def on_open(event):
+            self.protocol = str(self.ws.protocol)
+            if not self.opened.done():
+                self.opened.set_result(None)
+
+        def on_message(event):
+            data = event.data
+            self.queue.put_nowait(data if isinstance(data, str) else bytes(data.to_bytes()))
+
+        def on_close(event):
+            self.close_code, self.close_reason = int(event.code), str(event.reason)
+            if not self.opened.done():
+                self.opened.set_exception(http.NetworkError(
+                    f"couldn't open a WebSocket to {self.url} (closed with {event.code})"
+                ))
+            if not self.finished.done():
+                self.finished.set_result(None)
+            self.queue.put_nowait(None)
+            for proxy in self.proxies:
+                proxy.destroy()
+
+        self.proxies = [create_proxy(on_open), create_proxy(on_message), create_proxy(on_close)]
+        self.ws = js.WebSocket.new(self.url, to_js(list(protocols)))
+        self.ws.binaryType = "arraybuffer"
+        self.ws.onopen, self.ws.onmessage, self.ws.onclose = self.proxies
+
+    async def send(self, data):
+        from pyodide.ffi import to_js  # type: ignore[import-not-found]
+
+        if self.close_code is not None or int(self.ws.readyState) != 1:
+            raise ConnectionError("the WebSocket is closed")
+        self.ws.send(data if isinstance(data, str) else to_js(data))
+
+    async def receive(self):
+        item = await self.queue.get()
+        if item is None:
+            self.queue.put_nowait(None)
+        return item
+
+    async def close(self, code=1000, reason=""):
+        if self.close_code is None:
+            self.ws.close(code, reason)
+            try:
+                await asyncio.wait_for(asyncio.shield(self.finished), 5)
+            except asyncio.TimeoutError:
+                self.close_code, self.close_reason = code, reason
+                self.queue.put_nowait(None)
+
+    def close_now(self):
+        try:
+            self.ws.close()
+        except Exception:  # noqa: BLE001 - it never opened
+            pass
 
 
 class LocalStorage:

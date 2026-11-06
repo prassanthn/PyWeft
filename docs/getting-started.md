@@ -61,6 +61,7 @@ later mobile: only the transport differs.
    [calling JavaScript](#calling-javascript),
    [files and dialogs](#files-and-dialogs),
    [loading data (http)](#loading-data-pywefthttp),
+   [live data: events, WebSockets, streams](#live-data-server-sent-events-websockets-and-streams),
    [saving data between visits (storage)](#saving-data-between-visits-pyweftstorage),
    [building for deployment](#building-for-deployment),
    [inside another website](#putting-an-app-inside-another-website),
@@ -2398,6 +2399,123 @@ Each takes `params=` (added to the URL's query), `headers=`, `timeout=`
   request(method, url, headers, body, timeout)` returning `(status,
   headers, data, url)`.
 
+**Headers on every request: `http.Client`.** An API you sign in to wants
+the same address and `Authorization` header on every call. A client keeps
+both:
+
+```python
+from pyweft import http
+
+api = http.Client("https://api.example.com/v1",
+                  headers={"Authorization": f"Bearer {token}"})
+
+async def on_init(self):
+    self.orders = await api.get_json("/orders")        # .../v1/orders
+```
+
+- It has the same calls as the module (`get_json`, `get`, `post`, ...,
+  `stream`, `events`, `websocket`). Relative URLs join its address; full
+  ones go as they are. Headers given to one call are added to the
+  client's, and win.
+- **A token that changes** (it expires, the user signs in again): pass a
+  function, called for every request, instead of a dict:
+  `headers=lambda: {"Authorization": f"Bearer {session.token}"}`. It may
+  be `async`, to refresh the token first.
+- A header such as `Authorization` on a request to another site makes the
+  browser ask that server first (a CORS "preflight"), so the server must
+  allow the header.
+
+### Live data: server-sent events, WebSockets and streams
+
+For data that keeps coming (prices, a chat, progress, a model writing its
+answer), keep a connection open in a task the component owns, and render
+as each piece arrives. Data that arrives this way comes in outside a
+handler, so call `self.state_has_changed()` after changing state (or keep
+it in a [Store](#sharing-state-between-components-store), which updates
+the page on its own).
+
+**Server-sent events** are the simplest: the server keeps a response open
+and sends events down it. Plain HTTP, so they work through proxies and
+with headers:
+
+```python
+from pyweft import http
+
+prices: dict = {}
+
+def on_init(self):
+    self.start_task(self.follow())       # stops when the component goes away
+
+async def follow(self):
+    async for event in http.events("https://api.example.com/prices/live"):
+        if event.event == "price":
+            update = event.json()
+            self.prices[update["symbol"]] = update["price"]
+            self.state_has_changed()
+```
+
+- Each event has `data` (text), `event` (its type, `"message"` unless the
+  server named one), `id` and `json()`.
+- **It reconnects by itself** when the connection drops, after the wait
+  the server asked for (`retry:`, else 3 seconds), and tells the server
+  the last `id` it got so it can carry on from there. `reconnect=False`
+  ends the loop instead. An error status raises `http.HTTPError`; a 204
+  answer ends it.
+- `headers=`, `params=` and a `Client`'s headers work, sign-in included.
+  (They don't with the browser's own `EventSource`, which PyWeft doesn't
+  use.)
+
+**WebSockets** go both ways, for chat and anything interactive:
+
+```python
+async def join(self):
+    async with await http.websocket("wss://chat.example.com/room?token=" + self.token) as ws:
+        self.socket = ws
+        await ws.send_json({"join": "general"})
+        async for message in ws:              # ends when the server closes it
+            self.lines.append(message)
+            self.state_has_changed()
+
+async def say(self, text):
+    await self.socket.send(text)
+```
+
+- `send()` takes text or bytes, `send_json()` any JSON value;
+  `receive()` and `receive_json()` wait for the next message, or `async
+  for` reads them until the connection closes. `close()` ends it (the
+  `async with` does that for you); `close_code` and `close_reason` say how
+  it ended.
+- A relative address (`/ws`) means the server the page came from.
+  `protocols=["chat"]` offers subprotocols; `ws.protocol` is the one the
+  server chose.
+- **Sign-in:** browsers don't let a page send headers with a WebSocket, so
+  put the token in the address, as above, or send it as the first
+  message. (`headers=` works on the desktop and in tests, and in the
+  browser raises an error saying so, rather than being dropped.)
+- It doesn't reconnect by itself: wrap the `async with` in a loop with a
+  `try`/`except http.NetworkError` and a pause if it should.
+
+**A response read as it arrives**, such as a long download or a model's
+answer streamed token by token:
+
+```python
+async def ask(self):
+    self.answer = ""
+    async with api.stream("POST", "/chat", json={"question": self.question}) as reply:
+        async for text in reply.iter_text():
+            self.answer += text
+            self.state_has_changed()
+```
+
+`iter_bytes()`, `iter_text()` and `iter_lines()` read it in pieces,
+`read()` all at once; `status`, `ok` and `headers` are there before the
+body. The timeout only covers waiting for the answer to begin.
+
+**Stopping.** A loop in a task started with `self.start_task()` stops when
+the component is removed, and that closes the connection. To stop it
+earlier, keep the task (`self.feed = self.start_task(...)`) and call
+`self.feed.cancel()`, or `break` out of the loop.
+
 ### Saving data between visits: pyweft.storage
 
 `pyweft.storage` keeps small amounts of data, such as settings, a draft or
@@ -2801,7 +2919,9 @@ Working today:
   with an error overlay; the first screen rendered ahead of time, so pages
   appear at once; a customizable loading screen that shows real progress;
   PyPI dependencies from `pyproject.toml`, installed in the browser.
-- **Data in and out:** `pyweft.http` calls web APIs and loads the app's
+- **Data in and out:** `pyweft.http` calls web APIs (with sign-in
+  headers through `http.Client`), follows live data with server-sent
+  events, WebSockets and streamed responses, and loads the app's
   data files; `pyweft.storage` keeps data between visits. Same code on
   both targets.
 - **Controls:** `pyweft-ui`, 63 ready-made, themeable controls: layout,

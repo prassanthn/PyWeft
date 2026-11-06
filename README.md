@@ -209,8 +209,10 @@ To see every control live, clone this repository and run
 - **Files and dialogs:** `pyweft.dialogs` opens and saves files and asks for
   confirmation with the same code on both targets: the browser's picker and
   downloads on the web, the system's own dialogs on the desktop.
-- **Data in and out:** `pyweft.http` calls web APIs and loads your app's
-  data files, and `pyweft.storage` keeps settings and lists between visits,
+- **Data in and out:** `pyweft.http` calls web APIs (sign-in headers on
+  every call with `http.Client`) and loads your app's data files; live data
+  arrives through server-sent events, WebSockets and streamed responses;
+  and `pyweft.storage` keeps settings and lists between visits,
   with the same code in the browser and on the desktop.
 - **A fast dev loop:** hot reload that keeps your app's state, and readable
   errors that point to your `.weft` file and line.
@@ -247,6 +249,7 @@ To see every control live, clone this repository and run
 | Run it as a desktop app | [A desktop app](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#a-desktop-app-pyweft-run---desktop) |
 | Hand out a desktop app (`.exe`, `.app`) | [Handing out a desktop app](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#handing-out-a-desktop-app-pyweft-build---desktop) |
 | Open and save files, ask for confirmation | [Files and dialogs](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#files-and-dialogs) |
+| Show live data: events, WebSockets, streamed answers | [Live data](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#live-data-server-sent-events-websockets-and-streams) |
 | Call web APIs, save data between visits | [Loading data](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#loading-data-pywefthttp), [saving data](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#saving-data-between-visits-pyweftstorage) |
 | Name the app, give it an icon | [The app's title and icon](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#the-apps-title-and-icon) |
 | Test components without a browser | [Using the engine from plain Python](https://github.com/prassanthn/PyWeft/blob/main/docs/getting-started.md#6-using-the-engine-from-plain-python) |
@@ -347,7 +350,8 @@ handlers and Web Worker background work; file and confirmation dialogs on
 both targets; the app's title and icon, and window settings; scoped styles
 and CSS framework support; the `pyweft` CLI with hot reload, static builds
 and pre-rendered first screens; calling web APIs and saving data between
-visits (`pyweft.http`, `pyweft.storage`); `pyweft-ui` with 63
+visits (`pyweft.http`, `pyweft.storage`), with sign-in headers and live data
+(server-sent events, WebSockets, streams); `pyweft-ui` with 63
 keyboard-accessible controls (autocomplete, chips, sliders, date and date-range pickers, an
 event calendar, charts and a menu among them), form
 validation and a gallery; both released

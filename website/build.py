@@ -91,7 +91,8 @@ and the name probably meant, without a browser.
 - [Guide]({SITE_URL}guide/): install, components, async and `<Await>`,
   templates (bindings, events, transitions, `<Html>`), composing components
   (slots, stores, provide/inject, pages), apps and building (`pyweft check`,
-  `<Head>`, deployment, embedding with `<pyweft-app>`, desktop), testing
+  `<Head>`, http with sign-in headers, live data over server-sent events
+  and WebSockets, deployment, embedding with `<pyweft-app>`, desktop), testing
   without a browser
 
 ## Controls
