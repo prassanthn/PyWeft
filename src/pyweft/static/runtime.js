@@ -322,7 +322,10 @@ const PyWeftRuntime = (() => {
       "[data-pw-handle] { cursor: grab; touch-action: none; }\n" +
       // Lifted while dragged; an app's own [data-pw-dragging] rule wins.
       ":where([data-pw-dragging]) { box-shadow: 0 8px 24px rgb(0 0 0 / 0.18); }\n" +
-      "html.pyweft-sorting, html.pyweft-sorting * { cursor: grabbing !important; user-select: none !important; }";
+      "html.pyweft-sorting, html.pyweft-sorting * { cursor: grabbing !important; user-select: none !important; }\n" +
+      "[data-pw-splitter] { touch-action: none; }\n" +
+      "html.pyweft-splitting-x, html.pyweft-splitting-x * { cursor: col-resize !important; user-select: none !important; }\n" +
+      "html.pyweft-splitting-y, html.pyweft-splitting-y * { cursor: row-resize !important; user-select: none !important; }";
     document.head.appendChild(style);
   }
 
@@ -549,6 +552,7 @@ const PyWeftRuntime = (() => {
     container._pyweftSorting = true;
     sortStyles();
     container.addEventListener("pointerdown", onPointerDown);
+    container.addEventListener("pointerdown", onSplitDown);
     container.addEventListener("keydown", onSortKey);
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
@@ -557,6 +561,101 @@ const PyWeftRuntime = (() => {
     // or link inside the item.
     window.addEventListener("touchmove", (e) => drag && e.preventDefault(), { passive: false });
     container.addEventListener("dragstart", (e) => (press || drag) && e.preventDefault());
+  }
+
+  // -------------------------------------------------------------- splitters
+  // <div splitter @split="..."> (data-pw-splitter) between two elements of a
+  // flex container: dragging it resizes those two, live, by setting their
+  // `flex` (pixels) on the page; their sizes together stay the same, and
+  // their own min-/max-width (height in a column) still limit them. Python
+  // hears once, on release: @split with ratio (the first one's share of the
+  // two), before and after (their sizes in px). Like a sort's drop, the
+  // live sizes are taken back in the applyOps carrying Python's answer, so
+  // the page always ends up as the vdom says.
+  let split = null; // the drag in progress
+  let splitDone = null; // released, waiting for Python's patches
+
+  function onSplitDown(ev) {
+    if (ev.button !== 0 || !ev.isPrimary || split) return;
+    const divider = ev.target.closest && ev.target.closest("[data-pw-splitter]");
+    if (!divider || !container.contains(divider)) return;
+    const prev = divider.previousElementSibling;
+    const next = divider.nextElementSibling;
+    if (!prev || !next) return;
+    const column = getComputedStyle(divider.parentElement).flexDirection.startsWith("column");
+    const a = prev.getBoundingClientRect();
+    const b = next.getBoundingClientRect();
+    split = {
+      divider, prev, next, column, pointerId: ev.pointerId,
+      start: column ? a.top : a.left,
+      span: column ? a.height + b.height : a.width + b.width,
+      offset: (column ? ev.clientY : ev.clientX) - (column ? a.bottom : a.right),
+      saved: [prev.getAttribute("style"), next.getAttribute("style")],
+    };
+    ev.preventDefault(); // no text selection while dragging
+    try { divider.setPointerCapture(ev.pointerId); } catch {}
+    divider.setAttribute("data-pw-splitting", "");
+    document.documentElement.classList.add(column ? "pyweft-splitting-y" : "pyweft-splitting-x");
+    divider.addEventListener("pointermove", onSplitMove);
+    divider.addEventListener("pointerup", onSplitUp);
+    divider.addEventListener("pointercancel", onSplitUp);
+  }
+
+  function onSplitMove(ev) {
+    const s = split;
+    if (!s || ev.pointerId !== s.pointerId) return;
+    const pos = (s.column ? ev.clientY : ev.clientX) - s.offset;
+    const first = Math.max(0, Math.min(s.span, pos - s.start));
+    s.prev.style.flex = `0 0 ${first}px`;
+    s.next.style.flex = `0 0 ${s.span - first}px`;
+  }
+
+  function onSplitUp(ev) {
+    const s = split;
+    if (!s || ev.pointerId !== s.pointerId) return;
+    split = null;
+    // After the @split below, so its render comes first.
+    setTimeout(releaseSizes, 0);
+    s.divider.removeEventListener("pointermove", onSplitMove);
+    s.divider.removeEventListener("pointerup", onSplitUp);
+    s.divider.removeEventListener("pointercancel", onSplitUp);
+    s.divider.removeAttribute("data-pw-splitting");
+    document.documentElement.classList.remove("pyweft-splitting-x", "pyweft-splitting-y");
+    // As laid out: min/max sizes may have stopped either one short.
+    const a = s.prev.getBoundingClientRect();
+    const b = s.next.getBoundingClientRect();
+    const before = s.column ? a.height : a.width;
+    const after = s.column ? b.height : b.width;
+    const events = s.divider._pyweftEvents || {};
+    const spec = Object.keys(events).find((k) => k.split(".")[0] === "split");
+    if (!spec || !events[spec] || ev.type === "pointercancel") {
+      restoreSplit(s);
+      return;
+    }
+    splitDone = s;
+    // No answer that changes anything: the vdom's sizes come back.
+    s.timer = setTimeout(() => splitDone === s && takeSplit(), 400);
+    dispatch(events[spec], {
+      type: "split", ratio: before + after ? before / (before + after) : 0.5,
+      before: Math.round(before), after: Math.round(after),
+    });
+  }
+
+  function restoreSplit(s) {
+    [s.prev, s.next].forEach((el, i) => {
+      if (s.saved[i] === null) el.removeAttribute("style");
+      else el.setAttribute("style", s.saved[i]);
+    });
+  }
+
+  // From applyOps, before any patch: the style attributes go back to what
+  // the vdom has, so Python's patches (new sizes, or none) apply to them.
+  function takeSplit() {
+    const s = splitDone;
+    if (!s) return;
+    splitDone = null;
+    clearTimeout(s.timer);
+    restoreSplit(s);
   }
 
   // ------------------------------------------------------------------ files
@@ -712,6 +811,26 @@ const PyWeftRuntime = (() => {
    * One observer serves every element; it doesn't keep removed ones alive. */
   let resizeObserver = null;
 
+  const heldSizes = new Map();
+
+  function reportSize(target, width, height) {
+    const last = target._pyweftSize;
+    if (last && last[0] === width && last[1] === height) return;
+    target._pyweftSize = [width, height];
+    for (const s of target._pyweftResizeSpecs || []) {
+      const handlerId = (target._pyweftEvents || {})[s];
+      if (handlerId) dispatch(handlerId, { type: "resize", width, height });
+    }
+  }
+
+  function releaseSizes() {
+    const held = [...heldSizes];
+    heldSizes.clear();
+    for (const [target, [width, height]] of held) {
+      if (target.isConnected) reportSize(target, width, height);
+    }
+  }
+
   function observeSize(el, spec) {
     if (typeof ResizeObserver === "undefined") return;
     if (!resizeObserver) {
@@ -720,13 +839,10 @@ const PyWeftRuntime = (() => {
           const target = entry.target;
           const width = Math.round(entry.contentRect.width);
           const height = Math.round(entry.contentRect.height);
-          const last = target._pyweftSize;
-          if (last && last[0] === width && last[1] === height) continue;
-          target._pyweftSize = [width, height];
-          for (const s of target._pyweftResizeSpecs || []) {
-            const handlerId = (target._pyweftEvents || {})[s];
-            if (handlerId) dispatch(handlerId, { type: "resize", width, height });
-          }
+          // While a splitter is dragged, sizes change on every pointer move;
+          // each element hears its final size once, on release.
+          if (split) heldSizes.set(target, [width, height]);
+          else reportSize(target, width, height);
         }
       });
     }
@@ -746,7 +862,7 @@ const PyWeftRuntime = (() => {
     const [name, ...mods] = spec.split(".");
     const global = GLOBAL_TARGETS[el.tagName];
     if (name === "resize" && !global) return observeSize(el, spec);
-    if (name === "sort" && !global) return; // dispatched by the sorting code
+    if ((name === "sort" || name === "split") && !global) return; // dispatched by the code below
     const target = global ? global() : el;
     // Browsers fire no click for the right or middle button.
     let type = name;
@@ -845,6 +961,7 @@ const PyWeftRuntime = (() => {
 
   function applyOps(ops) {
     // After a drag-and-drop: its own slide replaces the list's flip.
+    takeSplit();
     const settling = takeDrop();
     const flips = !settling && container.querySelector("[data-pw-animate]") ? measureFlips() : null;
     for (const op of ops) {

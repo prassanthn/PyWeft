@@ -356,7 +356,7 @@ and CSS framework support; the `pyweft` CLI with hot reload, static builds
 and pre-rendered first screens; calling web APIs and saving data between
 visits (`pyweft.http`, `pyweft.storage`), with sign-in headers and live data
 (server-sent events, WebSockets, streams); drag and drop (sortable lists,
-dropped files); `pyweft-ui` with 64
+dropped files); resizable panes; `pyweft-ui` with 65
 keyboard-accessible controls (autocomplete, chips, sliders, date and date-range pickers, an
 event calendar, charts and a menu among them), form
 validation and a gallery; both released

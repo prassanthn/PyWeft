@@ -70,3 +70,12 @@ def test_sort_event_reorders_and_moves_between_lists():
     r.dispatch(done.events["sort"], {"type": "sort", "from_index": 1, "to_index": 0,
                                      "from_list": "todo", "to_list": "done", "keyboard": False})
     assert app.board == {"todo": ["b", "a"], "done": ["c", "x"]}
+
+
+def test_splitter_attribute():
+    (div,) = parse_template('<div><span splitter="" @split="moved(event)"></span></div>')
+    (handle,) = div.children
+    assert set(handle.attrs) == {"data-pw-splitter"} and "split" in handle.events
+    # On a component tag it stays a prop.
+    (comp,) = parse_template('<ui.Thing splitter="x" />')
+    assert set(comp.attrs) == {"splitter"}

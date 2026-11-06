@@ -644,6 +644,9 @@ _SORTING = {
     "sortable-name": ("data-pw-sortable-name",),
     "sortable-handle": ("data-pw-handle",),
     "sortable-ignore": ("data-pw-sortable-ignore",),
+    # A divider that resizes the elements on either side (runtime.js
+    # "splitters"); @split reports the result.
+    "splitter": ("data-pw-splitter",),
 }
 
 

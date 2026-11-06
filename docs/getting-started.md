@@ -39,6 +39,7 @@ later mobile: only the transport differs.
    [focus and scrolling](#moving-focus-and-scrolling-ref), component styles,
    [transitions and animations](#transitions-and-animations),
    [drag to reorder (sortable)](#drag-to-reorder-sortable-lists),
+   [resizable panes (splitter)](#resizable-panes-splitter),
    [showing HTML (Html)](#showing-html-from-elsewhere-html)
 4. [Composing components](#4-composing-components): props, events,
    components in folders, [slots](#passing-content-slots),
@@ -684,6 +685,7 @@ def on_key(self, event):
 | `files` | `drop` and a file `<input>`'s `change`: the files, as `PickedFile`s (see [files dragged onto the page](#files-and-dialogs)) |
 | `kinds` | drag events: what is being dragged, `["Files"]` for files from the computer |
 | `from_index`, `to_index`, `from_list`, `to_list`, `keyboard` | `@sort` on a [sortable list](#drag-to-reorder-sortable-lists) |
+| `ratio`, `before`, `after` | `@split` on a [splitter](#resizable-panes-splitter) |
 
 Asking for a key the event doesn't have raises an `AttributeError` that
 lists the keys it does have.
@@ -1039,6 +1041,33 @@ def move(self, event):
   list. Key the `<For>`, and `animate="flip"` makes the final move slide.
 - Your handler decides: it may refuse a move (leave the list as it is) and
   the item slides back.
+
+### Resizable panes: splitter
+
+A `splitter` element between two others in a flex row (or column) is a
+divider the user can drag to resize them. The browser moves it smoothly,
+and your handler hears the result once, on release:
+
+```xml
+<div class="panes">
+  <div :style="f'flex: {left} 1 0'">...</div>
+  <div class="divider" splitter="" @split="resized(event)"></div>
+  <div :style="f'flex: {100 - left} 1 0'">...</div>
+</div>
+```
+
+```python
+left: float = 30
+
+def resized(self, event):
+    self.left = round(event.ratio * 100, 1)   # ratio: the first one's share
+```
+
+`event.before` and `event.after` are the two sizes in pixels. Their
+`min-width` and `max-width` (height in a column) limit the drag, and while
+it lasts `@resize` handlers wait, hearing only the final size. In most apps
+[`ui.Splitter`](#ready-made-controls-pyweft-ui) is the easier way: panes,
+keyboard support, collapsing and remembered sizes included.
 
 ### Showing HTML from elsewhere: Html
 
@@ -3001,7 +3030,8 @@ Working today:
   events, WebSockets and streamed responses, and loads the app's
   data files; `pyweft.storage` keeps data between visits. Same code on
   both targets.
-- **Controls:** `pyweft-ui`, 64 ready-made, themeable controls: layout,
+- **Controls:** `pyweft-ui`, 65 ready-made, themeable controls: layout
+  (resizable panes included),
   form fields with validation, autocomplete, chips, sliders and masks, a file drop zone, date and date-range pickers,
   calendars of events, charts, menus, tabs, tables, dialogs, toasts (see
   "Ready-made controls" in section 5), with a live gallery.

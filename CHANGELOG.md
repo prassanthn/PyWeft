@@ -8,6 +8,12 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **Splitters:** a `splitter` element between two others in a flex
+  container is a divider the user drags to resize them; the runtime moves
+  it live and `@split` reports `ratio`, `before` and `after` once, on
+  release. `@resize` events wait while a splitter is dragged, so charts
+  and other size-aware components redraw once instead of on every move.
+
 - **Drag to reorder:** `sortable` on a list makes its children draggable
   into a new order with a mouse, a finger (after a short hold without a
   grip) or Alt+arrow keys; `@sort` gets `from_index`/`to_index`. Lists

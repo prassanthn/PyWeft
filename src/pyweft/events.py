@@ -107,6 +107,10 @@ class Event(dict):
       event: an item was dragged (or moved with Alt+arrow keys) from one
       position to another, possibly from another list of the same group
       (``from_list``/``to_list`` are the lists' ``sortable-name``)
+    - ``ratio``, ``before``, ``after``: ``@split`` on a ``splitter``
+      divider, not a DOM event either: it was dragged, and the elements
+      before and after it are now ``before`` and ``after`` px wide (high,
+      in a column); ``ratio`` is the first one's share of the two
     """
 
     @property
