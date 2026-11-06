@@ -8,6 +8,20 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **Templates parsed at build time:** `pyweft build` (and `pyweft run`, on
+  the fly) writes `pyweft-bundle.bin`, every `.weft` file the app ships
+  (component libraries included) parsed, style-scoped and with its
+  compiled render code generated, keyed by the file's text. The page
+  installs it before loading the app: loading the gallery's 72 components
+  in the browser went from about 200 ms to 100 ms. Edited files miss the
+  bundle and are parsed as before.
+- **Faster page start:** the page now downloads the framework, library and
+  app files all at once while Pyodide loads, instead of one after another
+  once it has; and `pyweft run` keeps connections open (HTTP/1.1) and
+  works out which files it may serve once per change rather than per
+  request. The gallery under `pyweft run` became usable in 5.4 s instead of
+  22.7 s in the browser preview.
+
 - **Faster start for big apps:** templates compile in the page's idle time
   instead of before the first render (hosts set
   `Renderer.compile_when_idle` and call `compile_templates()`), field types

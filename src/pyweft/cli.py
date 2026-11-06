@@ -25,6 +25,7 @@ from html import escape
 from html.parser import HTMLParser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 try:
@@ -844,6 +845,7 @@ class ChangeFeed:
         self.cond = threading.Condition()
         self.closed = False
         self.stale = False  # the server's own code changed since it started
+        self.version = 0  # bumped by the watcher on every change it sees
 
     def publish(self, event: dict) -> None:
         with self.cond:
@@ -867,6 +869,7 @@ def _watch(app_dir: Path, feed: ChangeFeed, interval: float, stop: threading.Eve
         stop.wait(0.1)
         new = snapshot(app_dir)
         event = describe_change(current, new)
+        feed.version += 1  # before publishing: what the page asks for next is new
         if current.get(_SERVER_CODE) != new.get(_SERVER_CODE):
             # Reloading would only serve new page files from old server code
             # (missing routes, unfilled placeholders). Say so where the user
@@ -906,7 +909,30 @@ def make_dev_server(
     # A new id per server run: a page that reconnects to a restarted server
     # reloads, since the server may have been restarted for a reason.
     server_id = uuid.uuid4().hex
+    # Which files may be served, worked out once per state of the app rather
+    # than per request: a page load asks for a hundred files or more, and
+    # listing them (walking folders, looking up installed libraries) took
+    # 10-30 ms each time, one request after another.
+    served: dict[str, Any] = {"version": None}
+    served_lock = threading.Lock()
+
+    def servable() -> dict[str, Any]:
+        with served_lock:
+            if served["version"] != feed.version:
+                served["version"] = feed.version
+                served["app"] = set(app_shipped_files(app_dir)) | set(app_css_files(app_dir))
+                served["libs"] = {lib.name: (lib.folder, set(lib.files)) for lib in app_libraries(app_dir)}
+                served["modules"] = set(pyweft_modules())
+            return served
+
     class Handler(SimpleHTTPRequestHandler):
+        # Keep-alive: a page load asks for a hundred files or more, and with
+        # HTTP/1.0 each needed a new connection (on Windows, a browser asking
+        # for localhost first tries ::1, where nothing listens: seconds in
+        # all, with the requests queued behind the six connections a browser
+        # allows). Every answer below says its length, so this is safe.
+        protocol_version = "HTTP/1.1"
+
         def do_GET(self):  # noqa: N802 (stdlib naming)
             route = self.path.split("?", 1)[0]
             if route in ("/", "/index.html"):
@@ -928,22 +954,22 @@ def make_dev_server(
             if route in ("/runtime.js", "/worker.js", "/embed.js"):
                 return self._file(_STATIC / route[1:], "text/javascript")
             name = Path(route).name  # flat lookups only; no traversal
-            if route == f"/pyweft-src/{name}" and name in pyweft_modules():
+            if route == f"/pyweft-src/{name}" and name in servable()["modules"]:
                 return self._file(_PKG_DIR / name, "text/x-python")
             if route.startswith("/app/"):
                 # Only paths the app actually ships, so a crafted URL cannot
                 # reach anything else on disk.
                 rel = route[len("/app/") :]
-                if rel in app_shipped_files(app_dir) or rel in app_css_files(app_dir):
+                if rel in servable()["app"]:
                     ctype = "text/css" if rel.endswith(".css") else "text/plain"
                     return self._file(app_dir / rel, ctype)
             if route.startswith("/lib/"):
                 # Only files of a library the app depends on, listed by name.
                 lib_name, _, rel = route[len("/lib/") :].partition("/")
-                for lib in app_libraries(app_dir):
-                    if lib.name == lib_name and rel in lib.files:
-                        ctype = "text/css" if rel.endswith(".css") else "text/plain"
-                        return self._file(lib.folder / rel, ctype)
+                folder, files = servable()["libs"].get(lib_name, (None, ()))
+                if rel in files:
+                    ctype = "text/css" if rel.endswith(".css") else "text/plain"
+                    return self._file(folder / rel, ctype)
             if route.startswith(f"/{_ASSET}"):
                 path = _asset_path(app_dir, unquote(route[len(_ASSET) + 1 :]))
                 if path is not None:
@@ -977,6 +1003,9 @@ def make_dev_server(
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-store")
+            # Open-ended, so no length: its connection is never reused.
+            self.send_header("Connection", "close")
+            self.close_connection = True
             self.end_headers()
             query = parse_qs(urlsplit(self.path).query)
             start = self.headers.get("Last-Event-ID") or query.get("since", [None])[0]
