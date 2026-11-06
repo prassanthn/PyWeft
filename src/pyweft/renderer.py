@@ -243,6 +243,12 @@ class Renderer:
         # The component whose template is being rendered right now: the
         # parent, for context (inject), of any component it creates.
         self._rendering: list[Any] = [component]
+        # Hosts set this: render by walking templates until the host has a
+        # quiet moment to compile them (compile_templates). Compiling a big
+        # app's templates costs more than walking them once, and the first
+        # render is what the user waits for.
+        self.compile_when_idle = False
+        self._to_compile: set[type] = set()
         # <Head> content: this render's nodes, and what hosts were last sent.
         self._head_nodes: list[Node] = []
         self._head_sent: list[dict] = []
@@ -541,11 +547,27 @@ class Renderer:
     def _template(self, instance: Any, scope: Scope, path: list[str], out: list[Node], key: Any) -> None:
         """A component's own template: through its compiled function
         (compiler.py) when there is one, else walked node by node."""
-        function = compiled(type(instance))
+        cls = type(instance)
+        function = compiled(cls, create=not self.compile_when_idle)
         if function is None:
-            self._emit(type(instance).__template__, scope, path, out, key)
+            if self.compile_when_idle:
+                self._to_compile.add(cls)
+            self._emit(cls.__template__, scope, path, out, key)
         else:
             function(self, scope, path, out, key)
+
+    def compile_templates(self, budget: float | None = None) -> bool:
+        """With ``compile_when_idle``: compile the templates rendered so far,
+        for up to ``budget`` seconds (all of them for None). True when some
+        are left, so a host calls this again in its next idle moment."""
+        import time
+
+        start = time.perf_counter()
+        while self._to_compile:
+            compiled(self._to_compile.pop())
+            if budget is not None and time.perf_counter() - start > budget:
+                break
+        return bool(self._to_compile)
 
     def _loop(
         self, tnode: TFor, scope: Scope, path: list[str], out: list[Node]

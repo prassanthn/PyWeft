@@ -303,6 +303,10 @@ class DesktopApp:
         # code that made its own thread: call_soon_threadsafe covers both.
         self.renderer.on_invalidate = self._schedule_render
         self.renderer.on_error = self.report
+        # As in the browser: the first screen walks the templates, and they
+        # compile between events afterwards (_compile_some).
+        self.renderer.compile_when_idle = True
+        self._compiling = False
         self.renderer.init_root()
 
     def mount(self, here: str) -> dict:
@@ -329,6 +333,9 @@ class DesktopApp:
         focus and scroll requests."""
         while self.renderer.after_render():
             self._push(self._render())
+        if self.renderer._to_compile and not self._compiling:
+            self._compiling = True
+            asyncio.get_running_loop().call_later(0.05, self._compile_some)
         commands = self.renderer.take_commands()
         for command in commands:
             # The page's <title> is set too, but the window keeps its own.
@@ -347,6 +354,13 @@ class DesktopApp:
                     self._head_titled = False
         if commands:
             self.js(f"pyweftDesktop.commands({json.dumps(commands)})")
+
+    def _compile_some(self) -> None:
+        # A slice at a time, so a click waiting on the loop isn't held up.
+        if self.renderer.compile_templates(0.02):
+            asyncio.get_running_loop().call_later(0.01, self._compile_some)
+        else:
+            self._compiling = False
 
     def dispatch(self, handler_id: str, event: dict, seq: int) -> None:
         try:

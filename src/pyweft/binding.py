@@ -77,15 +77,23 @@ def collection_type(cls: type, field: str) -> type | None:
     return type(default) if type(default) in _COLLECTIONS else None
 
 
+@functools.lru_cache(maxsize=4096)
+def _class_annotations(klass: type) -> dict[str, Any]:
+    """A class's own annotations, evaluated once: evaluating them (strings
+    under ``from __future__ import annotations``) for every field looked
+    up was a large part of a big app's first render."""
+    try:
+        return inspect.get_annotations(klass, eval_str=True)
+    except Exception:
+        try:
+            return inspect.get_annotations(klass)
+        except Exception:
+            return {}
+
+
 def _annotation(cls: type, field: str) -> Any:
     for klass in cls.__mro__:
-        try:
-            annotations = inspect.get_annotations(klass, eval_str=True)
-        except Exception:
-            try:
-                annotations = inspect.get_annotations(klass)
-            except Exception:
-                continue
+        annotations = _class_annotations(klass)
         if field in annotations:
             value = annotations[field]
             return None if isinstance(value, str) else value

@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import ast
 import builtins
+import functools
 import os
 from typing import Any, Callable
 
@@ -136,6 +137,19 @@ class _Rewriter(ast.NodeTransformer):
         return self._comprehension(node, ("key", "value"))
 
 
+@functools.lru_cache(maxsize=16384)
+def _rewrite(src: str, names: tuple[tuple[str, str], ...]) -> str | None:
+    """An expression as Python code with these loop variables in reach, or
+    None when it must be evaluated the old way. Cached: deciding whether a
+    loop body needs a Scope asks again for every expression inside it, and
+    templates repeat the same expressions (``label``, ``disabled``)."""
+    try:
+        tree = ast.parse(src, mode="eval")
+        return ast.unparse(_Rewriter(dict(names)).visit(tree.body))
+    except (_Fallback, SyntaxError):
+        return None
+
+
 class _Context:
     """Where generated code is emitting to: variable names for the scope,
     path, output list and inherited key, and the loop variables in reach."""
@@ -171,11 +185,7 @@ class _Generator:
         self.lines.append("    " * depth + text)
 
     def expression(self, src: str, ctx: _Context) -> str | None:
-        try:
-            tree = ast.parse(src.strip(), mode="eval")
-            return ast.unparse(_Rewriter(ctx.names).visit(tree.body))
-        except (_Fallback, SyntaxError):
-            return None
+        return _rewrite(src.strip(), tuple(sorted(ctx.names.items())))
 
     def evaluate(self, depth: int, target: str, src: str, ctx: _Context) -> None:
         """``target = <src>`` with the interpreter's error wrapping."""
@@ -434,16 +444,20 @@ _RUNTIME = {
 _COMPILED: dict[int, tuple[Any, Callable | None]] = {}
 
 
-def compiled(cls: type) -> Callable | None:
+
+def compiled(cls: type, create: bool = True) -> Callable | None:
     """The compiled render function for a component class's template, or
     None when compilation is off or the template couldn't be compiled (the
-    renderer then walks it). Cached per template object."""
+    renderer then walks it). Cached per template object. ``create=False``
+    only looks: None if it isn't compiled yet."""
     if not ENABLED:
         return None
     template = cls.__template__
     hit = _COMPILED.get(id(template))
     if hit is not None and hit[0] is template:
         return hit[1]
+    if not create:
+        return None
     try:
         source, constants = generate(template)
         namespace = {**_RUNTIME, **constants}

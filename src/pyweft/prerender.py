@@ -105,6 +105,7 @@ def prerender(app_dir: Path) -> dict[str, Any]:
         # What the browser shows once its first render has settled: effects
         # and the synchronous start of an async on_init included.
         renderer = Renderer(App())
+        renderer.compile_when_idle = True  # one render: walking is cheaper
         renderer.init_root()
         tree = renderer.render()
         for _ in range(100):

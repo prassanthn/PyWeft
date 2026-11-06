@@ -169,6 +169,12 @@ def _task_error(exc):
     )
 
 _renderer.on_error = _task_error
+# The first screen renders by walking the templates; they are compiled
+# afterwards, in the browser's idle time (pyweft_compile below).
+_renderer.compile_when_idle = True
+
+def pyweft_compile():
+    return _renderer.compile_templates(0.03)
 
 class _WorkerHost:
     # run_in_background() calls go to pyweftWorker (a Web Worker) and back,
@@ -666,6 +672,12 @@ def pyweft_hot_reload():
       setStep("ready"); // lets a loading screen finish its picture as it fades
       wakeApp();
       hideLoading();
+      // Templates compile a few at a time while the page is idle; renders
+      // before then walk the ones not compiled yet.
+      const compileSome = pyodide.globals.get("pyweft_compile");
+      const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 50));
+      const compileLoop = () => { if (compileSome()) idle(compileLoop); };
+      idle(compileLoop);
       if (EMBEDDED) {
         const deliver = pyodide.globals.get("pyweft_embed_message");
         embedDeliver = (name, detail) => deliver(String(name), String(detail ?? "null"));

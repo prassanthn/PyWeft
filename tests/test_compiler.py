@@ -268,3 +268,24 @@ def test_generated_source_is_readable():
         '<template><ul><For each="t in items" key="t"><li @click="pick(t)">{{ t }}</li></For></ul></template>'
         "<code>\nitems: list = []\ndef pick(self, t): pass\n</code>", "App").__template__)
     assert "def _pw_render(" in source and "for _pw_i" in source and "_pw_attr(_pw_c, 'items')" in source
+
+
+def test_compile_when_idle(monkeypatch):
+    monkeypatch.setattr(compiler, "ENABLED", True)
+    child = component_from_source("<template><b>{{ n }}</b></template><code>\nn: int = 1\n</code>", "Child")
+    app = component_from_source(
+        "<template><p><For each='i in range(3)'><Child :n='i' /></For></p></template>",
+        "IdleApp", components={"Child": child},
+    )
+    r = Renderer(app())
+    r.compile_when_idle = True
+    first = to_dicts(r.render())
+    # Walked: nothing compiled yet, both templates waiting.
+    assert compiler.compiled(app, create=False) is None
+    assert r._to_compile == {app, child}
+    assert r.compile_templates(budget=0) is True       # one at a time when out of time
+    assert r.compile_templates() is False              # the rest
+    assert compiler.compiled(app, create=False) is not None
+    assert compiler.compiled(child, create=False) is not None
+    assert to_dicts(r.render()) == first               # same output, compiled now
+    assert not r._to_compile
