@@ -8,6 +8,9 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+## 0.7.0
+
+- Needs `pyweft` 0.8.
 - The gallery renders its first group at once and the others when the
   page is idle (its charts once scrolled near), with `<Defer>`.
 

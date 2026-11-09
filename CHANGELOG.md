@@ -8,6 +8,8 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+## 0.8.0
+
 - **Templates parsed at build time:** `pyweft build` (and `pyweft run`, on
   the fly) writes `pyweft-bundle.bin`, every `.weft` file the app ships
   (component libraries included) parsed, style-scoped and with its
