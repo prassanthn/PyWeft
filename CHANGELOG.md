@@ -13,6 +13,10 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
   of one each (`Renderer.dispatch_many`; the runtime's `init` takes a
   `dispatchMany` callback). Opening the gallery's Charts section went from
   about 13 s to under 1 s in the browser.
+- Templates that appear after the first screen (a `<Defer>` filling in)
+  are now compiled in the page's idle time too; before, only the first
+  screen's were.
+
 ## 0.8.0
 
 - **Templates parsed at build time:** `pyweft build` (and `pyweft run`, on
