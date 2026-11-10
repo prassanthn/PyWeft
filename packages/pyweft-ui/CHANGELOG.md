@@ -8,6 +8,8 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+## 0.8.1
+
 - Charts keep their layout while their data, settings, width and hidden
   series stay the same: a click or hover anywhere on a page of charts no
   longer lays every chart out again (the gallery with all its charts
