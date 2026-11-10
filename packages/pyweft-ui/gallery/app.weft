@@ -474,7 +474,7 @@
           </ui.Card>
 
           <!-- Dozens of charts, laid out in Python: only once scrolled near. -->
-          <Defer height="2400px" :ready="nav_selected == 'charts'">
+          <Defer height="2400px" :ready="charts_shown">
             <ui.Card title="Charts" id="charts" ref="charts" subtitle="Dashboards, everyday charts and data science: hover, use the arrow keys, click the legend">
               <Charts />
               <pre class="code">{{ CODE['charts'] }}</pre>
@@ -610,6 +610,8 @@
       </ui.Column>
     </ui.AppShell>
     <ui.Toaster :look="toast_look" />
+    <!-- Last: shown and hidden, it shifts no sibling (unkeyed ones are known by position). -->
+    <If cond="jumping"><ui.Progress class="jump-bar" size="sm" aria_label="Loading the section" /></If>
   </ui.Theme>
 </template>
 
@@ -830,21 +832,45 @@ def nav_tree(self):
 opened_groups: int = 0   # groups shown ahead of the idle loading (see go)
 
 
-def go(self, slug):
+charts_shown: bool = False   # the Charts card is built on its first visit
+jumping = None               # the section being built for a jump (the bar at the top)
+
+async def go(self, slug):
     """A section (or a group's heading) picked in the sidebar: show it,
     with every group above it rendered first (the later groups load when
     the page is idle), so nothing above shifts it afterwards."""
-    for index, (group, _, names) in enumerate(GROUPS):
-        slugs = {"group-" + group.lower().replace(" ", "-")} | {n.lower().replace(" ", "-") for n in names}
-        if slug in slugs:
-            self.opened_groups = max(self.opened_groups, index)
     self.nav_selected = slug
+    # Page order: (slug, group index) for every heading and card.
+    order = []
+    for index, (name, _, names) in enumerate(GROUPS):
+        for each in ["group-" + name] + names:
+            order.append((each.lower().replace(" ", "-"), index))
+    slugs = [each for each, _ in order]
+    if slug not in slugs:
+        return
+    group = order[slugs.index(slug)][1]
+    # The Charts card too when the target is at or below it: built while the
+    # page scrolls past, it would push the target 8000px further down.
+    charts = slugs.index(slug) >= slugs.index("charts")
+    if group > self.opened_groups or (charts and not self.charts_shown):
+        # Building those cards keeps the browser busy for a moment: the
+        # highlighted section and the bar at the top are drawn first.
+        self.jumping = slug
+        await self.after_paint()
+        self.opened_groups = max(self.opened_groups, group)
+        self.charts_shown = self.charts_shown or charts
+        # New cards (charts above all) lay themselves out for their real
+        # width once on the page (@resize), which moves everything below
+        # them: scroll after that.
+        await self.after_paint()
+        if self.jumping == slug:
+            self.jumping = None
     self.scroll_to(slug, align="start")
 
 def jump_to_first(self):
     items = self.nav_items
     if items and self.nav_query.strip():
-        self.go(items[0]["slug"])
+        return self.go(items[0]["slug"])
 uploaded: int = 0
 uploading: bool = False
 
@@ -1390,6 +1416,7 @@ toast("Item deleted.", action="Undo", on_action=self.undo)""",
 [id] { scroll-margin-top: 16px; }
 /* The search stays at the top while the list scrolls under it: a band in
    the page colour over the sidebar's padding, stuck to its scroller. */
+.jump-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 1000; }
 .nav-top {
   /* top: -16px: the scroller's 16px padding counts, so 0 would stop short. */
   position: sticky; top: -16px; z-index: 1; flex-basis: 100%;

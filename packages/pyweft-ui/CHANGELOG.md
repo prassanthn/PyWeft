@@ -10,6 +10,11 @@ releasing moves them under the new version (see
 
 - `Progress` without a value (busy) animates with `translate` instead of
   `left`, so the bar keeps moving while Python is busy.
+- Gallery: picking a section that isn't built yet highlights it and shows a
+  loading bar at the top first, then builds it, and scrolls once the cards
+  above have laid themselves out (jumps below the charts used to land
+  thousands of pixels short).
+
 ## 0.7.0
 
 - Needs `pyweft` 0.8.

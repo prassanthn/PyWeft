@@ -1,6 +1,7 @@
 """The gallery app loads and renders every section: a mistake in it shows
 here, not only in a browser."""
 
+import asyncio
 from pathlib import Path
 
 from pyweft import Renderer, load_component
@@ -130,11 +131,21 @@ def test_the_section_list_searches_controls_too():
     assert search("zzz") == []
     app.nav_query = "slider"
     renderer.render()
-    app.jump_to_first()
-    renderer.render()  # as a host does before carrying commands out
+
+    async def jump():
+        task = app.start_task(app.jump_to_first())
+        await asyncio.sleep(0)  # started (at once on 3.12+, eager tasks)
+        renderer.render()
+        # Sliders is in a group that loads when idle: until it is built, the
+        # section is picked and the loading bar shows.
+        assert app.jumping == "sliders" and app.opened_groups == 0
+        await task
+        renderer.render()  # as a host does before carrying commands out
+
+    asyncio.run(jump())
     commands = renderer.take_commands()
-    # Sliders is in a group that loads when idle: jumping there opened it.
-    assert app.opened_groups == 1
+    assert app.opened_groups == 1 and app.jumping is None
+    assert not app.charts_shown  # above the charts: they wait until scrolled to
     assert [(c["op"], c.get("align")) for c in commands] == [("scroll_to", "start")]
 
 
@@ -166,9 +177,22 @@ def test_the_sidebar_tree_groups_sections_in_page_order():
     assert [i for i in ids if i in expected] == expected
     # Picking a section in the tree selects it and scrolls to its card.
     row = [r for r in _links(tree) if _text(r) == "Charts"][0]
-    renderer.dispatch(row.events["click"], {"type": "click"})
-    renderer.render()
-    assert app.nav_selected == "charts"
+
+    before = set(map(id, renderer.instances.values()))
+
+    async def pick():
+        renderer.dispatch(row.events["click"], {"type": "click"})
+        await asyncio.sleep(0)
+        renderer.render()
+        assert app.nav_selected == "charts" and app.jumping == "charts"
+        await renderer.idle()
+        renderer.render()
+
+    asyncio.run(pick())
+    assert app.charts_shown and app.jumping is None
+    # The loading bar came and went without moving the page's other
+    # components to new positions (= new instances).
+    assert before <= set(map(id, renderer.instances.values()))
     assert [(c["op"], c.get("align")) for c in renderer.take_commands()] == [("scroll_to", "start")]
 
 
