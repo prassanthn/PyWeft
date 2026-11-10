@@ -8,6 +8,8 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+## 0.9.0
+
 - **`await self.after_paint()`:** in an async handler, waits until the page
   shows what the handler has changed so far (a spinner, a highlighted row),
   so slow synchronous work after it no longer freezes the page with no

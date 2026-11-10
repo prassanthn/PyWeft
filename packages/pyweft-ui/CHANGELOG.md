@@ -8,6 +8,9 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+## 0.8.0
+
+- Needs `pyweft` 0.9.
 - `Progress` without a value (busy) animates with `translate` instead of
   `left`, so the bar keeps moving while Python is busy.
 - Gallery: picking a section that isn't built yet highlights it and shows a
