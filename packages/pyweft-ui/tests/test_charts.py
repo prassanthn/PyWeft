@@ -301,3 +301,15 @@ def test_every_chart_renders(tmp_path):
     assert find([figures[0]], cls("area")) is not None and find([figures[1]], cls("polar")) is not None
     assert find([figures[2]], cls("radar-area")) is not None
     assert text([find([figures[3]], cls("empty"))]) == "Nothing yet"
+
+
+
+def test_hiding_a_series_hides_it_in_that_chart_only(tmp_path):
+    _, a, r, tree = app(tmp_path, '<div><ui.BarChart :data="rows" x="month" /><ui.BarChart :data="rows" x="month" /></div>',
+                        CODE)
+    r.dispatch(find([tree[0].children[0]], cls("legend")).children[0].events["click"], {"type": "click"})
+    tree = cycle(r, tree)
+    first, second = [find([chart], cls("legend")).children[0] for chart in tree[0].children]
+    assert first.attrs["aria-pressed"] == "false" and second.attrs["aria-pressed"] == "true"
+    _, a, r, tree = app(tmp_path, '<div><ui.BarChart :data="rows" x="month" /></div>', CODE)
+    assert find(tree, cls("legend")).children[0].attrs["aria-pressed"] == "true"   # a new chart too

@@ -95,7 +95,9 @@ aria_label: str = ""
 clickable: bool = False
 
 _width = 0                # the plot's width in pixels; 0 until the page lays it out
-_hidden: set = set()
+# A frozenset: private defaults aren't copied per instance, so an in-place
+# change to a set here would hide that series in every chart.
+_hidden = frozenset()
 _hover = None             # index of the tooltip showing
 _keys = False             # the hover came from the keyboard: say it aloud
 _scene = None

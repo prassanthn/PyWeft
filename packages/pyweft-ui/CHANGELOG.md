@@ -8,6 +8,9 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- Hiding a series from a chart's legend hid it in every other chart too,
+  and in charts created later.
+
 ## 0.8.0
 
 - Needs `pyweft` 0.9.
