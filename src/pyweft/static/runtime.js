@@ -21,7 +21,9 @@ const PyWeftRuntime = (() => {
   let dispatchMany = null;
   // Host hooks. typing(el): true while events from el are still on their way
   // to Python, so a value from an older render must not overwrite it.
-  const options = { typing: null };
+  // painted(ids): the page has been drawn since the after_paint commands
+  // with these ids (Renderer.painted).
+  const options = { typing: null, painted: null };
 
   function init(el, dispatchFn, dispatchManyFn) {
     container = el;
@@ -1152,6 +1154,7 @@ const PyWeftRuntime = (() => {
   // run once the render they refer to is on the page. Not patch ops: they
   // change no node, so dommodel.py has nothing to mirror.
   function runCommands(commands) {
+    const paints = [];
     for (const cmd of commands) {
       const el = cmd.path ? nodeAt(cmd.path) : null;
       switch (cmd.op) {
@@ -1215,9 +1218,17 @@ const PyWeftRuntime = (() => {
           if (target && target.isConnected) target.focus();
           break;
         }
+        case "after_paint":
+          paints.push(cmd.id);
+          break;
         default:
           throw new Error(`unknown command ${cmd.op}`);
       }
+    }
+    // A frame's callbacks run before it is painted (ResizeObserver reports
+    // too, so @resize layouts are in it); a timeout set there runs after.
+    if (paints.length && options.painted) {
+      requestAnimationFrame(() => setTimeout(() => options.painted(paints), 0));
     }
   }
 

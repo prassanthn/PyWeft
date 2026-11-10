@@ -154,17 +154,28 @@ class Component:
         still on the page."""
         self._pw_request("restore_focus")
 
-    def _pw_request(self, op: str, ref: str | None = None, **options: Any) -> None:
+    async def after_paint(self) -> None:
+        """Wait until the page shows what has changed so far. In an async
+        handler, ``await self.after_paint()`` before slow work puts a
+        spinner, a progress bar or a highlighted row on screen first;
+        without it, work that keeps Python busy also keeps the page as it
+        was, since the browser draws only between Python's steps. Elements
+        that lay themselves out for their size (``@resize``) have done so
+        once it returns. Without a screen (tests) it returns at once."""
+        await self._pw_request("after_paint")
+
+    def _pw_request(self, op: str, ref: str | None = None, **options: Any) -> Any:
         command = self.__dict__.get("_pw_command")
         if command is None:
             raise RuntimeError(
                 f"{type(self).__name__}.{op}() needs the component to be rendered "
                 "(call it from on_init or later), and not yet removed"
             )
-        command(op, ref, **options)
+        result = command(op, ref, **options)
         # Even when nothing else changed, the host must render and settle to
         # reach the point where it carries requests out.
         self.state_has_changed()
+        return result
 
     # ---------------------------------------------------------------- state
 

@@ -8,6 +8,12 @@ releasing moves them under the new version (see [RELEASING.md](RELEASING.md)).
 
 ## Unreleased
 
+- **`await self.after_paint()`:** in an async handler, waits until the page
+  shows what the handler has changed so far (a spinner, a highlighted row),
+  so slow synchronous work after it no longer freezes the page with no
+  sign of anything happening. Hosts report paints (`Renderer.paint_reports`,
+  `Renderer.painted(ids)`, an `after_paint` command); without one it
+  returns at once.
 - **Size reports render once:** `@resize` reports that arrive together
   (a page of charts laid out at once) are handled with one render instead
   of one each (`Renderer.dispatch_many`; the runtime's `init` takes a

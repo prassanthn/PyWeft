@@ -238,6 +238,12 @@ class Renderer:
         self._refs: dict[tuple[int, str], Element] = {}
         self._tree: list[Node] = []
         self._commands: list[tuple[Any, str, str | None, dict[str, Any]]] = []
+        # after_paint(): futures by id, resolved by the host's painted().
+        # A host that reports paints sets paint_reports; without one there
+        # is no screen to wait for.
+        self.paint_reports = False
+        self._paint_waiters: dict[int, asyncio.Future] = {}
+        self._paint_ids = 0
         # <Await> blocks by where they are, kept across renders like child
         # instances so a render doesn't restart what they wait for.
         self._awaits: dict[tuple, _Awaited] = {}
@@ -267,8 +273,32 @@ class Renderer:
 
     # -------------------------------------------------------------- commands
 
-    def _command(self, component: Any, op: str, ref: str | None, **options: Any) -> None:
+    def _command(self, component: Any, op: str, ref: str | None, **options: Any) -> Any:
+        if op == "after_paint":
+            return self._after_paint()
         self._commands.append((component, op, ref, options))
+        return None
+
+    def _after_paint(self) -> asyncio.Future:
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+        if not self.paint_reports:
+            loop.call_soon(lambda: future.done() or future.set_result(None))
+            return future
+        self._paint_ids += 1
+        self._paint_waiters[self._paint_ids] = future
+        self._commands.append((None, "after_paint", None, {"id": self._paint_ids}))
+        return future
+
+    def painted(self, ids: list[int]) -> None:
+        """Host: the page has been drawn since it carried out the
+        ``{"op": "after_paint", "id": n}`` commands with these ids (in a
+        browser: a requestAnimationFrame, then a timeout, which runs after
+        that frame is painted). Resumes the ``after_paint()`` calls."""
+        for paint_id in ids:
+            future = self._paint_waiters.pop(paint_id, None)
+            if future is not None and not future.done():
+                future.set_result(None)
 
     def set_title(self, text: str) -> None:
         """See the module-level set_title()."""
@@ -290,7 +320,7 @@ class Renderer:
             if op == "set_title":
                 out.append({"op": op, "text": ref})
                 continue
-            if op == "head":
+            if op in ("head", "after_paint"):
                 out.append({"op": op, **options})
                 continue
             if ref is None:

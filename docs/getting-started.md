@@ -348,6 +348,24 @@ async def load_users(self):
   immediately. The component updates again when the handler finishes. To
   show progress in between (a counter in a long loop, say), call
   `self.state_has_changed()` after the change.
+- **Slow work that doesn't wait.** The page is drawn only while Python
+  pauses, so a spinner set before heavy Python work (building a long
+  report, laying out many charts) never shows: the page stays as it was
+  until the work is done. `await self.after_paint()` waits until the page
+  shows what the handler has changed so far, then carries on:
+
+  ```python
+  async def build_report(self):
+      self.busy = True                  # a spinner, a progress bar
+      await self.after_paint()          # ...on screen now
+      self.report = make_report(self.rows)   # slow, synchronous
+      self.busy = False
+  ```
+
+  Once it returns, elements that lay themselves out for their size
+  (`@resize`) have done so, which is also the moment to `scroll_to()`
+  something below them. Work that is slow enough to freeze the page for
+  more than a moment belongs in `run_in_background()` instead.
 - **`on_init` can be async**, which is the usual way to load a component's
   data. The component renders right away with whatever it has (say,
   "Loading…") and again when `on_init` finishes. `on_after_render` can be

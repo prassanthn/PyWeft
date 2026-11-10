@@ -152,6 +152,25 @@ def test_focus_requests_follow_the_render(desktop):
     assert json.loads(cmd[len("pyweftDesktop.commands(") : -1]) == [{"op": "focus", "path": [0, 4]}]
 
 
+def test_after_paint_waits_for_the_page(desktop):
+    app, window, _ = desktop({"app.weft": APP})
+    done = []
+
+    async def work():
+        await app.renderer.component.after_paint()
+        done.append(True)
+
+    app.call(lambda: app.renderer.component.start_task(work()))
+    flush(app, lambda: any("after_paint" in s for s in window.scripts))
+    (cmd,) = [s for s in window.scripts if "after_paint" in s]
+    (request,) = json.loads(cmd[len("pyweftDesktop.commands(") : -1])
+    flush(app, timeout=0.1)
+    assert not done
+    app.api.painted([request["id"]])
+    flush(app, lambda: done)
+    assert done
+
+
 def test_set_title_names_the_window_and_the_page(desktop):
     app, window, _ = desktop({"app.weft": APP})
     app.call(lambda: __import__("pyweft").set_title("Order #7 - Acme"))

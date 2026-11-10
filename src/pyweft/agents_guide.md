@@ -247,6 +247,9 @@ def save_theme(self, name):
   sooner if you call `self.state_has_changed()` (a progress count in a loop).
   `self.start_task(coro)` starts one yourself (cancelled when the component
   goes away).
+- **A spinner before slow synchronous work** only shows if the page gets to
+  draw it: `self.busy = True`, then `await self.after_paint()`, then the
+  work. Without the await the page stays frozen as it was until the work ends.
 - `await run_in_background(fn, *args)` runs a slow, synchronous **module-level**
   function in a Web Worker (a thread on the desktop) so the page stays
   responsive. No lambdas or methods; arguments and results must pickle.

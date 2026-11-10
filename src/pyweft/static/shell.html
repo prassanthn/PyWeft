@@ -172,6 +172,11 @@ _renderer.on_error = _task_error
 # The first screen renders by walking the templates; they are compiled
 # afterwards, in the browser's idle time (pyweft_compile below).
 _renderer.compile_when_idle = True
+# after_paint() waits for the page to say it has drawn (pyweft_painted).
+_renderer.paint_reports = True
+
+def pyweft_painted(ids_json):
+    _renderer.painted(json.loads(ids_json))
 
 def pyweft_compile():
     return _renderer.compile_templates(0.03)
@@ -675,6 +680,8 @@ def pyweft_hot_reload():
       const dispatchMany = pyodide.globals.get("pyweft_dispatch_many");
       const afterRender = pyodide.globals.get("pyweft_after_render");
       const takeCommands = pyodide.globals.get("pyweft_commands");
+      const painted = pyodide.globals.get("pyweft_painted");
+      PyWeftRuntime.options.painted = (ids) => painted(JSON.stringify(ids));
 
       // Templates compile a few at a time while the page is idle; renders
       // before then walk the ones not compiled yet. Restarted after every

@@ -73,6 +73,7 @@ _PAGE = """<!DOCTYPE html>
       let done = 0;  // events Python has rendered
       // Still typing: the input's latest keystrokes haven't come back yet.
       PyWeftRuntime.options.typing = (el) => sent > done && el === document.activeElement;
+      PyWeftRuntime.options.painted = (ids) => window.pywebview.api.painted(ids);
 
       async function start() {
         const api = window.pywebview.api;
@@ -231,6 +232,9 @@ class _Api:
     def location(self, url: str) -> None:
         self._app.post(self._app.location, url)
 
+    def painted(self, ids: list) -> None:
+        self._app.post(self._app.renderer.painted, [int(i) for i in ids])
+
 
 class DesktopApp:
     """One app, one window. ``window`` is anything with ``evaluate_js``:
@@ -316,6 +320,7 @@ class DesktopApp:
         # As in the browser: the first screen walks the templates, and they
         # compile between events afterwards (_compile_some).
         self.renderer.compile_when_idle = True
+        self.renderer.paint_reports = True  # the page calls api.painted
         self._compiling = False
         self.renderer.init_root()
 
