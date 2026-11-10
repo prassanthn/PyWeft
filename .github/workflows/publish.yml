@@ -29,8 +29,8 @@ jobs:
     # The suite is developed and run on Windows; it gates every release.
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3  # publishes no major-version tag
       - run: uv sync --extra dev
       - run: uv run pytest -q
 
@@ -40,8 +40,8 @@ jobs:
     outputs:
       package: ${{ steps.which.outputs.package }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3  # publishes no major-version tag
       - id: which
         name: Find the package, and check the tag matches its version
         env:
@@ -69,7 +69,7 @@ jobs:
           echo "package=$pkg" >> "$GITHUB_OUTPUT"
       - run: uv build --package "${{ steps.which.outputs.package }}" --out-dir dist
       - run: uvx twine check dist/*
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
@@ -82,7 +82,7 @@ jobs:
     permissions:
       id-token: write  # proves to PyPI that this workflow is the publisher
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
@@ -96,7 +96,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
