@@ -152,7 +152,9 @@ def classes(self):
   animation: ui-progress-stripes 0.8s linear infinite;
 }
 .busy.striped .fill { animation: ui-progress-slide 1.4s ease-in-out infinite, ui-progress-stripes 0.8s linear infinite; }
-@keyframes ui-progress-slide { from { left: -40%; } to { left: 100%; } }
+/* translate, not left: the browser moves it off the main thread, so it keeps
+   going while Python works, which is when a busy bar is shown. */
+@keyframes ui-progress-slide { from { translate: -100% 0; } to { translate: 250% 0; } }
 @keyframes ui-progress-stripes { to { background-position: 1rem 0; } }
 /* ---- circle */
 .ring-row { display: inline-flex; align-items: center; gap: 10px; }

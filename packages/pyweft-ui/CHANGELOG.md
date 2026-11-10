@@ -8,6 +8,8 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- `Progress` without a value (busy) animates with `translate` instead of
+  `left`, so the bar keeps moving while Python is busy.
 ## 0.7.0
 
 - Needs `pyweft` 0.8.
