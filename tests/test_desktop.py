@@ -118,6 +118,19 @@ def test_bind_and_async_handlers_render_when_they_finish(desktop):
     assert text(window.dom[0]["children"][0]) == "10 hi"
 
 
+def test_events_sent_together_cost_one_render(desktop):
+    app, window, _ = desktop({"app.weft": APP})
+    plus = buttons(window)[0]["events"]["click"]
+    field = window.dom[0]["children"][-1]["events"]["input"]
+    pushed = len(window.scripts)
+    events = [[plus, {"type": "click"}], [plus, {"type": "click"}], [field, {"value": "x"}]]
+    app.api.dispatch_many(json.dumps(events), 1)
+    flush(app, lambda: window.done == 1)
+    assert text(window.dom[0]["children"][0]) == "2 x"
+    applied = [s for s in window.scripts[pushed:] if s.startswith("pyweftDesktop.apply(")]
+    assert len(applied) == 1
+
+
 def test_a_failing_handler_is_shown_and_the_app_keeps_going(desktop, capsys):
     app, window, _ = desktop({"app.weft": APP})
     app.api.dispatch(buttons(window)[2]["events"]["click"], "{}", 1)

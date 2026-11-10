@@ -292,3 +292,41 @@ def test_convert(text, target, allows_none, number, expected):
     assert convert(text, target, allows_none, number) == expected or (
         expected is KEEP and convert(text, target, allows_none, number) is KEEP
     )
+
+
+# ------------------------------------------------------------ dispatch_many
+
+
+def test_dispatch_many_runs_every_handler_and_raises_the_first_failure():
+    App = make("""
+<template>
+  <div>
+    <p @resize="sized(event)">a</p>
+    <button @click="boom">b</button>
+    <span @resize="sized(event)">c</span>
+  </div>
+</template>
+<code>
+sizes: list = []
+def sized(self, event):
+    self.sizes.append(event.width)
+def boom(self):
+    raise ValueError("nope")
+</code>
+""")
+    app = App()
+    r = Renderer(app)
+    tree = r.render()
+    p, button, span = tree[0].children
+    r.dispatch_many([
+        (p.events["resize"], {"type": "resize", "width": 10, "height": 1}),
+        ("i:9#gone", {}),  # stale: ignored
+        (span.events["resize"], {"type": "resize", "width": 20, "height": 1}),
+    ])
+    assert app.sizes == [10, 20]
+    with pytest.raises(ValueError, match="nope"):
+        r.dispatch_many([
+            (button.events["click"], {}),
+            (p.events["resize"], {"type": "resize", "width": 30, "height": 1}),
+        ])
+    assert app.sizes == [10, 20, 30]  # ran although the one before it failed

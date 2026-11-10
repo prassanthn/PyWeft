@@ -1125,3 +1125,17 @@ class Renderer:
             return handler(event)
         finally:
             self._busy -= 1
+
+    def dispatch_many(self, events: list) -> None:
+        """Several ``(handler_id, event)`` pairs that arrived together, so the
+        host renders once for all of them (a page of charts reporting their
+        sizes would otherwise cost a render each). Every handler runs; the
+        first one's exception is raised once the rest have."""
+        failure: BaseException | None = None
+        for handler_id, event in events:
+            try:
+                self.dispatch(handler_id, event)
+            except Exception as exc:  # noqa: BLE001 - re-raised below
+                failure = failure or exc
+        if failure is not None:
+            raise failure

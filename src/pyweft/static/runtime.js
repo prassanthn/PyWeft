@@ -15,13 +15,18 @@
 const PyWeftRuntime = (() => {
   let container = null;
   let dispatch = null; // (handlerId, eventPayload) -> void
+  // ([[handlerId, eventPayload], ...]) -> void: several events that arrive
+  // together (a ResizeObserver report on many elements), handled with one
+  // render. A host without it gets them one by one.
+  let dispatchMany = null;
   // Host hooks. typing(el): true while events from el are still on their way
   // to Python, so a value from an older render must not overwrite it.
   const options = { typing: null };
 
-  function init(el, dispatchFn) {
+  function init(el, dispatchFn, dispatchManyFn) {
     container = el;
     dispatch = dispatchFn;
+    dispatchMany = dispatchManyFn || ((events) => events.forEach(([id, payload]) => dispatchFn(id, payload)));
     container.replaceChildren();
     // Capture: an input's mask is applied before its own listeners (and so
     // before @bind) see the event. Added once per container.
@@ -873,28 +878,39 @@ const PyWeftRuntime = (() => {
 
   const heldSizes = new Map();
 
-  function reportSize(target, width, height) {
+  // Adds the element's @resize events to `out` if its size changed.
+  function reportSize(out, target, width, height) {
     const last = target._pyweftSize;
     if (last && last[0] === width && last[1] === height) return;
     target._pyweftSize = [width, height];
     for (const s of target._pyweftResizeSpecs || []) {
       const handlerId = (target._pyweftEvents || {})[s];
-      if (handlerId) dispatch(handlerId, { type: "resize", width, height });
+      if (handlerId) out.push([handlerId, { type: "resize", width, height }]);
     }
+  }
+
+  // Every size in one report goes to Python together: a page of charts
+  // laid out at once would otherwise cost a render per chart.
+  function sendSizes(events) {
+    if (events.length === 1) dispatch(...events[0]);
+    else if (events.length) dispatchMany(events);
   }
 
   function releaseSizes() {
     const held = [...heldSizes];
     heldSizes.clear();
+    const events = [];
     for (const [target, [width, height]] of held) {
-      if (target.isConnected) reportSize(target, width, height);
+      if (target.isConnected) reportSize(events, target, width, height);
     }
+    sendSizes(events);
   }
 
   function observeSize(el, spec) {
     if (typeof ResizeObserver === "undefined") return;
     if (!resizeObserver) {
       resizeObserver = new ResizeObserver((entries) => {
+        const events = [];
         for (const entry of entries) {
           const target = entry.target;
           const width = Math.round(entry.contentRect.width);
@@ -902,8 +918,9 @@ const PyWeftRuntime = (() => {
           // While a splitter is dragged, sizes change on every pointer move;
           // each element hears its final size once, on release.
           if (split) heldSizes.set(target, [width, height]);
-          else reportSize(target, width, height);
+          else reportSize(events, target, width, height);
         }
+        sendSizes(events);
       });
     }
     (el._pyweftResizeSpecs = el._pyweftResizeSpecs || []).push(spec);

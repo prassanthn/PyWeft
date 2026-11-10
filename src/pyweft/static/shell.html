@@ -237,6 +237,16 @@ def pyweft_dispatch(handler_id, event_json):
     _tree = new_tree
     return json.dumps(ops)
 
+def pyweft_dispatch_many(events_json):
+    # Events that arrived together (sizes from one ResizeObserver report):
+    # one render for all of them.
+    global _tree
+    _renderer.dispatch_many(json.loads(events_json))
+    new_tree = _renderer.render()
+    ops = diff(_tree, new_tree)
+    _tree = new_tree
+    return json.dumps(ops)
+
 def pyweft_rerender():
     # A render requested from outside a handler. null when it was already
     # covered (an event's render got there first) or nothing is dirty.
@@ -662,6 +672,7 @@ def pyweft_hot_reload():
 
       const initial = pyodide.globals.get("pyweft_initial");
       const dispatch = pyodide.globals.get("pyweft_dispatch");
+      const dispatchMany = pyodide.globals.get("pyweft_dispatch_many");
       const afterRender = pyodide.globals.get("pyweft_after_render");
       const takeCommands = pyodide.globals.get("pyweft_commands");
 
@@ -674,16 +685,20 @@ def pyweft_hot_reload():
         PyWeftRuntime.runCommands(JSON.parse(takeCommands()));
       };
 
-      PyWeftRuntime.init(document.getElementById("app"), (handlerId, event) => {
+      const handled = (send) => {
         try {
-          const ops = JSON.parse(dispatch(handlerId, JSON.stringify(event)));
-          PyWeftRuntime.applyOps(ops);
+          PyWeftRuntime.applyOps(JSON.parse(send()));
           settle();
         } catch (err) {
           if (DEV) showDevError(lastLine(err), RUNTIME_ERROR);
           throw err; // full traceback in the console
         }
-      });
+      };
+      PyWeftRuntime.init(
+        document.getElementById("app"),
+        (handlerId, event) => handled(() => dispatch(handlerId, JSON.stringify(event))),
+        (events) => handled(() => dispatchMany(JSON.stringify(events))),
+      );
       // init() empties #app and mount() builds the same page again in the same
       // task, so a pre-rendered page never visibly blinks.
       PyWeftRuntime.mount(JSON.parse(initial()));

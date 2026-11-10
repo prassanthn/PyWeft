@@ -79,10 +79,17 @@ _PAGE = """<!DOCTYPE html>
         const here = location.hash.startsWith("#/") ? location.hash.slice(1) : "/";
         const first = await api.mount(here);
         setCss(first.css);
-        PyWeftRuntime.init(document.getElementById("app"), (id, event) => {
-          sent += 1;
-          api.dispatch(id, JSON.stringify(event), sent);
-        });
+        PyWeftRuntime.init(
+          document.getElementById("app"),
+          (id, event) => {
+            sent += 1;
+            api.dispatch(id, JSON.stringify(event), sent);
+          },
+          (events) => {
+            sent += 1;
+            api.dispatch_many(JSON.stringify(events), sent);
+          },
+        );
         PyWeftRuntime.mount(first.tree);
         window.addEventListener("hashchange", () => {
           if (!location.hash.startsWith("#/")) return; // an in-page anchor
@@ -217,6 +224,9 @@ class _Api:
 
     def dispatch(self, handler_id: str, event_json: str, seq: int) -> None:
         self._app.post(self._app.dispatch, handler_id, json.loads(event_json), seq)
+
+    def dispatch_many(self, events_json: str, seq: int) -> None:
+        self._app.post(self._app.dispatch_many, json.loads(events_json), seq)
 
     def location(self, url: str) -> None:
         self._app.post(self._app.location, url)
@@ -363,8 +373,11 @@ class DesktopApp:
             self._compiling = False
 
     def dispatch(self, handler_id: str, event: dict, seq: int) -> None:
+        self.dispatch_many([(handler_id, event)], seq)
+
+    def dispatch_many(self, events: list, seq: int) -> None:
         try:
-            self.renderer.dispatch(handler_id, event)
+            self.renderer.dispatch_many(events)
         finally:
             # Rendered even when the handler failed: it may have changed
             # state first, and the page must learn the event was handled.
