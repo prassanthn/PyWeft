@@ -303,6 +303,86 @@ def test_every_chart_renders(tmp_path):
     assert text([find([figures[3]], cls("empty"))]) == "Nothing yet"
 
 
+# ------------------------------------------------------------ layout memo
+def chart_views(r):
+    return [i for i in r.instances.values() if type(i).__name__ == "ChartView"]
+
+
+def test_layout_is_kept_until_something_it_reads_changes(tmp_path):
+    _, a, r, tree = app(tmp_path, '<div><p>{{ note }}</p><ui.BarChart :data="rows" x="month" /></div>',
+                        CODE + 'note: str = "a"\n')
+    view, = chart_views(r)
+    first = view._scene
+    r.dispatch(find(tree, cls("band")).events["mouseenter"], {"type": "mouseenter"})
+    tree = cycle(r, tree)
+    assert view._scene is first and find(tree, cls("tip")) is not None   # hover: same layout
+    a.note = "b"   # the page changed, the chart didn't
+    tree = cycle(r, tree)
+    assert view._scene is first and text([find(tree, tag("p"))]) == "b"
+
+    a.rows.append({"month": "Mar", "online": 90, "store": 60})   # in place
+    tree = cycle(r, tree)
+    assert view._scene is not first
+    assert len([n for n in find(tree, tag("svg")).children if n.tag == "rect" and "bar" in n.attrs["class"]]) == 6
+    second = view._scene
+    r.dispatch(find(tree, cls("plot")).events["resize"], {"type": "resize", "width": 360, "height": 300})
+    tree = cycle(r, tree)
+    assert view._scene is not second and view._scene.width == 360
+    third = view._scene
+    r.dispatch(find(tree, cls("legend")).children[0].events["click"], {"type": "click"})
+    tree = cycle(r, tree)
+    assert view._scene is not third
+
+
+def test_a_changed_setting_lays_out_again(tmp_path):
+    _, a, r, tree = app(tmp_path, '<div><ui.BarChart :data="rows" x="month" :stacked="mode" /></div>',
+                        CODE + 'mode: str = ""\n')
+    view, = chart_views(r)
+    first = view._scene
+    a.mode = "percent"
+    tree = cycle(r, tree)
+    assert view._scene is not first and view._scene.marks != first.marks
+
+
+def test_memo_compares_frames_and_gives_up_on_what_it_cannot_compare():
+    from pyweft_ui.charting.memo import LayoutMemo, same
+
+    class Frame:   # equals() like pandas/polars; == is elementwise
+        def __init__(self, values):
+            self.values = list(values)
+
+        def equals(self, other):
+            return self.values == other.values
+
+        def __eq__(self, other):
+            raise ValueError("truth value is ambiguous")
+
+        def __deepcopy__(self, memo):
+            return Frame(self.values)
+
+    assert same(Frame([1, 2]), Frame([1, 2])) and not same(Frame([1]), Frame([2]))
+    assert not same([Frame([1])], [Frame([1])])   # can't tell: different
+
+    class Owner:
+        def __init__(self, data):
+            self.data = data
+
+        def build(self, width, hidden):
+            return object()
+
+    memo = LayoutMemo()
+    owner = Owner(Frame([1, 2]))
+    scene = memo.get(owner.build, 640, frozenset())
+    assert memo.get(owner.build, 640, frozenset()) is scene
+    owner.data.values.append(3)    # changed in place
+    assert memo.get(owner.build, 640, frozenset()) is not scene
+
+    import threading
+    locked = Owner(threading.Lock())   # can't be deep-copied: laid out every time
+    memo = LayoutMemo()
+    assert memo.get(locked.build, 640, frozenset()) is not memo.get(locked.build, 640, frozenset())
+    assert memo.get(lambda w, h: (w, h), 1, frozenset()) == (1, frozenset())
+
 
 def test_hiding_a_series_hides_it_in_that_chart_only(tmp_path):
     _, a, r, tree = app(tmp_path, '<div><ui.BarChart :data="rows" x="month" /><ui.BarChart :data="rows" x="month" /></div>',

@@ -8,6 +8,10 @@ releasing moves them under the new version (see
 
 ## Unreleased
 
+- Charts keep their layout while their data, settings, width and hidden
+  series stay the same: a click or hover anywhere on a page of charts no
+  longer lays every chart out again (the gallery with all its charts
+  renders in half the time).
 - Hiding a series from a chart's legend hid it in every other chart too,
   and in charts created later.
 

@@ -87,6 +87,8 @@
 # (width, hidden series keys) -> Scene, so layout happens for the width the
 # chart really has (@resize) and for the series the legend leaves visible.
 # Hover, the legend, keyboard reading and the data table live here.
+from pyweft_ui.charting.memo import LayoutMemo
+
 build = None
 title: str = ""
 subtitle: str = ""
@@ -101,6 +103,7 @@ _hidden = frozenset()
 _hover = None             # index of the tooltip showing
 _keys = False             # the hover came from the keyboard: say it aloud
 _scene = None
+_memo = None              # the last layout, kept while its inputs are unchanged
 
 @property
 def classes(self):
@@ -109,8 +112,12 @@ def classes(self):
 
 def current(self):
     # Laid out once per render (the For above binds it); handlers read the
-    # copy kept here, which is what the user saw.
-    self._scene = self.build(self._width or 640, frozenset(self._hidden))
+    # copy kept here, which is what the user saw. Re-laid out only when the
+    # chart's fields, the width or the hidden series change: every render
+    # renders every chart, and a hover elsewhere shouldn't redo a KDE.
+    if self._memo is None:
+        self._memo = LayoutMemo()
+    self._scene = self._memo.get(self.build, self._width or 640, frozenset(self._hidden))
     return self._scene
 
 def legend_shown(self, scene):
